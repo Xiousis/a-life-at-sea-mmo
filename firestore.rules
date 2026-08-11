@@ -10,40 +10,53 @@ service cloud.firestore {
       // Characters must be created via Cloud Function to ensure valid starting stats and unique names
       allow create: if false;
 
-      // Critical game state is locked. Client can only update non-essential fields (like title if we want, or avatar).
-      // Most game fields are now SERVER-ONLY.
+      // Whitelist update: Clients can only update cosmetic or preference fields.
+      // Game logic fields are SERVER-ONLY.
       allow update: if request.auth != null && request.auth.uid == userId
-        && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny([
-              'gold', 'xp', 'stats', 'energy', 'level', 'bounty', 'hp', 'maxHp',
-              'maxEnergy', 'currentLocation', 'travelState', 'combatState',
-              'energyUpdatedAt', 'inventory', 'equipment', 'crewId', 'pvpWins', 'pvpLosses'
-            ]);
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['title', 'avatarUrl', 'settings']);
 
       allow delete: if false; // Characters cannot be deleted by clients
     }
 
     // Chat collection
     match /chat/{messageId} {
-      allow read: if request.auth != null;
+      // Enforce crew membership for reading crew channels
+      allow read: if request.auth != null && (
+        resource.data.channelId == 'global' ||
+        get(/databases/$(database)/documents/players/$(request.auth.uid)).data.crewId == resource.data.channelId
+      );
 
-      // Server-authoritative chat would be better, but we can enforce sender identity here
-      allow create: if request.auth != null
-        && request.resource.data.senderName == request.auth.token.name;
+      // Clients can send messages if they belong to the channel
+      allow create: if request.auth != null && (
+        request.resource.data.channelId == 'global' ||
+        get(/databases/$(database)/documents/players/$(request.auth.uid)).data.crewId == request.resource.data.channelId
+      ) && request.resource.data.message.size() <= 200; // Basic length limit
 
       allow update, delete: if false;
     }
 
-    // Missions collection (Game Data)
-    match /missions/{missionId} {
+    // Static Game Data (World, Items, Loot, Skills)
+    match /gameData/{document=**} {
       allow read: if true;
-      allow write: if false; // Game data is read-only for clients
+      allow write: if false;
     }
 
     // Crews collection
     match /crews/{crewId} {
       allow read: if true;
       allow write: if false; // Only Cloud Functions can update crew data
+    }
+
+    // Social collections
+    match /friendRequests/{requestId} {
+      allow read: if request.auth != null && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /crewInvites/{inviteId} {
+      allow read: if request.auth != null && (resource.data.senderId == request.auth.uid || resource.data.targetId == request.auth.uid);
+      allow write: if false;
     }
 
     // Default deny

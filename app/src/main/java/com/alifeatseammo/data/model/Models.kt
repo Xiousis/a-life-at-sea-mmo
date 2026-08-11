@@ -37,12 +37,6 @@ data class Character(
         return (energy + regenerated).coerceAtMost(maxEnergy)
     }
 
-    fun getEnergyRegenProgress(): Float {
-        val regenRateMs = 3 * 60 * 1000L
-        val elapsed = System.currentTimeMillis() - energyUpdatedAt
-        if (energy >= maxEnergy) return 0f
-        return (elapsed % regenRateMs).toFloat() / regenRateMs.toFloat()
-    }
 }
 
 enum class Gender {
@@ -63,16 +57,10 @@ enum class Race {
 
 data class TravelState(
     val destination: String = "",
-    val arrivalTime: Long = 0
+    val arrivalTime: Long = 0,
+    val startTime: Long = 0
 )
 
-data class CombatLog(
-    val id: String = "",
-    val attackerName: String = "",
-    val defenderName: String = "",
-    val result: String = "",
-    val timestamp: Long = System.currentTimeMillis()
-)
 
 data class TransactionLog(
     val id: String = "",
@@ -85,12 +73,12 @@ data class TransactionLog(
 )
 
 data class Stats(
-    val strength: Int = 5,
-    val endurance: Int = 5,
-    val agility: Int = 5,
-    val perception: Int = 5,
-    val willpower: Int = 5,
-    val luck: Int = 5,
+    val strength: Int = 0,
+    val endurance: Int = 0,
+    val agility: Int = 0,
+    val perception: Int = 0,
+    val willpower: Int = 0,
+    val luck: Int = 0,
     // Combat Skills
     val swordsmanship: Int = 0,
     val brawling: Int = 0,
@@ -106,20 +94,18 @@ enum class StatType {
 }
 
 data class Mission(
-    val id: String,
-    val title: String,
-    val description: String,
-    val energyCost: Int,
-    val minLevel: Int,
-    val rewards: Reward,
-    val difficulty: Int,
+    val id: String = "",
+    val title: String = "",
+    val description: String = "",
+    val energyCost: Int = 10,
+    val minLevel: Int = 1,
+    val goldReward: Int = 0,
+    val xpReward: Int = 0,
+    val difficulty: Int = 1,
+    val locationId: String = "",
     val factionRequirement: Faction = Faction.Neutral
 )
 
-data class Reward(
-    val gold: Int,
-    val xp: Int
-)
 
 data class Enemy(
     val name: String = "",
@@ -157,15 +143,6 @@ enum class EffectType {
     Bleed, Stun, Weaken, Fortify, Burn, Haste
 }
 
-data class Technique(
-    val id: String = "",
-    val name: String = "",
-    val description: String = "",
-    val energyCost: Int = 0,
-    val cooldown: Int = 0,
-    val power: Float = 1.0f,
-    val effects: List<StatusEffect> = emptyList()
-)
 
 enum class CombatAction {
     Attack, Technique, Defend, Item, Flee

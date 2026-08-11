@@ -20,6 +20,15 @@ fun CharacterCreationScreen(
     var selectedGender by remember { mutableStateOf(Gender.Male) }
     var selectedRace by remember { mutableStateOf(Race.Human) }
     var expanded by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun validateName(input: String): String? {
+        val trimmed = input.trim()
+        if (trimmed.length < 3) return "Name too short (min 3)"
+        if (trimmed.length > 16) return "Name too long (max 16)"
+        if (!trimmed.all { it.isLetterOrDigit() || it == '_' }) return "Only letters, numbers, and underscores allowed"
+        return null
+    }
 
     Column(
         modifier = Modifier
@@ -34,8 +43,13 @@ fun CharacterCreationScreen(
 
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it },
+            onValueChange = { 
+                name = it
+                error = null
+            },
             label = { Text("Character Name") },
+            isError = error != null,
+            supportingText = { error?.let { Text(it) } },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -93,8 +107,11 @@ fun CharacterCreationScreen(
 
         Button(
             onClick = {
-                if (name.isNotBlank()) {
-                    onCharacterCreated(name, selectedGender, selectedRace)
+                val validationError = validateName(name)
+                if (validationError == null) {
+                    onCharacterCreated(name.trim(), selectedGender, selectedRace)
+                } else {
+                    error = validationError
                 }
             },
             modifier = Modifier.fillMaxWidth()

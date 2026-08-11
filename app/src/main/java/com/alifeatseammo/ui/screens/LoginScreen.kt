@@ -8,11 +8,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
+import com.alifeatseammo.data.repository.AuthResult
+
 @Composable
 fun LoginScreen(
+    authResult: AuthResult?,
     onLogin: (String, String) -> Unit,
     onSignUp: (String, String, String) -> Unit,
-    onGuestSignIn: () -> Unit
+    onGuestSignIn: () -> Unit,
+    onForgotPassword: (String) -> Unit,
+    onClearError: () -> Unit
 ) {
     var isSignUp by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
@@ -38,7 +43,8 @@ fun LoginScreen(
                 value = username,
                 onValueChange = { username = it },
                 label = { Text("Username") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = authResult !is AuthResult.Loading
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -47,7 +53,8 @@ fun LoginScreen(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = authResult !is AuthResult.Loading
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -57,10 +64,44 @@ fun LoginScreen(
             onValueChange = { password = it },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = authResult !is AuthResult.Loading
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        if (!isSignUp) {
+            TextButton(
+                onClick = { 
+                    if (email.isNotBlank()) {
+                        onForgotPassword(email)
+                    } else {
+                        // Perhaps a toast or simple error here, but for now just disable
+                    }
+                },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Forgot Password?")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (authResult is AuthResult.Error) {
+            Text(
+                text = authResult.message,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        if (authResult is AuthResult.Success && !isSignUp) {
+            Text(
+                text = "Success! Please check your email if you requested a reset.",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         Button(
             onClick = {
@@ -70,12 +111,27 @@ fun LoginScreen(
                     onLogin(email, password)
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = authResult !is AuthResult.Loading
         ) {
-            Text(if (isSignUp) "Register" else "Login")
+            if (authResult is AuthResult.Loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(if (isSignUp) "Register" else "Login")
+            }
         }
 
-        TextButton(onClick = { isSignUp = !isSignUp }) {
+        TextButton(
+            onClick = { 
+                isSignUp = !isSignUp 
+                onClearError()
+            },
+            enabled = authResult !is AuthResult.Loading
+        ) {
             Text(if (isSignUp) "Already have an account? Login" else "New here? Create an account")
         }
 
@@ -87,7 +143,8 @@ fun LoginScreen(
         
         OutlinedButton(
             onClick = onGuestSignIn,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = authResult !is AuthResult.Loading
         ) {
             Text("Play as Guest (Skip Login)")
         }

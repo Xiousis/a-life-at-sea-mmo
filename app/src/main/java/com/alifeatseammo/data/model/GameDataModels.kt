@@ -10,7 +10,7 @@ data class LocationDef(
     val weather: String = "Clear",
     val actions: List<ActionDef> = emptyList(),
     val x: Int = 0,
-    val y: Int = 0
+    val y: Int = 0,
 )
 
 data class ActionDef(
@@ -43,15 +43,4 @@ data class LootEntry(
     val maxAmount: Int = 1
 )
 
-data class MissionDef(
-    val id: String = "",
-    val title: String = "",
-    val description: String = "",
-    val energyCost: Int = 10,
-    val minLevel: Int = 1,
-    val goldReward: Int = 0,
-    val xpReward: Int = 0,
-    val difficulty: Int = 1,
-    val locationId: String = "",
-    val factionRequirement: Faction = Faction.Neutral
-)
+

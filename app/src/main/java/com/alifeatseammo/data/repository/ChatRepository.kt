@@ -29,8 +29,8 @@ class FirestoreChatRepository(
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .limit(50)
             .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<ChatMessage>() })
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<ChatMessage>() })
                 }
             }
         awaitClose { subscription.remove() }

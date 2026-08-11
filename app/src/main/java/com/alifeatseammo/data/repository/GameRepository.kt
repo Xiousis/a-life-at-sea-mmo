@@ -16,30 +16,32 @@ interface GameRepository {
     suspend fun completeMission(userId: String, missionId: String): Boolean
     fun getAvailableMissions(): Flow<List<Mission>>
     suspend fun startTravel(userId: String, destination: String): Boolean
+    suspend fun finishTravel(): Boolean
     suspend fun combatAction(userId: String, action: CombatAction, techniqueId: String? = null, itemId: String? = null): Boolean
     suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean
     suspend fun equipItem(itemId: String, slot: String): Boolean
     suspend fun unequipItem(slot: String): Boolean
     suspend fun purchaseItem(itemId: String, shopId: String): Boolean
     suspend fun sellItem(itemId: String): Boolean
+    suspend fun useItem(itemId: String): Boolean
     suspend fun joinFaction(userId: String, faction: Faction): Boolean
     fun getPlayersAtLocation(location: String): Flow<List<Character>>
     fun getTopPlayers(limit: Int): Flow<List<Character>>
     fun getPlayerProfile(playerId: String): Flow<Character?>
     fun getLocations(): Flow<List<LocationDef>>
     fun getEnemyDefs(): Flow<List<EnemyDef>>
-    fun getMissionDefs(): Flow<List<MissionDef>>
+    fun getMissionDefs(): Flow<List<Mission>>
 }
 
 class FirestoreGameRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance()
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance(),
 ) : GameRepository {
     
     override fun getCharacter(userId: String): Flow<Character?> = callbackFlow {
         val docRef = db.collection("players").document(userId)
         val subscription = docRef.addSnapshotListener { snapshot, _ ->
-            if (snapshot != null && snapshot.exists()) {
+            if (snapshot?.exists() == true) {
                 val character = snapshot.toObject<Character>()
                 if (character != null) {
                     // Server-authoritative travel finish check
@@ -73,7 +75,7 @@ class FirestoreGameRepository(
             val data = hashMapOf("statType" to statType.name)
             functions.getHttpsCallable("train").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -83,17 +85,17 @@ class FirestoreGameRepository(
             val data = hashMapOf("missionId" to missionId)
             functions.getHttpsCallable("completeMission").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
 
     override fun getAvailableMissions(): Flow<List<Mission>> = callbackFlow {
-        val subscription = db.collection("missions")
+        val subscription = db.collection("gameData").document("world").collection("missions")
             .orderBy("difficulty")
             .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<Mission>() })
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Mission>() })
                 }
             }
         awaitClose { subscription.remove() }
@@ -104,7 +106,16 @@ class FirestoreGameRepository(
             val data = hashMapOf("destination" to destination)
             functions.getHttpsCallable("startTravel").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    override suspend fun finishTravel(): Boolean {
+        return try {
+            functions.getHttpsCallable("finishTravel").call().await()
+            true
+        } catch (_: Exception) {
             false
         }
     }
@@ -118,7 +129,7 @@ class FirestoreGameRepository(
             )
             functions.getHttpsCallable("combatAction").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -128,7 +139,7 @@ class FirestoreGameRepository(
             val data = hashMapOf("defenderId" to defenderId)
             functions.getHttpsCallable("attackPlayer").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -138,7 +149,7 @@ class FirestoreGameRepository(
             val data = hashMapOf("itemId" to itemId, "slot" to slot)
             functions.getHttpsCallable("equipItem").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -148,7 +159,7 @@ class FirestoreGameRepository(
             val data = hashMapOf("slot" to slot)
             functions.getHttpsCallable("unequipItem").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -158,7 +169,7 @@ class FirestoreGameRepository(
             val data = hashMapOf("itemId" to itemId, "shopId" to shopId)
             functions.getHttpsCallable("purchaseItem").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -168,7 +179,17 @@ class FirestoreGameRepository(
             val data = hashMapOf("itemId" to itemId)
             functions.getHttpsCallable("sellItem").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    override suspend fun useItem(itemId: String): Boolean {
+        return try {
+            val data = hashMapOf("itemId" to itemId)
+            functions.getHttpsCallable("useItem").call(data).await()
+            true
+        } catch (_: Exception) {
             false
         }
     }
@@ -178,7 +199,7 @@ class FirestoreGameRepository(
             val data = hashMapOf("faction" to faction.name)
             functions.getHttpsCallable("joinFaction").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -188,8 +209,8 @@ class FirestoreGameRepository(
             .whereEqualTo("currentLocation", location)
             .limit(10)
             .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<Character>() })
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Character>() })
                 }
             }
         awaitClose { subscription.remove() }
@@ -197,11 +218,12 @@ class FirestoreGameRepository(
 
     override fun getTopPlayers(limit: Int): Flow<List<Character>> = callbackFlow {
         val subscription = db.collection("players")
+            .orderBy("level", Query.Direction.DESCENDING)
             .orderBy("xp", Query.Direction.DESCENDING)
             .limit(limit.toLong())
             .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<Character>() })
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Character>() })
                 }
             }
         awaitClose { subscription.remove() }
@@ -218,8 +240,8 @@ class FirestoreGameRepository(
     override fun getLocations(): Flow<List<LocationDef>> = callbackFlow {
         val subscription = db.collection("gameData").document("world").collection("locations")
             .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<LocationDef>() })
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<LocationDef>() })
                 }
             }
         awaitClose { subscription.remove() }
@@ -228,18 +250,18 @@ class FirestoreGameRepository(
     override fun getEnemyDefs(): Flow<List<EnemyDef>> = callbackFlow {
         val subscription = db.collection("gameData").document("world").collection("enemies")
             .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<EnemyDef>() })
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<EnemyDef>() })
                 }
             }
         awaitClose { subscription.remove() }
     }
 
-    override fun getMissionDefs(): Flow<List<MissionDef>> = callbackFlow {
+    override fun getMissionDefs(): Flow<List<Mission>> = callbackFlow {
         val subscription = db.collection("gameData").document("world").collection("missions")
             .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<MissionDef>() })
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Mission>() })
                 }
             }
         awaitClose { subscription.remove() }
@@ -308,13 +330,14 @@ class MockGameRepository : GameRepository {
 
     override fun getAvailableMissions(): Flow<List<Mission>> = flowOf(
         listOf(
-            Mission("1", "Scout the Shore", "Check for any suspicious activity on Fogi Tail Island's beach.", 10, 1, Reward(50, 20), 1),
-            Mission("2", "Deliver Message", "Take a letter to the merchant on Ironcrest Isle.", 15, 1, Reward(75, 30), 2),
-            Mission("3", "Clear Pests", "Help an Amber Reach farmer clear giant crabs from his field.", 25, 2, Reward(150, 60), 3)
+            Mission("1", "Scout the Shore", "Check for any suspicious activity on Fogi Tail Island's beach.", 10, 1, 50, 20, 1),
+            Mission("2", "Deliver Message", "Take a letter to the merchant on Ironcrest Isle.", 15, 1, 75, 30, 2),
+            Mission("3", "Clear Pests", "Help an Amber Reach farmer clear giant crabs from his field.", 25, 2, 150, 60, 3)
         )
     )
 
     override suspend fun startTravel(userId: String, destination: String): Boolean = true
+    override suspend fun finishTravel(): Boolean = true
     override suspend fun combatAction(userId: String, action: CombatAction, techniqueId: String?, itemId: String?): Boolean = true
     override suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean = true
     override suspend fun equipItem(itemId: String, slot: String): Boolean = true
@@ -328,6 +351,21 @@ class MockGameRepository : GameRepository {
                     it.copy(
                         inventory = it.inventory.filter { i -> i.id != itemId },
                         gold = it.gold + (item.price / 2)
+                    )
+                } else it
+            }
+        }
+        return true
+    }
+
+    override suspend fun useItem(itemId: String): Boolean {
+        _character.update { char ->
+            char?.let {
+                val item = it.inventory.find { i -> i.id == itemId }
+                if (item != null && item.type == ItemType.Consumable) {
+                    it.copy(
+                        inventory = it.inventory.filter { i -> i.id != itemId },
+                        hp = (it.hp + 30).coerceAtMost(it.maxHp)
                     )
                 } else it
             }
@@ -354,5 +392,5 @@ class MockGameRepository : GameRepository {
 
     override fun getLocations(): Flow<List<LocationDef>> = flowOf(emptyList())
     override fun getEnemyDefs(): Flow<List<EnemyDef>> = flowOf(emptyList())
-    override fun getMissionDefs(): Flow<List<MissionDef>> = flowOf(emptyList())
+    override fun getMissionDefs(): Flow<List<Mission>> = flowOf(emptyList())
 }

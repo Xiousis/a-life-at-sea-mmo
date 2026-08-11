@@ -44,7 +44,7 @@ class FirestoreCrewRepository(
             )
             functions.getHttpsCallable("createCrew").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -54,7 +54,7 @@ class FirestoreCrewRepository(
             val data = hashMapOf("crewId" to crewId)
             functions.getHttpsCallable("joinCrew").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -63,7 +63,7 @@ class FirestoreCrewRepository(
         return try {
             functions.getHttpsCallable("leaveCrew").call().await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -73,7 +73,7 @@ class FirestoreCrewRepository(
             val data = hashMapOf("targetId" to targetId)
             functions.getHttpsCallable("inviteToCrew").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -83,7 +83,7 @@ class FirestoreCrewRepository(
             val data = hashMapOf("crewId" to crewId, "accept" to accept)
             functions.getHttpsCallable("respondToInvite").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -93,7 +93,7 @@ class FirestoreCrewRepository(
             val data = hashMapOf("targetId" to targetId, "rank" to rank)
             functions.getHttpsCallable("promoteMember").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }

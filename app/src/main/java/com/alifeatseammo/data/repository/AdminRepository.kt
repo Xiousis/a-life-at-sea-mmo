@@ -56,7 +56,7 @@ class FirestoreAdminRepository(
             val data = hashMapOf("userId" to userId, "reason" to reason, "durationHours" to durationHours)
             functions.getHttpsCallable("adminMutePlayer").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -66,7 +66,7 @@ class FirestoreAdminRepository(
             val data = hashMapOf("userId" to userId, "reason" to reason)
             functions.getHttpsCallable("adminBanPlayer").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -76,7 +76,7 @@ class FirestoreAdminRepository(
             val data = hashMapOf("userId" to userId, "location" to location)
             functions.getHttpsCallable("adminTeleportPlayer").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -86,7 +86,7 @@ class FirestoreAdminRepository(
             val data = hashMapOf("userId" to userId, "amount" to amount, "reason" to reason)
             functions.getHttpsCallable("adminAdjustGold").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -96,7 +96,7 @@ class FirestoreAdminRepository(
             val data = hashMapOf("message" to message)
             functions.getHttpsCallable("adminSendAnnouncement").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }

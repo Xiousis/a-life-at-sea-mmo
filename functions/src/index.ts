@@ -8,6 +8,7 @@ const db = admin.firestore();
 // --- Constants & Config ---
 const ENERGY_REGEN_RATE_MS = 3 * 60 * 1000; // 1 energy per 3 minutes
 const MAX_ENERGY = 100;
+const INVENTORY_CAPACITY = 20;
 
 const STAT_MAPPING: Record<string, string> = {
     "Strength": "strength",
@@ -61,7 +62,7 @@ function recordLog(transaction: admin.firestore.Transaction, userId: string, act
     });
 }
 
-function calculateCurrentEnergy(character: any): { energy: number, energyUpdatedAt: number } {
+export function calculateCurrentEnergy(character: any): { energy: number, energyUpdatedAt: number } {
     const now = Date.now();
     const elapsed = now - character.energyUpdatedAt;
     const regenerated = Math.floor(elapsed / ENERGY_REGEN_RATE_MS);
@@ -70,7 +71,7 @@ function calculateCurrentEnergy(character: any): { energy: number, energyUpdated
     if (regenerated <= 0) return { energy: character.energy, energyUpdatedAt: character.energyUpdatedAt };
 
     const newEnergy = Math.min(currentMaxEnergy, character.energy + regenerated);
-    const newTimestamp = character.energy + regenerated >= currentMaxMaxEnergy ? now : character.energyUpdatedAt + (regenerated * ENERGY_REGEN_RATE_MS);
+    const newTimestamp = character.energy + regenerated >= currentMaxEnergy ? now : character.energyUpdatedAt + (regenerated * ENERGY_REGEN_RATE_MS);
 
     return { energy: newEnergy, energyUpdatedAt: newTimestamp };
 }
@@ -99,7 +100,7 @@ function checkLevelUp(character: any) {
         leveledUp = true;
     }
 
-    return { level, xp, stats, maxEnergy, energy, maxHp, hp, leveledUp };
+    return { ...character, level, xp, stats, maxEnergy, energy, maxHp, hp, leveledUp };
 }
 
 // --- Player Management ---
@@ -110,18 +111,43 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
     const { name, gender, race } = data;
     const userId = context.auth.uid;
 
-    if (!name || name.length < 3 || name.length > 16) {
-        throw new functions.https.HttpsError("invalid-argument", "Name must be between 3 and 16 characters.");
+    // Validate if character already exists for this user
+    const playerDoc = await db.collection("players").doc(userId).get();
+    if (playerDoc.exists) {
+        throw new functions.https.HttpsError("already-exists", "You already have a character.");
     }
 
-    const nameQuery = await db.collection("players").where("name", "==", name).get();
+    // Name Validation
+    const trimmedName = (name || "").trim();
+    if (trimmedName.length < 3 || trimmedName.length > 16) {
+        throw new functions.https.HttpsError("invalid-argument", "Name must be between 3 and 16 characters.");
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmedName)) {
+        throw new functions.https.HttpsError("invalid-argument", "Name contains invalid characters.");
+    }
+
+    const reservedNames = ["admin", "system", "moderator", "game-master", "gm"];
+    if (reservedNames.includes(trimmedName.toLowerCase())) {
+        throw new functions.https.HttpsError("invalid-argument", "This name is reserved.");
+    }
+
+    // Case-insensitive uniqueness check
+    const nameLower = trimmedName.toLowerCase();
+    const nameQuery = await db.collection("players").where("nameLower", "==", nameLower).get();
     if (!nameQuery.empty) {
         throw new functions.https.HttpsError("already-exists", "Character name is already taken.");
     }
 
+    // Race/Gender Validation
+    const allowedRaces = ["Human", "Fishman", "Mink", "Skypiean", "Cyborg"];
+    const allowedGenders = ["Male", "Female", "Other"];
+    if (!allowedRaces.includes(race)) throw new functions.https.HttpsError("invalid-argument", "Invalid race.");
+    if (!allowedGenders.includes(gender)) throw new functions.https.HttpsError("invalid-argument", "Invalid gender.");
+
     const character = {
         id: userId,
-        name: name,
+        name: trimmedName,
+        nameLower: nameLower,
         gender: gender,
         race: race,
         level: 1,
@@ -252,6 +278,10 @@ export const startTravel = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("invalid-argument", "Already at destination.");
         }
 
+        if (!LOCATION_DATA[destination]) {
+            throw new functions.https.HttpsError("invalid-argument", "Invalid destination.");
+        }
+
         const travelDuration = calculateTravelTime(character.currentLocation, destination);
         const arrivalTime = Date.now() + travelDuration;
 
@@ -272,7 +302,7 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         }
 
         transaction.update(playerRef, {
-            travelState: { destination, arrivalTime }
+            travelState: { destination, arrivalTime, startTime: Date.now() }
         });
         return { success: true, arrivalTime, travelDuration };
     });
@@ -689,7 +719,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 const stealAmount = Math.floor(loser.gold * 0.1);
 
                 // Update Winner
-                const winnerUpdate = {
+                const winnerUpdate: any = {
                     gold: winner.gold + stealAmount,
                     bounty: (winner.bounty || 0) + 100,
                     pvpWins: (winner.pvpWins || 0) + 1,
@@ -697,10 +727,18 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     hp: playerWon ? playerHp : winner.hp,
                     energy: playerWon ? playerEnergy : winner.energy
                 };
+                if (playerWon) winnerUpdate.inventory = character.inventory;
                 transaction.update(winnerRef, winnerUpdate);
 
+                // Update Winner's Crew Bounty
+                if (winner.crewId) {
+                    transaction.update(db.collection("crews").doc(winner.crewId), {
+                        totalBounty: admin.firestore.FieldValue.increment(100)
+                    });
+                }
+
                 // Update Loser
-                const loserUpdate = {
+                const loserUpdate: any = {
                     gold: loser.gold - stealAmount,
                     pvpLosses: (loser.pvpLosses || 0) + 1,
                     combatState: null,
@@ -708,6 +746,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     energy: playerWon ? loser.energy : playerEnergy,
                     currentLocation: "Fogi Tail Island" // Respawn
                 };
+                if (!playerWon) loserUpdate.inventory = character.inventory;
                 transaction.update(loserRef, loserUpdate);
 
                 recordLog(transaction, winner.id, "PvPWin", `Defeated ${loser.name}`, stealAmount, 0);
@@ -723,8 +762,17 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     updatedChar.gold += enemy.goldReward;
                     updatedChar.xp += enemy.xpReward;
                     if (loot.length > 0) {
-                        updatedChar.inventory = [...(updatedChar.inventory || []), ...loot];
-                        logs.push(`Loot found: ${loot.map((i: any) => i.name).join(", ")}`);
+                        const currentInv = updatedChar.inventory || [];
+                        const freeSlots = INVENTORY_CAPACITY - currentInv.length;
+                        const lootToAdd = loot.slice(0, Math.max(0, freeSlots));
+
+                        updatedChar.inventory = [...currentInv, ...lootToAdd];
+                        if (lootToAdd.length > 0) {
+                            logs.push(`Loot found: ${lootToAdd.map((i: any) => i.name).join(", ")}`);
+                        }
+                        if (lootToAdd.length < loot.length) {
+                            logs.push("Some loot was lost because your inventory is full!");
+                        }
                     }
                     updatedChar = checkLevelUp(updatedChar);
                     recordLog(transaction, userId, "CombatWin", `Defeated ${enemy.name}`, enemy.goldReward, enemy.xpReward);
@@ -749,6 +797,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 transaction.update(playerRef, {
                     hp: playerHp,
                     energy: playerEnergy,
+                    inventory: character.inventory,
                     combatState: { ...combat, enemy: updatedEnemy, playerTurn: false, logs: nextLogs, cooldowns: updatedCooldowns, playerEffects: pActiveEffects }
                 });
 
@@ -766,6 +815,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 transaction.update(playerRef, {
                     hp: playerHp,
                     energy: playerEnergy,
+                    inventory: character.inventory,
                     combatState: { ...combat, enemy, logs, turnCount: (combat.turnCount || 0) + 1, cooldowns: updatedCooldowns, playerEffects: pActiveEffects }
                 });
             }
@@ -794,6 +844,10 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
 
         const attacker = attackerSnap.data() as any;
         const defender = defenderSnap.data() as any;
+
+        if (userId === defenderId) {
+            throw new functions.https.HttpsError("invalid-argument", "You cannot attack yourself.");
+        }
 
         if (attacker.currentLocation !== defender.currentLocation) {
             throw new functions.https.HttpsError("failed-precondition", "Target is not at your location.");
@@ -860,7 +914,7 @@ export const completeMission = functions.https.onCall(async (data, context) => {
     const { missionId } = data;
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
-    const missionRef = db.collection("gameData").document("world").collection("missions").doc(missionId);
+    const missionRef = db.collection("gameData").doc("world").collection("missions").doc(missionId);
 
     return db.runTransaction(async (transaction) => {
         const [playerSnap, missionSnap] = await Promise.all([
@@ -994,18 +1048,15 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
 
 // --- Admin Tools ---
 
-async function checkAdmin(userId: string) {
-    const userDoc = await db.collection("players").doc(userId).get();
-    const userData = userDoc.data() as any;
-    if (!userData || userData.role !== "admin") {
-        // For early development, we can comment out the restriction or check for a specific UID
-        // throw new functions.https.HttpsError("permission-denied", "User is not an admin.");
+export async function checkAdmin(context: functions.https.CallableContext) {
+    if (!context.auth?.token.admin) {
+        throw new functions.https.HttpsError("permission-denied", "User is not an admin.");
     }
 }
 
 export const adminAdjustGold = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
-    await checkAdmin(context.auth.uid);
+    await checkAdmin(context);
 
     const { userId, amount, reason } = data;
     const playerRef = db.collection("players").doc(userId);
@@ -1019,7 +1070,7 @@ export const adminAdjustGold = functions.https.onCall(async (data, context) => {
 
 export const adminTeleportPlayer = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
-    await checkAdmin(context.auth.uid);
+    await checkAdmin(context);
 
     const { userId, location } = data;
     await db.collection("players").doc(userId).update({ currentLocation: location, travelState: null });
@@ -1028,13 +1079,40 @@ export const adminTeleportPlayer = functions.https.onCall(async (data, context) 
 
 export const adminSendAnnouncement = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
-    await checkAdmin(context.auth.uid);
+    await checkAdmin(context);
 
     const { message } = data;
     await db.collection("announcements").add({
         message,
         timestamp: Date.now(),
         authorId: context.auth.uid
+    });
+    return { success: true };
+});
+
+export const adminMutePlayer = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    await checkAdmin(context);
+
+    const { userId, reason, durationHours } = data;
+    const muteUntil = Date.now() + (durationHours * 3600000);
+
+    await db.collection("players").doc(userId).update({
+        mutedUntil: muteUntil,
+        muteReason: reason
+    });
+    return { success: true };
+});
+
+export const adminBanPlayer = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    await checkAdmin(context);
+
+    const { userId, reason } = data;
+
+    await db.collection("players").doc(userId).update({
+        isBanned: true,
+        banReason: reason
     });
     return { success: true };
 });
@@ -1087,6 +1165,61 @@ export const acceptFriendRequest = functions.https.onCall(async (data, context) 
 
         return { success: true };
     });
+});
+
+export const declineFriendRequest = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { senderId } = data;
+    const receiverId = context.auth.uid;
+    const requestRef = db.collection("friendRequests").doc(`${senderId}_${receiverId}`);
+
+    await requestRef.update({ status: "declined" });
+    return { success: true };
+});
+
+export const removeFriend = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { friendId } = data;
+    const userId = context.auth.uid;
+
+    await db.runTransaction(async (transaction) => {
+        transaction.update(db.collection("players").doc(userId), {
+            friends: admin.firestore.FieldValue.arrayRemove(friendId)
+        });
+        transaction.update(db.collection("players").doc(friendId), {
+            friends: admin.firestore.FieldValue.arrayRemove(userId)
+        });
+    });
+
+    return { success: true };
+});
+
+export const blockPlayer = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { targetId } = data;
+    const userId = context.auth.uid;
+
+    await db.collection("players").doc(userId).update({
+        blocked: admin.firestore.FieldValue.arrayUnion(targetId)
+    });
+
+    return { success: true };
+});
+
+export const unblockPlayer = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { targetId } = data;
+    const userId = context.auth.uid;
+
+    await db.collection("players").doc(userId).update({
+        blocked: admin.firestore.FieldValue.arrayRemove(targetId)
+    });
+
+    return { success: true };
 });
 
 // --- Inventory & Equipment ---
@@ -1143,7 +1276,7 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
     const { itemId, shopId } = data;
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
-    const itemRef = db.collection("gameData").document("items").collection("all").doc(itemId);
+    const itemRef = db.collection("gameData").doc("items").collection("all").doc(itemId);
 
     return db.runTransaction(async (transaction) => {
         const [playerSnap, itemSnap] = await Promise.all([
@@ -1157,11 +1290,25 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
         const character = playerSnap.data() as any;
         const item = itemSnap.data() as any;
 
+        // Validate location has a market
+        const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
+        const location = locationSnap.data();
+        const hasMarket = location?.actions?.some((a: any) => a.type === "Market" || a.type === "BlackMarket");
+
+        if (!hasMarket) {
+            throw new functions.https.HttpsError("failed-precondition", "There is no market at your current location.");
+        }
+
         if (character.gold < item.price) {
             throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
         }
 
-        const newInventory = [...(character.inventory || []), { ...item, id: `${item.id}_${Date.now()}` }];
+        const inventory = character.inventory || [];
+        if (inventory.length >= INVENTORY_CAPACITY) {
+            throw new functions.https.HttpsError("failed-precondition", "Inventory is full.");
+        }
+
+        const newInventory = [...inventory, { ...item, id: `${item.id}_${Date.now()}` }];
 
         transaction.update(playerRef, {
             gold: character.gold - item.price,
@@ -1170,6 +1317,74 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
 
         recordLog(transaction, userId, "PurchaseItem", `Purchased ${item.name}`, -item.price, 0);
         return { success: true };
+    });
+});
+
+export const sellItem = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { itemId } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = snapshot.data() as any;
+        const inventory = character.inventory || [];
+        const itemIndex = inventory.findIndex((i: any) => i.id === itemId);
+
+        if (itemIndex === -1) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
+
+        const item = inventory[itemIndex];
+        const sellPrice = Math.floor(item.price * 0.5);
+
+        inventory.splice(itemIndex, 1);
+
+        transaction.update(playerRef, {
+            gold: admin.firestore.FieldValue.increment(sellPrice),
+            inventory
+        });
+
+        recordLog(transaction, userId, "SellItem", `Sold ${item.name}`, sellPrice, 0);
+        return { success: true, goldGained: sellPrice };
+    });
+});
+
+export const useItem = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { itemId } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = snapshot.data() as any;
+        const inventory = character.inventory || [];
+        const itemIndex = inventory.findIndex((i: any) => i.id === itemId);
+
+        if (itemIndex === -1) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
+
+        const item = inventory[itemIndex];
+        if (item.type !== "Consumable") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
+
+        let playerHp = character.hp;
+        const healAmount = item.healAmount || 30;
+        playerHp = Math.min(character.maxHp, playerHp + healAmount);
+
+        inventory.splice(itemIndex, 1);
+
+        transaction.update(playerRef, {
+            hp: playerHp,
+            inventory
+        });
+
+        recordLog(transaction, userId, "UseItem", `Used ${item.name}`, 0, 0);
+        return { success: true, newHp: playerHp };
     });
 });
 

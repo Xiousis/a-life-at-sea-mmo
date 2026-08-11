@@ -29,7 +29,7 @@ class FirestoreSocialRepository(
     override fun getFriends(userId: String): Flow<List<Character>> = callbackFlow {
         val subscription = db.collection("players").document(userId)
             .addSnapshotListener { snapshot, _ ->
-                val friendIds = snapshot?.get("friends") as? List<String> ?: emptyList()
+                val friendIds = snapshot?.toObject<Character>()?.friends ?: emptyList()
                 if (friendIds.isEmpty()) {
                     trySend(emptyList())
                 } else {
@@ -66,7 +66,7 @@ class FirestoreSocialRepository(
             val data = hashMapOf("targetId" to targetId)
             functions.getHttpsCallable("sendFriendRequest").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -76,7 +76,7 @@ class FirestoreSocialRepository(
             val data = hashMapOf("senderId" to senderId)
             functions.getHttpsCallable("acceptFriendRequest").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -86,7 +86,7 @@ class FirestoreSocialRepository(
             val data = hashMapOf("senderId" to senderId)
             functions.getHttpsCallable("declineFriendRequest").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -96,7 +96,7 @@ class FirestoreSocialRepository(
             val data = hashMapOf("friendId" to friendId)
             functions.getHttpsCallable("removeFriend").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -106,7 +106,7 @@ class FirestoreSocialRepository(
             val data = hashMapOf("targetId" to targetId)
             functions.getHttpsCallable("blockPlayer").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -116,7 +116,7 @@ class FirestoreSocialRepository(
             val data = hashMapOf("targetId" to targetId)
             functions.getHttpsCallable("unblockPlayer").call(data).await()
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -124,7 +124,7 @@ class FirestoreSocialRepository(
     override fun getBlockedPlayers(userId: String): Flow<List<String>> = callbackFlow {
         val subscription = db.collection("players").document(userId)
             .addSnapshotListener { snapshot, _ ->
-                trySend(snapshot?.get("blocked") as? List<String> ?: emptyList())
+                trySend(snapshot?.toObject<Character>()?.blocked ?: emptyList())
             }
         awaitClose { subscription.remove() }
     }

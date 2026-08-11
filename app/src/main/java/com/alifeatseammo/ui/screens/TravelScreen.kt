@@ -8,22 +8,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
+import com.alifeatseammo.data.model.LocationDef
+import com.alifeatseammo.data.model.TravelState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TravelScreen(
     character: Character,
+    locations: List<LocationDef>,
     onTravelClick: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val islands = listOf(
-        Island("Fogi Tail Island", 10000),
-        Island("Ironcrest Isle", 30000), 
-        Island("Amber Reach", 60000),
-        Island("Tortuga Bay", 120000)
-    )
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -40,17 +37,17 @@ fun TravelScreen(
             Text("Current Location: ${character.currentLocation}", style = MaterialTheme.typography.titleMedium)
             
             if (character.travelState != null) {
-                TravelTimer(character.travelState.arrivalTime)
+                TravelTimer(character.travelState)
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(islands.filter { it.name != character.currentLocation }) { island ->
+                    items(locations.filter { it.name != character.currentLocation }) { location ->
                         OutlinedCard(
-                            onClick = { onTravelClick(island.name) },
+                            onClick = { onTravelClick(location.name) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             ListItem(
-                                headlineContent = { Text(island.name) },
-                                supportingContent = { Text("Estimated Time: ${island.travelTime / 1000}s") }
+                                headlineContent = { Text(location.name) },
+                                supportingContent = { Text("Region: ${location.region}") }
                             )
                         }
                     }
@@ -61,26 +58,30 @@ fun TravelScreen(
 }
 
 @Composable
-fun TravelTimer(arrivalTime: Long) {
-    var timeLeft by remember { mutableLongStateOf(arrivalTime - System.currentTimeMillis()) }
+fun TravelTimer(travel: TravelState) {
+    var timeLeft by remember { mutableLongStateOf(travel.arrivalTime - System.currentTimeMillis()) }
+    val duration = travel.arrivalTime - travel.startTime
 
-    LaunchedEffect(arrivalTime) {
+    LaunchedEffect(travel.arrivalTime) {
         while (timeLeft > 0) {
-            delay(1000)
-            timeLeft = arrivalTime - System.currentTimeMillis()
+            delay(500)
+            timeLeft = travel.arrivalTime - System.currentTimeMillis()
         }
     }
 
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Sailing...", style = MaterialTheme.typography.headlineSmall)
-            Text("Estimated Arrival: ${timeLeft / 1000}s", style = MaterialTheme.typography.bodyLarge)
+            Text("Sailing to ${travel.destination}...", style = MaterialTheme.typography.headlineSmall)
+            Text("Estimated Arrival: ${Math.max(0, timeLeft / 1000)}s", style = MaterialTheme.typography.bodyLarge)
+            
+            val progress = if (duration > 0) {
+                1f - (timeLeft.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+            } else 1f
+
             LinearProgressIndicator(
-                progress = { 1f - (timeLeft.toFloat() / 60000f).coerceIn(0f, 1f) },
+                progress = { progress },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
         }
     }
 }
-
-data class Island(val name: String, val travelTime: Long)

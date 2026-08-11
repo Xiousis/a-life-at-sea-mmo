@@ -9,23 +9,60 @@ import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+
+sealed class CharacterState {
+    object Loading : CharacterState()
+    object NoCharacter : CharacterState()
+    data class Loaded(val character: Character) : CharacterState()
+}
 
 class GameViewModel(
     private val authRepository: AuthRepository = FirebaseAuthRepository(),
     private val gameRepository: GameRepository = FirestoreGameRepository(),
     private val chatRepository: ChatRepository = FirestoreChatRepository(),
-    private val crewRepository: CrewRepository = FirestoreCrewRepository()
+    private val crewRepository: CrewRepository = FirestoreCrewRepository(),
+    private val socialRepository: SocialRepository = FirestoreSocialRepository()
 ) : ViewModel() {
 
     val currentUser: StateFlow<FirebaseUser?> = authRepository.currentUser
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val character: StateFlow<Character?> = currentUser
+    val characterState: StateFlow<CharacterState> = currentUser
         .flatMapLatest { user ->
-            if (user != null) gameRepository.getCharacter(user.uid)
-            else flowOf(null)
+            if (user != null) {
+                gameRepository.getCharacter(user.uid)
+                    .map { if (it == null) CharacterState.NoCharacter else CharacterState.Loaded(it) }
+            } else flowOf(CharacterState.NoCharacter)
+        }
+        .stateIn(viewModelScope, SharingStarted.Lazily, CharacterState.Loading)
+
+    private var travelJob: Job? = null
+
+    val character: StateFlow<Character?> = characterState
+        .map { if (it is CharacterState.Loaded) it.character else null }
+        .onEach { char ->
+            val travel = char?.travelState
+            if (travel != null) {
+                scheduleTravelFinish(travel.arrivalTime)
+            } else {
+                travelJob?.cancel()
+                travelJob = null
+            }
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    private fun scheduleTravelFinish(arrivalTime: Long) {
+        travelJob?.cancel()
+        val delayMs = arrivalTime - System.currentTimeMillis()
+        travelJob = viewModelScope.launch {
+            if (delayMs > 0) {
+                delay(delayMs)
+            }
+            gameRepository.finishTravel()
+        }
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val playersAtLocation: StateFlow<List<Character>> = character
@@ -39,24 +76,50 @@ class GameViewModel(
     val topPlayers: StateFlow<List<Character>> = gameRepository.getTopPlayers(20)
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val currentLocationInfo: StateFlow<Location?> = character
-        .map { it?.currentLocation }
-        .distinctUntilChanged()
-        .map { locationName ->
-            if (locationName != null) {
-                allLocations[locationName] ?: allLocations.values.first()
-            } else null
-        }
-        .stateIn(viewModelScope, SharingStarted.Lazily, null)
-
     val missions: StateFlow<List<Mission>> = gameRepository.getAvailableMissions()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val chatMessages: StateFlow<List<ChatMessage>> = chatRepository.getMessages("global")
+    val locations: StateFlow<List<LocationDef>> = gameRepository.getLocations()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val locations: StateFlow<List<LocationDef>> = gameRepository.getLocations()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val currentLocationInfo: StateFlow<Location?> = combine(
+        character.map { it?.currentLocation }.distinctUntilChanged(),
+        locations
+    ) { locationName, allLocs ->
+        if (locationName != null) {
+            val def = allLocs.find { it.name.equals(locationName, ignoreCase = true) }
+            if (def != null) {
+                Location(
+                    name = def.name,
+                    region = def.region,
+                    isSafe = def.isSafe,
+                    description = def.description,
+                    weather = def.weather,
+                    recommendedLevel = def.recommendedLevel,
+                    actions = def.actions.map { 
+                        LocationAction(ActionType.valueOf(it.type), it.label, it.icon)
+                    }
+                )
+            } else {
+                allLocs.firstOrNull()?.let { first ->
+                    Location(
+                        name = first.name,
+                        region = first.region,
+                        isSafe = first.isSafe,
+                        description = first.description,
+                        weather = first.weather,
+                        recommendedLevel = first.recommendedLevel,
+                        actions = first.actions.map { 
+                            LocationAction(ActionType.valueOf(it.type), it.label, it.icon)
+                        }
+                    )
+                }
+            }
+        } else null
+    }.stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    val chatMessages: StateFlow<List<ChatMessage>> = chatRepository.getMessages("global")
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -69,93 +132,114 @@ class GameViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    private val _authResult = MutableStateFlow<AuthResult?>(null)
+    val authResult: StateFlow<AuthResult?> = _authResult.asStateFlow()
+
     fun signIn() {
-        authRepository.signInAnonymously { }
+        viewModelScope.launch {
+            _authResult.value = AuthResult.Loading
+            _authResult.value = authRepository.signInAnonymously()
+        }
     }
 
     fun signIn(email: String, password: String) {
-        authRepository.signIn(email, password) { }
+        viewModelScope.launch {
+            _authResult.value = AuthResult.Loading
+            _authResult.value = authRepository.signIn(email, password)
+        }
     }
 
     fun signUp(email: String, password: String, username: String) {
-        authRepository.signUp(email, password, username) { }
+        viewModelScope.launch {
+            _authResult.value = AuthResult.Loading
+            _authResult.value = authRepository.signUp(email, password, username)
+        }
+    }
+
+    fun resetPassword(email: String) {
+        viewModelScope.launch {
+            _authResult.value = AuthResult.Loading
+            _authResult.value = authRepository.sendPasswordResetEmail(email)
+        }
+    }
+
+    fun upgradeGuestAccount(email: String, password: String) {
+        viewModelScope.launch {
+            _authResult.value = AuthResult.Loading
+            _authResult.value = authRepository.upgradeGuestAccount(email, password)
+        }
+    }
+
+    fun clearAuthResult() {
+        _authResult.value = null
     }
 
     fun signOut() {
         authRepository.signOut()
+        _authResult.value = null
     }
 
     fun createCharacter(name: String, gender: Gender, race: Race) {
-        val user = currentUser.value ?: return
-        gameRepository.createCharacter(user.uid, name, gender, race)
+        val userId = currentUser.value?.uid ?: return
+        gameRepository.createCharacter(userId, name, gender, race)
     }
 
     fun train(statType: StatType) {
-        val user = currentUser.value ?: return
+        val userId = currentUser.value?.uid ?: return
         viewModelScope.launch {
-            gameRepository.train(user.uid, statType)
+            gameRepository.train(userId, statType)
         }
     }
 
-    fun completeMission(mission: Mission) {
-        val user = currentUser.value ?: return
-        viewModelScope.launch {
-            gameRepository.completeMission(user.uid, mission.id)
-        }
+    suspend fun completeMission(mission: Mission): Boolean {
+        val userId = currentUser.value?.uid ?: return false
+        return gameRepository.completeMission(userId, mission.id)
     }
 
     fun startTravel(destination: String) {
-        val user = currentUser.value ?: return
+        val userId = currentUser.value?.uid ?: return
         viewModelScope.launch {
-            gameRepository.startTravel(user.uid, destination)
+            gameRepository.startTravel(userId, destination)
         }
     }
 
     fun combatAction(action: CombatAction, techniqueId: String? = null, itemId: String? = null) {
-        val user = currentUser.value ?: return
+        val userId = currentUser.value?.uid ?: return
         viewModelScope.launch {
-            gameRepository.combatAction(user.uid, action, techniqueId, itemId)
+            gameRepository.combatAction(userId, action, techniqueId, itemId)
         }
     }
 
     fun attackPlayer(target: Character) {
-        val user = currentUser.value ?: return
+        val userId = currentUser.value?.uid ?: return
         viewModelScope.launch {
-            gameRepository.attackPlayer(user.uid, target.id)
+            gameRepository.attackPlayer(userId, target.id)
         }
     }
 
     fun equipItem(item: Item) {
-        val user = currentUser.value ?: return
+        val char = character.value ?: return
+        if (char.level < item.levelRequirement) return
         viewModelScope.launch {
             gameRepository.equipItem(item.id, item.type.name)
         }
     }
 
     fun unequipItem(slot: String) {
-        val user = currentUser.value ?: return
+        if (currentUser.value == null) return
         viewModelScope.launch {
             gameRepository.unequipItem(slot)
         }
     }
 
     fun useItem(item: Item) {
-        val user = currentUser.value ?: return
         viewModelScope.launch {
-            // Placeholder: currently using purchase logic or combat action logic
-            // gameRepository.useItem(item.id)
-        }
-    }
-
-    fun purchaseItem(itemId: String, shopId: String) {
-        val user = currentUser.value ?: return
-        viewModelScope.launch {
-            gameRepository.purchaseItem(itemId, shopId)
+            gameRepository.useItem(item.id)
         }
     }
 
     fun sellItem(item: Item) {
-        val user = currentUser.value ?: return
+        if (currentUser.value == null) return
         viewModelScope.launch {
             gameRepository.sellItem(item.id)
         }
@@ -198,12 +282,13 @@ class GameViewModel(
     }
 
     fun joinFaction(faction: Faction) {
-        val user = currentUser.value ?: return
+        val userId = currentUser.value?.uid ?: return
         viewModelScope.launch {
-            gameRepository.joinFaction(user.uid, faction)
+            gameRepository.joinFaction(userId, faction)
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val crewInvites: StateFlow<List<CrewInvite>> = currentUser
         .flatMapLatest { user ->
             if (user != null) crewRepository.getInvitesForUser(user.uid)
@@ -217,55 +302,15 @@ class GameViewModel(
         chatRepository.sendMessage(char.name, text, channelId)
     }
 
-    private val allLocations = mapOf(
-        "Port Haven" to Location(
-            name = "PORT HAVEN",
-            region = "Western Blue • Starter Region",
-            isSafe = true,
-            description = "A bustling trade port watched over by the Royal Navy.",
-            weather = "Clear",
-            playersHere = 37,
-            recommendedLevel = 1,
-            actions = listOf(
-                LocationAction(ActionType.Docks, "DOCKS", "⚓"),
-                LocationAction(ActionType.Tavern, "TAVERN", "🍺"),
-                LocationAction(ActionType.Training, "TRAINING", "🥊"),
-                LocationAction(ActionType.Market, "MARKET", "🛒"),
-                LocationAction(ActionType.Bounties, "BOUNTIES", "☠"),
-                LocationAction(ActionType.Crew, "CREW", "👥")
-            )
-        ),
-        "Blacktooth Island" to Location(
-            name = "BLACKTOOTH ISLAND",
-            region = "Dangerous Waters",
-            isSafe = false,
-            description = "A rugged island known for its pirate activity and treacherous reefs.",
-            weather = "Stormy",
-            playersHere = 11,
-            recommendedLevel = 20,
-            actions = listOf(
-                LocationAction(ActionType.Arena, "ARENA", "🥊"),
-                LocationAction(ActionType.Smuggler, "SMUGGLER", "👤"),
-                LocationAction(ActionType.BlackMarket, "BLACK MARKET", "🛒"),
-                LocationAction(ActionType.Shipyard, "SHIPYARD", "🏗"),
-                LocationAction(ActionType.Tavern, "TAVERN", "🍺"),
-                LocationAction(ActionType.Docks, "DOCKS", "⚓")
-            )
-        ),
-        "Fogi Tail Island" to Location(
-            name = "FOGI TAIL ISLAND",
-            region = "East Blue • Remote",
-            isSafe = true,
-            description = "A quiet, mist-covered island with a small fishing village.",
-            weather = "Foggy",
-            playersHere = 5,
-            recommendedLevel = 5,
-            actions = listOf(
-                LocationAction(ActionType.Camp, "CAMP", "🏕"),
-                LocationAction(ActionType.Cave, "CAVE", "🕳"),
-                LocationAction(ActionType.Fishing, "FISHING", "🎣"),
-                LocationAction(ActionType.Docks, "DOCKS", "⚓")
-            )
-        )
-    )
+    fun addFriend(targetId: String) {
+        viewModelScope.launch {
+            socialRepository.sendFriendRequest(targetId)
+        }
+    }
+
+    fun blockPlayer(targetId: String) {
+        viewModelScope.launch {
+            socialRepository.blockPlayer(targetId)
+        }
+    }
 }
