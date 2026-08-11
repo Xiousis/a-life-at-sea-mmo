@@ -2,6 +2,8 @@ package com.alifeatseammo.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -23,7 +25,9 @@ import com.alifeatseammo.data.model.Location
 fun DashboardScreen(
     character: Character,
     location: Location?,
+    playersNearby: List<Character>,
     onActionClick: (ActionType) -> Unit,
+    onPlayerClick: (Character) -> Unit,
     onMissionsClick: () -> Unit,
     onMailClick: () -> Unit
 ) {
@@ -85,7 +89,7 @@ fun DashboardScreen(
 
                 StatusBar("HP", character.hp, character.maxHp, Color(0xFFE57373))
                 Spacer(modifier = Modifier.height(8.dp))
-                StatusBar("Energy", character.energy, character.maxEnergy, Color(0xFF64B5F6))
+                StatusBar("Energy", character.getCurrentEnergy(), character.maxEnergy, Color(0xFF64B5F6))
                 Spacer(modifier = Modifier.height(8.dp))
                 val xpNeeded = character.level * 100
                 StatusBar("XP", character.xp, xpNeeded, Color(0xFF81C784))
@@ -124,9 +128,33 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Weather: ${it.weather} | Players here: ${it.playersHere}",
+                    text = "Weather: ${it.weather} | Players here: ${playersNearby.size}",
                     style = MaterialTheme.typography.labelMedium
                 )
+
+                if (playersNearby.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "PLAYERS AT ${it.name}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(playersNearby) { other ->
+                            if (other.id != character.id) {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = { onPlayerClick(other) },
+                                    label = { Text(other.name) },
+                                    leadingIcon = { Text("☠") }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 

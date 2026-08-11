@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.alifeatseammo.data.model.ActionType
+import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.StatType
 import com.alifeatseammo.ui.GameViewModel
 import com.alifeatseammo.ui.screens.*
@@ -29,11 +30,13 @@ class MainActivity : ComponentActivity() {
                     val character by viewModel.character.collectAsState()
                     val user by viewModel.currentUser.collectAsState()
                     var currentScreen by remember { mutableStateOf<Screen>(Screen.Dashboard) }
+                    var selectedPlayer by remember { mutableStateOf<Character?>(null) }
 
                     if (user == null) {
                         LoginScreen(
                             onLogin = { email, password -> viewModel.signIn(email, password) },
-                            onSignUp = { email, password, username -> viewModel.signUp(email, password, username) }
+                            onSignUp = { email, password, username -> viewModel.signUp(email, password, username) },
+                            onGuestSignIn = { viewModel.signIn() }
                         )
                     } else if (character == null) {
                         CharacterCreationScreen { name, gender, race ->
@@ -83,9 +86,11 @@ class MainActivity : ComponentActivity() {
                                         Screen.Dashboard -> {
                                             currentChar?.let { char ->
                                                 val location by viewModel.currentLocationInfo.collectAsState()
+                                                val playersNearby by viewModel.playersAtLocation.collectAsState()
                                                 DashboardScreen(
                                                     character = char,
                                                     location = location,
+                                                    playersNearby = playersNearby,
                                                     onActionClick = { actionType ->
                                                         when (actionType) {
                                                             ActionType.Training -> currentScreen = Screen.Training
@@ -97,14 +102,19 @@ class MainActivity : ComponentActivity() {
                                                             else -> {}
                                                         }
                                                     },
+                                                    onPlayerClick = { player ->
+                                                        selectedPlayer = player
+                                                        currentScreen = Screen.Character
+                                                    },
                                                     onMissionsClick = { currentScreen = Screen.Missions },
                                                     onMailClick = { /* TODO */ }
                                                 )
                                             }
                                         }
                                         Screen.Missions -> {
+                                            val missions by viewModel.missions.collectAsState()
                                             MissionScreen(
-                                                missions = viewModel.missions,
+                                                missions = missions,
                                                 onMissionClick = {
                                                     viewModel.completeMission(it)
                                                     currentScreen = Screen.Dashboard
@@ -181,14 +191,16 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                         Screen.Character -> {
-                                            // TODO: Implement Character Screen
-                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text("Character Details coming soon!")
-                                                    Button(onClick = { currentScreen = Screen.Dashboard }) {
-                                                        Text("Back")
+                                            selectedPlayer?.let { player ->
+                                                ProfileScreen(
+                                                    character = player,
+                                                    isOwnProfile = player.id == currentChar?.id,
+                                                    onBackClick = { currentScreen = Screen.Dashboard },
+                                                    onAttackClick = {
+                                                        viewModel.attackPlayer(player)
+                                                        currentScreen = Screen.Dashboard
                                                     }
-                                                }
+                                                )
                                             }
                                         }
                                         Screen.More -> {

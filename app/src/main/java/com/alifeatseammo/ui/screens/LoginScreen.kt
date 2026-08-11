@@ -11,7 +11,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LoginScreen(
     onLogin: (String, String) -> Unit,
-    onSignUp: (String, String, String) -> Unit
+    onSignUp: (String, String, String) -> Unit,
+    onGuestSignIn: () -> Unit
 ) {
     var isSignUp by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
@@ -76,6 +77,19 @@ fun LoginScreen(
 
         TextButton(onClick = { isSignUp = !isSignUp }) {
             Text(if (isSignUp) "Already have an account? Login" else "New here? Create an account")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        OutlinedButton(
+            onClick = onGuestSignIn,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Play as Guest (Skip Login)")
         }
     }
 }

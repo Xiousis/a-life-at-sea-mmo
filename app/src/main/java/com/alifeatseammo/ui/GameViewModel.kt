@@ -8,6 +8,7 @@ import com.alifeatseammo.data.repository.*
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
 class GameViewModel(
     private val authRepository: AuthRepository = FirebaseAuthRepository(),
@@ -48,7 +49,8 @@ class GameViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
-    val missions: List<Mission> = gameRepository.getAvailableMissions()
+    val missions: StateFlow<List<Mission>> = gameRepository.getAvailableMissions()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val chatMessages: StateFlow<List<ChatMessage>> = chatRepository.getMessages()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -76,12 +78,16 @@ class GameViewModel(
 
     fun train(statType: StatType) {
         val user = currentUser.value ?: return
-        gameRepository.train(user.uid, statType)
+        viewModelScope.launch {
+            gameRepository.train(user.uid, statType)
+        }
     }
 
     fun completeMission(mission: Mission) {
         val user = currentUser.value ?: return
-        gameRepository.completeMission(user.uid, mission)
+        viewModelScope.launch {
+            gameRepository.completeMission(user.uid, mission.id)
+        }
     }
 
     fun startTravel(destination: String, arrivalTime: Long) {

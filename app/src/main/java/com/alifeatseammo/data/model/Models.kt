@@ -14,11 +14,28 @@ data class Character(
     val xp: Int = 0,
     val level: Int = 1,
     val bounty: Long = 0,
+    val energyUpdatedAt: Long = System.currentTimeMillis(),
     val currentLocation: String = "Fogi Tail Island",
     val travelState: TravelState? = null,
     val combatState: CombatState? = null,
-    val inventory: List<Item> = emptyList()
-)
+    val inventory: List<Item> = emptyList(),
+    val equipment: Map<String, Item?> = emptyMap(),
+    val crewId: String? = null
+) {
+    fun getCurrentEnergy(): Int {
+        val regenRateMs = 3 * 60 * 1000L // 3 minutes
+        val elapsed = System.currentTimeMillis() - energyUpdatedAt
+        val regenerated = (elapsed / regenRateMs).toInt()
+        return (energy + regenerated).coerceAtMost(maxEnergy)
+    }
+
+    fun getEnergyRegenProgress(): Float {
+        val regenRateMs = 3 * 60 * 1000L
+        val elapsed = System.currentTimeMillis() - energyUpdatedAt
+        if (energy >= maxEnergy) return 0f
+        return (elapsed % regenRateMs).toFloat() / regenRateMs.toFloat()
+    }
+}
 
 enum class Gender {
     Male, Female
@@ -127,6 +144,17 @@ data class LocationAction(
     val type: ActionType,
     val label: String,
     val icon: String // Emoji for now
+)
+
+data class Crew(
+    val id: String = "",
+    val name: String = "",
+    val description: String = "",
+    val captainId: String = "",
+    val members: List<String> = emptyList(),
+    val totalBounty: Long = 0,
+    val level: Int = 1,
+    val experience: Long = 0
 )
 
 enum class ActionType {

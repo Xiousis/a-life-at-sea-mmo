@@ -4,15 +4,17 @@ import com.alifeatseammo.data.model.*
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.toObject
+import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.tasks.await
 
 interface GameRepository {
     fun getCharacter(userId: String): Flow<Character?>
     fun createCharacter(userId: String, name: String, gender: Gender, race: Race)
-    fun train(userId: String, statType: StatType)
-    fun completeMission(userId: String, mission: Mission)
-    fun getAvailableMissions(): List<Mission>
+    suspend fun train(userId: String, statType: StatType): Boolean
+    suspend fun completeMission(userId: String, missionId: String): Boolean
+    fun getAvailableMissions(): Flow<List<Mission>>
     fun startTravel(userId: String, destination: String, arrivalTime: Long)
     fun combatAction(userId: String, action: CombatAction)
     fun attackPlayer(attackerId: String, defenderId: String)
@@ -21,7 +23,8 @@ interface GameRepository {
 }
 
 class FirestoreGameRepository(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance()
 ) : GameRepository {
     
     override fun getCharacter(userId: String): Flow<Character?> = callbackFlow {
@@ -36,7 +39,8 @@ class FirestoreGameRepository(
                         // Optimistically emit the arrived state
                         trySend(character.copy(currentLocation = travel.destination, travelState = null))
                         
-                        // Persist to Firestore
+                        // Persist to Firestore (This might fail now due to security rules if not careful)
+                        // TODO: Move travel arrival to server-side check or separate function
                         db.runTransaction { transaction ->
                             transaction.update(docRef, "currentLocation", travel.destination)
                             transaction.update(docRef, "travelState", null)
@@ -59,71 +63,41 @@ class FirestoreGameRepository(
             id = userId,
             name = name,
             gender = gender,
-            race = race
+            race = race,
+            energyUpdatedAt = System.currentTimeMillis()
         )
         db.collection("players").document(userId).set(character)
     }
 
-    override fun train(userId: String, statType: StatType) {
-        // TODO: Move to Cloud Function for production
-        val docRef = db.collection("players").document(userId)
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(docRef)
-            val character = snapshot.toObject<Character>() ?: return@runTransaction
-            
-            if (character.energy >= 10) {
-                val updatedStats = when (statType) {
-                    StatType.Strength -> character.stats.copy(strength = character.stats.strength + 1)
-                    StatType.Endurance -> character.stats.copy(endurance = character.stats.endurance + 1)
-                    StatType.Agility -> character.stats.copy(agility = character.stats.agility + 1)
-                    StatType.Perception -> character.stats.copy(perception = character.stats.perception + 1)
-                    StatType.Willpower -> character.stats.copy(willpower = character.stats.willpower + 1)
-                    StatType.Luck -> character.stats.copy(luck = character.stats.luck + 1)
-                    StatType.Swordsmanship -> character.stats.copy(swordsmanship = character.stats.swordsmanship + 1)
-                    StatType.Brawling -> character.stats.copy(brawling = character.stats.brawling + 1)
-                    StatType.Gunslinging -> character.stats.copy(gunslinging = character.stats.gunslinging + 1)
-                    StatType.Spear -> character.stats.copy(spear = character.stats.spear + 1)
-                    StatType.MartialArts -> character.stats.copy(martialArts = character.stats.martialArts + 1)
-                    StatType.DualBlades -> character.stats.copy(dualBlades = character.stats.dualBlades + 1)
+    override suspend fun train(userId: String, statType: StatType): Boolean {
+        return try {
+            val data = hashMapOf("statType" to statType.name)
+            functions.getHttpsCallable("train").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override suspend fun completeMission(userId: String, missionId: String): Boolean {
+        return try {
+            val data = hashMapOf("missionId" to missionId)
+            functions.getHttpsCallable("completeMission").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override fun getAvailableMissions(): Flow<List<Mission>> = callbackFlow {
+        val subscription = db.collection("missions")
+            .orderBy("difficulty")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    trySend(snapshot.documents.mapNotNull { it.toObject<Mission>() })
                 }
-                
-                // Add 5 XP for training
-                val updatedCharacter = character.copy(
-                    stats = updatedStats,
-                    energy = character.energy - 10,
-                    xp = character.xp + 5
-                ).checkLevelUp()
-
-                transaction.set(docRef, updatedCharacter)
             }
-        }
-    }
-
-    override fun completeMission(userId: String, mission: Mission) {
-        // TODO: Move to Cloud Function for production
-        val docRef = db.collection("players").document(userId)
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(docRef)
-            val character = snapshot.toObject<Character>() ?: return@runTransaction
-            
-            if (character.energy >= mission.energyCost) {
-                val updatedCharacter = character.copy(
-                    energy = character.energy - mission.energyCost,
-                    gold = character.gold + mission.rewards.gold,
-                    xp = character.xp + mission.rewards.xp
-                ).checkLevelUp()
-                
-                transaction.set(docRef, updatedCharacter)
-            }
-        }
-    }
-
-    override fun getAvailableMissions(): List<Mission> {
-        return listOf(
-            Mission("1", "Scout the Shore", "Check for any suspicious activity on Fogi Tail Island's beach.", 10, 1, Reward(50, 20), 1),
-            Mission("2", "Deliver Message", "Take a letter to the merchant on Ironcrest Isle.", 15, 1, Reward(75, 30), 2),
-            Mission("3", "Clear Pests", "Help an Amber Reach farmer clear giant crabs from his field.", 25, 2, Reward(150, 60), 3)
-        )
+        awaitClose { subscription.remove() }
     }
 
     override fun startTravel(userId: String, destination: String, arrivalTime: Long) {
@@ -314,7 +288,7 @@ class MockGameRepository : GameRepository {
         )
     }
 
-    override fun train(userId: String, statType: StatType) {
+    override suspend fun train(userId: String, statType: StatType): Boolean {
         _character.update { char ->
             char?.let {
                 if (it.energy >= 10) {
@@ -340,29 +314,32 @@ class MockGameRepository : GameRepository {
                 } else it
             }
         }
+        return true
     }
 
-    override fun completeMission(userId: String, mission: Mission) {
+    override suspend fun completeMission(userId: String, missionId: String): Boolean {
         _character.update { char ->
             char?.let {
-                if (it.energy >= mission.energyCost) {
+                // Mock logic: assumes mission exists and costs 10 energy
+                if (it.energy >= 10) {
                     it.copy(
-                        energy = it.energy - mission.energyCost,
-                        gold = it.gold + mission.rewards.gold,
-                        xp = it.xp + mission.rewards.xp
+                        energy = it.energy - 10,
+                        gold = it.gold + 50,
+                        xp = it.xp + 20
                     ).checkLevelUp()
                 } else it
             }
         }
+        return true
     }
 
-    override fun getAvailableMissions(): List<Mission> {
-        return listOf(
+    override fun getAvailableMissions(): Flow<List<Mission>> = flowOf(
+        listOf(
             Mission("1", "Scout the Shore", "Check for any suspicious activity on Fogi Tail Island's beach.", 10, 1, Reward(50, 20), 1),
             Mission("2", "Deliver Message", "Take a letter to the merchant on Ironcrest Isle.", 15, 1, Reward(75, 30), 2),
             Mission("3", "Clear Pests", "Help an Amber Reach farmer clear giant crabs from his field.", 25, 2, Reward(150, 60), 3)
         )
-    }
+    )
 
     override fun startTravel(userId: String, destination: String, arrivalTime: Long) {}
     override fun combatAction(userId: String, action: CombatAction) {}
