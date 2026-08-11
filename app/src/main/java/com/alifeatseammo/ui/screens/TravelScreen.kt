@@ -18,10 +18,10 @@ fun TravelScreen(
     onBackClick: () -> Unit
 ) {
     val islands = listOf(
-        Island("Logue Town", 0),
-        Island("Shells Town", 60000), // 1 min
-        Island("Orange Town", 120000), // 2 min
-        Island("Syrup Village", 300000) // 5 min
+        Island("Fogi Tail Island", 0),
+        Island("Ironcrest Isle", 60000), // 1 min
+        Island("Amber Reach", 120000), // 2 min
+        Island("Storm's End", 300000) // 5 min
     )
 
     Scaffold(

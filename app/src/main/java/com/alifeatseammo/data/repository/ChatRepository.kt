@@ -2,7 +2,7 @@ package com.alifeatseammo.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.ktx.toObject
+import com.google.firebase.firestore.toObject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.callbackFlow
 data class ChatMessage(
     val senderName: String = "",
     val message: String = "",
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
 )
 
 interface ChatRepository {

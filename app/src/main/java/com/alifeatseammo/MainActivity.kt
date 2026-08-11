@@ -3,14 +3,15 @@ package com.alifeatseammo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.alifeatseammo.data.model.ActionType
+import com.alifeatseammo.data.model.StatType
 import com.alifeatseammo.ui.GameViewModel
 import com.alifeatseammo.ui.screens.*
 import com.alifeatseammo.ui.theme.ALifeAtSeaMMOTheme
@@ -30,106 +31,209 @@ class MainActivity : ComponentActivity() {
                     var currentScreen by remember { mutableStateOf<Screen>(Screen.Dashboard) }
 
                     if (user == null) {
-                        Column {
-                            Text("Please sign in via Firebase console to use this app.")
-                        }
-                    } else if (character == null) {
-                        CharacterCreationScreen(
-                            onCharacterCreated = { name, origin, style ->
-                                viewModel.createCharacter(name, origin, style)
-                            }
+                        LoginScreen(
+                            onLogin = { email, password -> viewModel.signIn(email, password) },
+                            onSignUp = { email, password, username -> viewModel.signUp(email, password, username) }
                         )
+                    } else if (character == null) {
+                        CharacterCreationScreen { name, gender, race ->
+                            viewModel.createCharacter(name, gender, race)
+                        }
                     } else {
-                        Scaffold(
-                            bottomBar = {
-                                NavigationBar {
-                                    NavigationBarItem(
-                                        selected = currentScreen == Screen.Dashboard,
-                                        onClick = { currentScreen = Screen.Dashboard },
-                                        icon = { Text("Home") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = currentScreen == Screen.Missions,
-                                        onClick = { currentScreen = Screen.Missions },
-                                        icon = { Text("Missions") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = currentScreen == Screen.Travel,
-                                        onClick = { currentScreen = Screen.Travel },
-                                        icon = { Text("Travel") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = currentScreen == Screen.Leaderboard,
-                                        onClick = { currentScreen = Screen.Leaderboard },
-                                        icon = { Text("Tops") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = currentScreen == Screen.PvP,
-                                        onClick = { currentScreen = Screen.PvP },
-                                        icon = { Text("PvP") }
-                                    )
-                                    NavigationBarItem(
-                                        selected = currentScreen == Screen.Chat,
-                                        onClick = { currentScreen = Screen.Chat },
-                                        icon = { Text("Chat") }
-                                    )
+                        val currentChar = character
+                        if (currentChar?.combatState != null) {
+                            CombatScreen(
+                                character = currentChar,
+                                onActionClick = { viewModel.combatAction(it) }
+                            )
+                        } else {
+                            Scaffold(
+                                bottomBar = {
+                                    NavigationBar {
+                                        NavigationBarItem(
+                                            selected = currentScreen == Screen.Dashboard,
+                                            onClick = { currentScreen = Screen.Dashboard },
+                                            icon = { Text("🏠 HUB") }
+                                        )
+                                        NavigationBarItem(
+                                            selected = currentScreen == Screen.Travel,
+                                            onClick = { currentScreen = Screen.Travel },
+                                            icon = { Text("🗺 SEA") }
+                                        )
+                                        NavigationBarItem(
+                                            selected = currentScreen == Screen.PvP,
+                                            onClick = { currentScreen = Screen.PvP },
+                                            icon = { Text("☠ BATTLE") }
+                                        )
+                                        NavigationBarItem(
+                                            selected = currentScreen == Screen.Crew,
+                                            onClick = { currentScreen = Screen.Crew },
+                                            icon = { Text("👥 CREW") }
+                                        )
+                                        NavigationBarItem(
+                                            selected = currentScreen == Screen.More,
+                                            onClick = { currentScreen = Screen.More },
+                                            icon = { Text("☰ MORE") }
+                                        )
+                                    }
                                 }
-                            }
-                        ) { padding ->
-                            Box(modifier = Modifier.padding(padding)) {
-                                val currentChar = character
-                                when (currentScreen) {
-                                    Screen.Dashboard -> {
-                                        if (currentChar != null) {
-                                            DashboardScreen(
-                                                character = currentChar,
-                                                onTrainClick = { viewModel.train(it) },
-                                                onMissionsClick = { currentScreen = Screen.Missions }
-                                            )
+                            ) { padding ->
+                                Box(modifier = Modifier.padding(padding)) {
+                                    when (currentScreen) {
+                                        Screen.Dashboard -> {
+                                            currentChar?.let { char ->
+                                                val location by viewModel.currentLocationInfo.collectAsState()
+                                                DashboardScreen(
+                                                    character = char,
+                                                    location = location,
+                                                    onActionClick = { actionType ->
+                                                        when (actionType) {
+                                                            ActionType.Training -> currentScreen = Screen.Training
+                                                            ActionType.Docks -> currentScreen = Screen.Travel
+                                                            ActionType.Bounties -> currentScreen = Screen.Leaderboard
+                                                            ActionType.Crew -> currentScreen = Screen.Crew
+                                                            ActionType.Market -> { /* TODO */ }
+                                                            ActionType.Tavern -> { /* TODO */ }
+                                                            else -> {}
+                                                        }
+                                                    },
+                                                    onMissionsClick = { currentScreen = Screen.Missions },
+                                                    onMailClick = { /* TODO */ }
+                                                )
+                                            }
                                         }
-                                    }
-                                    Screen.Missions -> {
-                                        MissionScreen(
-                                            missions = viewModel.missions,
-                                            onMissionClick = {
-                                                viewModel.completeMission(it)
-                                                currentScreen = Screen.Dashboard
-                                            },
-                                            onBackClick = { currentScreen = Screen.Dashboard }
-                                        )
-                                    }
-                                    Screen.Travel -> {
-                                        if (currentChar != null) {
-                                            TravelScreen(
-                                                character = currentChar,
-                                                onTravelClick = { dest, arrival ->
-                                                    viewModel.startTravel(dest, arrival)
+                                        Screen.Missions -> {
+                                            MissionScreen(
+                                                missions = viewModel.missions,
+                                                onMissionClick = {
+                                                    viewModel.completeMission(it)
+                                                    currentScreen = Screen.Dashboard
                                                 },
                                                 onBackClick = { currentScreen = Screen.Dashboard }
                                             )
                                         }
-                                    }
-                                    Screen.Leaderboard -> {
-                                        LeaderboardScreen(onBackClick = { currentScreen = Screen.Dashboard })
-                                    }
-                                    Screen.PvP -> {
-                                        if (currentChar != null) {
-                                            PvPScreen(
-                                                character = currentChar,
-                                                onAttackClick = { target ->
-                                                    viewModel.attackPlayer(target)
-                                                },
+                                        Screen.Travel -> {
+                                            currentChar?.let {
+                                                TravelScreen(
+                                                    character = it,
+                                                    onTravelClick = { dest, arrival ->
+                                                        viewModel.startTravel(dest, arrival)
+                                                    },
+                                                    onBackClick = { currentScreen = Screen.Dashboard }
+                                                )
+                                            }
+                                        }
+                                        Screen.Leaderboard -> {
+                                            val players by viewModel.topPlayers.collectAsState()
+                                            LeaderboardScreen(
+                                                players = players,
                                                 onBackClick = { currentScreen = Screen.Dashboard }
                                             )
                                         }
-                                    }
-                                    Screen.Chat -> {
-                                        val messages by viewModel.chatMessages.collectAsState()
-                                        ChatScreen(
-                                            messages = messages,
-                                            onSendMessage = { viewModel.sendMessage(it) },
-                                            onBackClick = { currentScreen = Screen.Dashboard }
-                                        )
+                                        Screen.PvP -> {
+                                            currentChar?.let { char ->
+                                                val potentialTargets by viewModel.playersAtLocation.collectAsState()
+                                                PvPScreen(
+                                                    character = char,
+                                                    potentialTargets = potentialTargets.filter { it.id != char.id },
+                                                    onAttackClick = { target ->
+                                                        viewModel.attackPlayer(target)
+                                                    },
+                                                    onBackClick = { currentScreen = Screen.Dashboard }
+                                                )
+                                            }
+                                        }
+                                        Screen.Chat -> {
+                                            val messages by viewModel.chatMessages.collectAsState()
+                                            ChatScreen(
+                                                messages = messages,
+                                                onSendMessage = { viewModel.sendMessage(it) },
+                                                onBackClick = { currentScreen = Screen.Dashboard }
+                                            )
+                                        }
+                                        Screen.Combat -> {} // Handled by forced override above
+                                        Screen.Training -> {
+                                            // TODO: Implement a proper Training Screen
+                                            // Reusing the old stat training logic for now in a simple list
+                                            Column(modifier = Modifier.padding(16.dp)) {
+                                                Text("Training Room", style = MaterialTheme.typography.headlineMedium)
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                val stats = listOf(StatType.Strength, StatType.Endurance, StatType.Agility)
+                                                stats.forEach { stat ->
+                                                    Button(onClick = { viewModel.train(stat) }) {
+                                                        Text("Train $stat")
+                                                    }
+                                                }
+                                                Button(onClick = { currentScreen = Screen.Dashboard }) {
+                                                    Text("Back")
+                                                }
+                                            }
+                                        }
+                                        Screen.Crew -> {
+                                            // TODO: Implement Crew Screen
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text("Crew system coming soon!")
+                                                    Button(onClick = { currentScreen = Screen.Dashboard }) {
+                                                        Text("Back")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Screen.Character -> {
+                                            // TODO: Implement Character Screen
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text("Character Details coming soon!")
+                                                    Button(onClick = { currentScreen = Screen.Dashboard }) {
+                                                        Text("Back")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Screen.More -> {
+                                            MoreScreen(
+                                                onMenuItemClick = { item ->
+                                                    when (item.label) {
+                                                        "Character" -> currentScreen = Screen.Character
+                                                        "Inventory" -> currentScreen = Screen.Inventory
+                                                        "Skills" -> currentScreen = Screen.Skills
+                                                        "Leaderboard" -> currentScreen = Screen.Leaderboard
+                                                        "Chat" -> currentScreen = Screen.Chat
+                                                        "Settings" -> currentScreen = Screen.Settings
+                                                        "Help" -> currentScreen = Screen.Help
+                                                    }
+                                                }
+                                            )
+                                        }
+                                        Screen.Inventory -> {
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Text("Inventory Screen")
+                                            }
+                                        }
+                                        Screen.Skills -> {
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Text("Skills Screen")
+                                            }
+                                        }
+                                        Screen.Settings -> {
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text("Settings Screen")
+                                                    Button(onClick = { viewModel.signOut() }) {
+                                                        Text("Logout")
+                                                    }
+                                                    Button(onClick = { currentScreen = Screen.More }) {
+                                                        Text("Back")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Screen.Help -> {
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Text("Help & Support")
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -148,4 +252,13 @@ sealed class Screen {
     object Leaderboard : Screen()
     object PvP : Screen()
     object Chat : Screen()
+    object Combat : Screen()
+    object Training : Screen()
+    object Character : Screen()
+    object Crew : Screen()
+    object More : Screen()
+    object Inventory : Screen()
+    object Skills : Screen()
+    object Settings : Screen()
+    object Help : Screen()
 }

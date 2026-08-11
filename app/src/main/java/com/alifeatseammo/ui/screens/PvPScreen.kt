@@ -8,31 +8,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.toObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PvPScreen(
     character: Character,
+    potentialTargets: List<Character>,
     onAttackClick: (Character) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
 ) {
-    val db = FirebaseFirestore.getInstance()
-    var potentialTargets by remember { mutableStateOf<List<Character>>(emptyList()) }
-
-    LaunchedEffect(character.currentLocation) {
-        db.collection("players")
-            .whereEqualTo("currentLocation", character.currentLocation)
-            .limit(10)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                potentialTargets = snapshot.documents
-                    .mapNotNull { it.toObject<Character>() }
-                    .filter { it.name != character.name } // Don't fight yourself
-            }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(

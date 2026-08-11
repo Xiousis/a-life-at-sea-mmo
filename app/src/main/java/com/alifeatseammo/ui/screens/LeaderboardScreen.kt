@@ -8,26 +8,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.ktx.toObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LeaderboardScreen(onBackClick: () -> Unit) {
-    val db = FirebaseFirestore.getInstance()
-    var players by remember { mutableStateOf<List<Character>>(emptyList()) }
-
-    LaunchedEffect(Unit) {
-        db.collection("players")
-            .orderBy("xp", Query.Direction.DESCENDING)
-            .limit(20)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                players = snapshot.documents.mapNotNull { it.toObject<Character>() }
-            }
-    }
-
+fun LeaderboardScreen(
+    players: List<Character>,
+    onBackClick: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
