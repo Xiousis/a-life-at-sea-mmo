@@ -70,7 +70,6 @@ fun CrewProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.extraSmall
                     ) {
-                        Text("REQUEST TO JOIN", fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

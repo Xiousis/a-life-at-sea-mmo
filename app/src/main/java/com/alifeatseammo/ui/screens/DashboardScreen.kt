@@ -20,13 +20,14 @@ import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.ActionType
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Faction
-import com.alifeatseammo.data.model.Location
+import com.alifeatseammo.data.model.LocationDef
 
 @Composable
 fun DashboardScreen(
     character: Character,
-    location: Location?,
+    location: LocationDef?,
     playersNearby: List<Character>,
+    missionCount: Int,
     onActionClick: (ActionType) -> Unit,
     onPlayerClick: (Character) -> Unit,
     onMissionsClick: () -> Unit,
@@ -219,7 +220,7 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "3 jobs currently available",
+                    text = if (missionCount > 0) "$missionCount jobs currently available" else "No jobs currently available",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -254,20 +255,22 @@ fun DashboardScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         // World Activity
-        Text(
-            text = "WORLD ACTIVITY",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                ActivityItem("☠ Red Tide defeated a Sea Beast")
-                ActivityItem("★ Raven reached Level 25")
-                ActivityItem("⚔ Blackwake attacked Port Haven")
+        if (playersNearby.isNotEmpty()) {
+            Text(
+                text = "WORLD ACTIVITY",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    playersNearby.take(3).forEach { player ->
+                        ActivityItem("${player.name} is currently at ${location?.name ?: "the docks"}")
+                    }
+                }
             }
         }
     }

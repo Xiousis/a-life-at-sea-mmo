@@ -24,9 +24,11 @@ class PlayerProfileViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val playerCrew: StateFlow<Crew?> = playerProfile
         .map { it?.crewId }
-        .filterNotNull()
         .distinctUntilChanged()
-        .flatMapLatest { crewId -> crewRepository.getCrew(crewId) }
+        .flatMapLatest { crewId ->
+            if (crewId != null) crewRepository.getCrew(crewId)
+            else flowOf(null)
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun loadPlayer(playerId: String) {

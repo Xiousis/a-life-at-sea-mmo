@@ -14,9 +14,10 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun MoreScreen(
+    isGuest: Boolean,
     onMenuItemClick: (MoreMenuItem) -> Unit
 ) {
-    val menuItems = listOf(
+    val menuItems = mutableListOf(
         MoreMenuItem("Character", "👤"),
         MoreMenuItem("Inventory", "📦"),
         MoreMenuItem("Skills", "📜"),
@@ -25,6 +26,10 @@ fun MoreScreen(
         MoreMenuItem("Settings", "⚙"),
         MoreMenuItem("Help", "❓")
     )
+
+    if (isGuest) {
+        menuItems.add(MoreMenuItem("Upgrade Account", "⭐"))
+    }
 
     Column(
         modifier = Modifier

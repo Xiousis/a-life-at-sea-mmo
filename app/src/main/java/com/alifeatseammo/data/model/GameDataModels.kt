@@ -14,7 +14,7 @@ data class LocationDef(
 )
 
 data class ActionDef(
-    val type: String = "",
+    val type: ActionType = ActionType.Market,
     val label: String = "",
     val icon: String = ""
 )

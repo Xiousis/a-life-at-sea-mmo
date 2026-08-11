@@ -28,7 +28,8 @@ data class Character(
     val lastOnline: Long = System.currentTimeMillis(),
     val isOnline: Boolean = false,
     val friends: List<String> = emptyList(),
-    val blocked: List<String> = emptyList()
+    val blocked: List<String> = emptyList(),
+    val learnedTechniques: List<String> = emptyList()
 ) {
     fun getCurrentEnergy(): Int {
         val regenRateMs = 3 * 60 * 1000L // 3 minutes
@@ -38,6 +39,24 @@ data class Character(
     }
 
 }
+
+data class CharacterPrivate(
+    val stats: Stats = Stats(),
+    val hp: Int = 100,
+    val maxHp: Int = 100,
+    val energy: Int = 100,
+    val maxEnergy: Int = 100,
+    val gold: Int = 0,
+    val xp: Int = 0,
+    val energyUpdatedAt: Long = System.currentTimeMillis(),
+    val travelState: TravelState? = null,
+    val combatState: CombatState? = null,
+    val inventory: List<Item> = emptyList(),
+    val equipment: Map<String, Item?> = emptyMap(),
+    val friends: List<String> = emptyList(),
+    val blocked: List<String> = emptyList(),
+    val learnedTechniques: List<String> = emptyList()
+)
 
 enum class Gender {
     Male, Female
@@ -126,6 +145,7 @@ data class CombatState(
     val isFinished: Boolean = false,
     val playerWon: Boolean = false,
     val defending: Boolean = false,
+    val turnExpiresAt: Long? = null,
     val turnCount: Int = 0,
     val playerEffects: List<StatusEffect> = emptyList(),
     val enemyEffects: List<StatusEffect> = emptyList(),
@@ -163,23 +183,6 @@ enum class ItemType {
     Weapon, Armor, Accessory, Consumable, Miscellaneous
 }
 
-data class Location(
-    val name: String = "",
-    val region: String = "",
-    val isSafe: Boolean = true,
-    val description: String = "",
-    val weather: String = "Clear",
-    val playersHere: Int = 0,
-    val recommendedLevel: Int = 1,
-    val actions: List<LocationAction> = emptyList()
-)
-
-data class LocationAction(
-    val type: ActionType,
-    val label: String,
-    val icon: String // Emoji for now
-)
-
 data class Crew(
     val id: String = "",
     val name: String = "",
@@ -203,6 +206,16 @@ data class CrewInvite(
     val targetId: String = "",
     val status: String = "pending",
     val timestamp: Long = System.currentTimeMillis()
+)
+
+data class MailMessage(
+    val id: String = "",
+    val senderName: String = "",
+    val subject: String = "",
+    val body: String = "",
+    val timestamp: Long = System.currentTimeMillis(),
+    val isRead: Boolean = false,
+    val rewards: Map<String, Int>? = null // e.g., gold, items
 )
 
 enum class ActionType {
