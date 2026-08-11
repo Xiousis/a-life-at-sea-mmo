@@ -27,6 +27,7 @@ fun DashboardScreen(
     character: Character,
     location: LocationDef?,
     playersNearby: List<Character>,
+    playerCount: Int,
     missionCount: Int,
     onActionClick: (ActionType) -> Unit,
     onPlayerClick: (Character) -> Unit,
@@ -104,8 +105,10 @@ fun DashboardScreen(
         // Faction Recruitment
         if (character.faction == Faction.Neutral && location != null) {
             val recruitment = when {
-                location.name == "Blacktooth Island" || location.actions.any { it.type == ActionType.Tavern } -> Faction.Pirate
-                location.name == "Port Haven" || location.actions.any { it.type == ActionType.Docks } -> Faction.Navy
+                location.name == "Port Haven" -> Faction.Navy
+                location.name == "Blacktooth Island" -> Faction.Pirate
+                location.actions.any { it.type == ActionType.Docks } -> Faction.Navy
+                location.actions.any { it.type == ActionType.Tavern } -> Faction.Pirate
                 else -> null
             }
 
@@ -170,7 +173,7 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Weather: ${it.weather} | Players here: ${playersNearby.size}",
+                    text = "Weather: ${it.weather} | Players here: $playerCount",
                     style = MaterialTheme.typography.labelMedium
                 )
 

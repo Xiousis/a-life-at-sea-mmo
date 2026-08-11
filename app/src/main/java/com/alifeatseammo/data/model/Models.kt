@@ -71,7 +71,7 @@ enum class Rarity {
 }
 
 enum class Race {
-    Human, Aquaris, Halfling
+    Human, Fishman, Mink, Skypiean, Cyborg
 }
 
 data class TravelState(
