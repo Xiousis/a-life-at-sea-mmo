@@ -20,6 +20,13 @@ interface GameRepository {
     fun attackPlayer(attackerId: String, defenderId: String)
     fun getPlayersAtLocation(location: String): Flow<List<Character>>
     fun getTopPlayers(limit: Int): Flow<List<Character>>
+    fun getPlayerProfile(playerId: String): Flow<Character?>
+    fun getCrew(crewId: String): Flow<Crew?>
+    suspend fun createCrew(name: String, description: String): String?
+    suspend fun joinCrew(crewId: String): Boolean
+    fun getLocations(): Flow<List<LocationDef>>
+    fun getEnemyDefs(): Flow<List<EnemyDef>>
+    fun getMissionDefs(): Flow<List<MissionDef>>
 }
 
 class FirestoreGameRepository(
@@ -33,18 +40,14 @@ class FirestoreGameRepository(
             if (snapshot != null && snapshot.exists()) {
                 val character = snapshot.toObject<Character>()
                 if (character != null) {
-                    // Lazy Travel Arrival check
+                    // Travel Arrival check - The client notifies the server when travel is complete
                     val travel = character.travelState
                     if (travel != null && travel.arrivalTime <= System.currentTimeMillis()) {
-                        // Optimistically emit the arrived state
+                        // We emit the arrival state optimistically, but the server must confirm it
                         trySend(character.copy(currentLocation = travel.destination, travelState = null))
                         
-                        // Persist to Firestore (This might fail now due to security rules if not careful)
-                        // TODO: Move travel arrival to server-side check or separate function
-                        db.runTransaction { transaction ->
-                            transaction.update(docRef, "currentLocation", travel.destination)
-                            transaction.update(docRef, "travelState", null)
-                        }
+                        // Call Cloud Function to persist arrival
+                        functions.getHttpsCallable("finishTravel").call()
                     } else {
                         trySend(character)
                     }
@@ -59,14 +62,12 @@ class FirestoreGameRepository(
     }
 
     override fun createCharacter(userId: String, name: String, gender: Gender, race: Race) {
-        val character = Character(
-            id = userId,
-            name = name,
-            gender = gender,
-            race = race,
-            energyUpdatedAt = System.currentTimeMillis()
+        val data = hashMapOf(
+            "name" to name,
+            "gender" to gender.name,
+            "race" to race.name
         )
-        db.collection("players").document(userId).set(character)
+        functions.getHttpsCallable("createCharacter").call(data)
     }
 
     override suspend fun train(userId: String, statType: StatType): Boolean {
@@ -101,151 +102,21 @@ class FirestoreGameRepository(
     }
 
     override fun startTravel(userId: String, destination: String, arrivalTime: Long) {
-        val docRef = db.collection("players").document(userId)
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(docRef)
-            val character = snapshot.toObject<Character>() ?: return@runTransaction
-            
-            if (character.travelState == null && character.combatState == null) {
-                // Encounter logic (25% chance if travel time > 30s)
-                val travelDuration = arrivalTime - System.currentTimeMillis()
-                val ambush = if (travelDuration > 30000 && (1..100).random() <= 25) {
-                    generateRandomEnemy(character.level)
-                } else null
-
-                if (ambush != null) {
-                    transaction.update(docRef, "combatState", CombatState(enemy = ambush, logs = listOf("You were ambushed by a ${ambush.name}!")))
-                } else {
-                    transaction.update(docRef, "travelState", TravelState(destination, arrivalTime))
-                }
-            }
-        }
+        val data = hashMapOf(
+            "destination" to destination,
+            "arrivalTime" to arrivalTime
+        )
+        functions.getHttpsCallable("startTravel").call(data)
     }
 
     override fun combatAction(userId: String, action: CombatAction) {
-        val docRef = db.collection("players").document(userId)
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(docRef)
-            val character = snapshot.toObject<Character>() ?: return@runTransaction
-            val combatState = character.combatState ?: return@runTransaction
-            if (combatState.isFinished) return@runTransaction
-
-            val logs = combatState.logs.toMutableList()
-            var currentEnemy = combatState.enemy
-            var currentPlayerHp = character.hp
-            var isFinished = false
-            var playerWon = false
-
-            when (action) {
-                CombatAction.Attack -> {
-                    val damage = (character.stats.strength * 2) + (character.stats.swordsmanship / 2)
-                    currentEnemy = currentEnemy.copy(hp = (currentEnemy.hp - damage).coerceAtLeast(0))
-                    logs.add("You attacked ${currentEnemy.name} for $damage damage!")
-                }
-                CombatAction.Technique -> {
-                    // Placeholder for future Technique system
-                    logs.add("Techniques are not yet available.")
-                }
-                CombatAction.Item -> {
-                    // Placeholder for future Item system
-                    logs.add("Your inventory is currently empty.")
-                }
-                CombatAction.Defend -> {
-                    logs.add("You take a defensive stance.")
-                }
-                CombatAction.Flee -> {
-                    if ((1..100).random() <= 50) {
-                        transaction.update(docRef, "combatState", null)
-                        return@runTransaction
-                    } else {
-                        logs.add("You failed to flee!")
-                    }
-                }
-            }
-
-            if (currentEnemy.hp <= 0) {
-                logs.add("You defeated ${currentEnemy.name}!")
-                isFinished = true
-                playerWon = true
-            } else {
-                // Enemy Turn
-                val enemyDamage = (currentEnemy.stats.strength * 1.5).toInt()
-                currentPlayerHp = (currentPlayerHp - enemyDamage).coerceAtLeast(0)
-                logs.add("${currentEnemy.name} attacked you for $enemyDamage damage!")
-                
-                if (currentPlayerHp <= 0) {
-                    logs.add("You were defeated...")
-                    isFinished = true
-                    playerWon = false
-                }
-            }
-
-            if (isFinished) {
-                val updatedChar = if (playerWon) {
-                    character.copy(
-                        hp = currentPlayerHp,
-                        gold = character.gold + currentEnemy.goldReward,
-                        xp = character.xp + currentEnemy.xpReward,
-                        combatState = null
-                    ).checkLevelUp()
-                } else {
-                    character.copy(
-                        hp = character.maxHp,
-                        gold = (character.gold * 0.9).toInt(),
-                        currentLocation = "Fogi Tail Island",
-                        combatState = null
-                    )
-                }
-                transaction.set(docRef, updatedChar)
-            } else {
-                transaction.update(docRef, "hp", currentPlayerHp)
-                transaction.update(docRef, "combatState", combatState.copy(enemy = currentEnemy, logs = logs))
-            }
-        }
-    }
-
-    private fun generateRandomEnemy(playerLevel: Int): Enemy {
-        val names = listOf("Sea Serpent", "Pirate Scout", "Feral Crab", "Ghost Ship")
-        val name = names.random()
-        val level = (playerLevel + (-1..1).random()).coerceAtLeast(1)
-        val stats = Stats(
-            strength = 5 + level * 2,
-            endurance = 5 + level * 2,
-            agility = 5 + level
-        )
-        return Enemy(
-            name = name,
-            level = level,
-            maxHp = 40 + (level * 10),
-            hp = 40 + (level * 10),
-            stats = stats,
-            goldReward = 20 * level,
-            xpReward = 15 * level
-        )
+        val data = hashMapOf("action" to action.name)
+        functions.getHttpsCallable("combatAction").call(data)
     }
 
     override fun attackPlayer(attackerId: String, defenderId: String) {
-        // Simple PvP logic: Attacker wins if total stats are higher
-        // TODO: Move to Cloud Function for production
-        val attackerRef = db.collection("players").document(attackerId)
-        val defenderRef = db.collection("players").document(defenderId)
-        
-        db.runTransaction { transaction ->
-            val attacker = transaction.get(attackerRef).toObject<Character>() ?: return@runTransaction
-            val defender = transaction.get(defenderRef).toObject<Character>() ?: return@runTransaction
-            
-            val attackerPower = attacker.stats.strength + attacker.stats.agility + attacker.stats.willpower
-            val defenderPower = defender.stats.strength + defender.stats.agility + defender.stats.willpower
-            
-            if (attackerPower > defenderPower) {
-                transaction.update(attackerRef, "gold", attacker.gold + (defender.gold / 10))
-                transaction.update(defenderRef, "gold", defender.gold - (defender.gold / 10))
-                transaction.update(attackerRef, "bounty", attacker.bounty + 100)
-            } else {
-                transaction.update(attackerRef, "gold", attacker.gold - (attacker.gold / 10))
-                transaction.update(defenderRef, "gold", defender.gold + (attacker.gold / 10))
-            }
-        }
+        val data = hashMapOf("defenderId" to defenderId)
+        functions.getHttpsCallable("attackPlayer").call(data)
     }
 
     override fun getPlayersAtLocation(location: String): Flow<List<Character>> = callbackFlow {
@@ -267,6 +138,73 @@ class FirestoreGameRepository(
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     trySend(snapshot.documents.mapNotNull { it.toObject<Character>() })
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getPlayerProfile(playerId: String): Flow<Character?> = callbackFlow {
+        val subscription = db.collection("players").document(playerId)
+            .addSnapshotListener { snapshot, _ ->
+                trySend(snapshot?.toObject<Character>())
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getCrew(crewId: String): Flow<Crew?> = callbackFlow {
+        val subscription = db.collection("crews").document(crewId)
+            .addSnapshotListener { snapshot, _ ->
+                trySend(snapshot?.toObject<Crew>())
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override suspend fun createCrew(name: String, description: String): String? {
+        return try {
+            val data = hashMapOf("name" to name, "description" to description)
+            val result = functions.getHttpsCallable("createCrew").call(data).await()
+            val resultData = result.data as? Map<*, *>
+            resultData?.get("crewId") as? String
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override suspend fun joinCrew(crewId: String): Boolean {
+        return try {
+            val data = hashMapOf("crewId" to crewId)
+            functions.getHttpsCallable("joinCrew").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override fun getLocations(): Flow<List<LocationDef>> = callbackFlow {
+        val subscription = db.collection("gameData").document("world").collection("locations")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    trySend(snapshot.documents.mapNotNull { it.toObject<LocationDef>() })
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getEnemyDefs(): Flow<List<EnemyDef>> = callbackFlow {
+        val subscription = db.collection("gameData").document("world").collection("enemies")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    trySend(snapshot.documents.mapNotNull { it.toObject<EnemyDef>() })
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getMissionDefs(): Flow<List<MissionDef>> = callbackFlow {
+        val subscription = db.collection("gameData").document("world").collection("missions")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    trySend(snapshot.documents.mapNotNull { it.toObject<MissionDef>() })
                 }
             }
         awaitClose { subscription.remove() }
@@ -347,4 +285,27 @@ class MockGameRepository : GameRepository {
 
     override fun getPlayersAtLocation(location: String): Flow<List<Character>> = flowOf(emptyList())
     override fun getTopPlayers(limit: Int): Flow<List<Character>> = flowOf(emptyList())
+
+    override fun getPlayerProfile(playerId: String): Flow<Character?> = flowOf(
+        Character(
+            id = playerId,
+            name = "RAZOR",
+            level = 31,
+            race = Race.Human,
+            bounty = 3482900,
+            title = "Sea Devil",
+            pvpWins = 81,
+            pvpLosses = 24
+        )
+    )
+
+    override fun getCrew(crewId: String): Flow<Crew?> = flowOf(
+        Crew(id = crewId, name = "Black Tide")
+    )
+
+    override suspend fun createCrew(name: String, description: String): String? = "mock-crew-id"
+    override suspend fun joinCrew(crewId: String): Boolean = true
+    override fun getLocations(): Flow<List<LocationDef>> = flowOf(emptyList())
+    override fun getEnemyDefs(): Flow<List<EnemyDef>> = flowOf(emptyList())
+    override fun getMissionDefs(): Flow<List<MissionDef>> = flowOf(emptyList())
 }

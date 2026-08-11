@@ -7,15 +7,18 @@ service cloud.firestore {
       // Anyone can read player profiles
       allow read: if true;
 
-      // Only the user can create their initial character
-      // In production, even this should be a Cloud Function to prevent spoofing starting stats
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // Characters must be created via Cloud Function to ensure valid starting stats and unique names
+      allow create: if false;
 
-      // Critical game state is locked. Only non-critical fields can be updated by client.
-      // gold, xp, stats, energy, level, bounty, etc. are SERVER-ONLY.
+      // Critical game state is locked. Client can only update non-essential fields (like title if we want, or avatar).
+      // Most game fields are now SERVER-ONLY.
       allow update: if request.auth != null && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['gold', 'xp', 'stats', 'energy', 'level', 'bounty', 'combatState', 'energyUpdatedAt']);
+            .hasAny([
+              'gold', 'xp', 'stats', 'energy', 'level', 'bounty', 'hp', 'maxHp',
+              'maxEnergy', 'currentLocation', 'travelState', 'combatState',
+              'energyUpdatedAt', 'inventory', 'equipment', 'crewId', 'pvpWins', 'pvpLosses'
+            ]);
 
       allow delete: if false; // Characters cannot be deleted by clients
     }

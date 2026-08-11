@@ -14,6 +14,7 @@ import com.alifeatseammo.data.model.ActionType
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.StatType
 import com.alifeatseammo.ui.GameViewModel
+import com.alifeatseammo.ui.PlayerProfileViewModel
 import com.alifeatseammo.ui.screens.*
 import com.alifeatseammo.ui.theme.ALifeAtSeaMMOTheme
 
@@ -27,10 +28,15 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val viewModel: GameViewModel = viewModel()
+                    val profileViewModel: PlayerProfileViewModel = viewModel()
                     val character by viewModel.character.collectAsState()
                     val user by viewModel.currentUser.collectAsState()
                     var currentScreen by remember { mutableStateOf<Screen>(Screen.Dashboard) }
-                    var selectedPlayer by remember { mutableStateOf<Character?>(null) }
+                    var selectedPlayerId by remember { mutableStateOf<String?>(null) }
+
+                    LaunchedEffect(selectedPlayerId) {
+                        selectedPlayerId?.let { profileViewModel.loadPlayer(it) }
+                    }
 
                     if (user == null) {
                         LoginScreen(
@@ -103,7 +109,7 @@ class MainActivity : ComponentActivity() {
                                                         }
                                                     },
                                                     onPlayerClick = { player ->
-                                                        selectedPlayer = player
+                                                        selectedPlayerId = player.id
                                                         currentScreen = Screen.Character
                                                     },
                                                     onMissionsClick = { currentScreen = Screen.Missions },
@@ -137,7 +143,11 @@ class MainActivity : ComponentActivity() {
                                             val players by viewModel.topPlayers.collectAsState()
                                             LeaderboardScreen(
                                                 players = players,
-                                                onBackClick = { currentScreen = Screen.Dashboard }
+                                                onBackClick = { currentScreen = Screen.Dashboard },
+                                                onPlayerClick = { player ->
+                                                    selectedPlayerId = player.id
+                                                    currentScreen = Screen.Character
+                                                }
                                             )
                                         }
                                         Screen.PvP -> {
@@ -148,6 +158,10 @@ class MainActivity : ComponentActivity() {
                                                     potentialTargets = potentialTargets.filter { it.id != char.id },
                                                     onAttackClick = { target ->
                                                         viewModel.attackPlayer(target)
+                                                    },
+                                                    onPlayerClick = { player ->
+                                                        selectedPlayerId = player.id
+                                                        currentScreen = Screen.Character
                                                     },
                                                     onBackClick = { currentScreen = Screen.Dashboard }
                                                 )
@@ -180,34 +194,51 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                         Screen.Crew -> {
-                                            // TODO: Implement Crew Screen
-                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text("Crew system coming soon!")
-                                                    Button(onClick = { currentScreen = Screen.Dashboard }) {
-                                                        Text("Back")
-                                                    }
+                                            val crew by profileViewModel.playerCrew.collectAsState()
+                                            currentChar?.let { char ->
+                                                LaunchedEffect(char.crewId) {
+                                                    char.crewId?.let { profileViewModel.loadPlayer(char.id) }
                                                 }
+                                                CrewScreen(
+                                                    character = char,
+                                                    crew = crew,
+                                                    onCreateCrew = { name, desc -> viewModel.createCrew(name, desc) },
+                                                    onJoinCrew = { id -> viewModel.joinCrew(id) },
+                                                    onBackClick = { currentScreen = Screen.Dashboard }
+                                                )
                                             }
                                         }
                                         Screen.Character -> {
-                                            selectedPlayer?.let { player ->
+                                            val player by profileViewModel.playerProfile.collectAsState()
+                                            val crew by profileViewModel.playerCrew.collectAsState()
+                                            
+                                            player?.let { p ->
                                                 ProfileScreen(
-                                                    character = player,
-                                                    isOwnProfile = player.id == currentChar?.id,
+                                                    character = p,
+                                                    crew = crew,
+                                                    isOwnProfile = p.id == currentChar?.id,
                                                     onBackClick = { currentScreen = Screen.Dashboard },
                                                     onAttackClick = {
-                                                        viewModel.attackPlayer(player)
+                                                        viewModel.attackPlayer(p)
                                                         currentScreen = Screen.Dashboard
+                                                    },
+                                                    onViewCrewClick = {
+                                                        selectedPlayerId = p.id
+                                                        currentScreen = Screen.Crew
                                                     }
                                                 )
+                                            } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                CircularProgressIndicator()
                                             }
                                         }
                                         Screen.More -> {
                                             MoreScreen(
                                                 onMenuItemClick = { item ->
                                                     when (item.label) {
-                                                        "Character" -> currentScreen = Screen.Character
+                                                        "Character" -> {
+                                                            selectedPlayerId = currentChar?.id
+                                                            currentScreen = Screen.Character
+                                                        }
                                                         "Inventory" -> currentScreen = Screen.Inventory
                                                         "Skills" -> currentScreen = Screen.Skills
                                                         "Leaderboard" -> currentScreen = Screen.Leaderboard
@@ -219,8 +250,14 @@ class MainActivity : ComponentActivity() {
                                             )
                                         }
                                         Screen.Inventory -> {
-                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                Text("Inventory Screen")
+                                            currentChar?.let { char ->
+                                                InventoryScreen(
+                                                    character = char,
+                                                    onEquipItem = { viewModel.equipItem(it) },
+                                                    onUseItem = { viewModel.useItem(it) },
+                                                    onSellItem = { viewModel.sellItem(it) },
+                                                    onBackClick = { currentScreen = Screen.More }
+                                                )
                                             }
                                         }
                                         Screen.Skills -> {

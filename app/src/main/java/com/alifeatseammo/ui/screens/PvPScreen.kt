@@ -15,6 +15,7 @@ fun PvPScreen(
     character: Character,
     potentialTargets: List<Character>,
     onAttackClick: (Character) -> Unit,
+    onPlayerClick: (Character) -> Unit,
     onBackClick: () -> Unit,
 ) {
     Scaffold(
@@ -35,7 +36,7 @@ fun PvPScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(potentialTargets) { target ->
-                OutlinedCard(onClick = { onAttackClick(target) }) {
+                OutlinedCard(onClick = { onPlayerClick(target) }) {
                     ListItem(
                         headlineContent = { Text(target.name) },
                         supportingContent = { Text("Level ${target.level} | Bounty: ${target.bounty}") },

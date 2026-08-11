@@ -7,23 +7,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
+import com.alifeatseammo.data.model.Crew
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     character: Character,
+    crew: Crew? = null,
     isOwnProfile: Boolean = false,
     onBackClick: () -> Unit,
     onAttackClick: () -> Unit = {},
-    onMessageClick: () -> Unit = {}
+    onMessageClick: () -> Unit = {},
+    onViewCrewClick: () -> Unit = {},
+    onAddFriendClick: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profile") },
+                title = { Text("Player Profile") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Text("Back")
@@ -41,63 +47,73 @@ fun ProfileScreen(
         ) {
             Text(
                 text = "☠ ${character.name.uppercase()}",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
             )
-            Text(text = "Level ${character.level} ${character.race}", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Level ${character.level}",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = character.race.name,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.secondary
+            )
             
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    ProfileStatRow("Bounty", "${character.bounty} B", color = MaterialTheme.colorScheme.error)
-                    ProfileStatRow("Crew", "Black Tide") // TODO: Fetch crew name
-                    ProfileStatRow("Location", character.currentLocation)
-                }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ProfileStatRow("Bounty:", String.format(Locale.getDefault(), "%,d", character.bounty), color = MaterialTheme.colorScheme.error)
+                ProfileStatRow("Crew:", crew?.name ?: "None")
+                ProfileStatRow("Title:", character.title)
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                ProfileStatRow("PvP:", "${character.pvpWins}W / ${character.pvpLosses}L")
             }
             
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(text = "Combat Stats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    val stats = character.stats
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column {
-                            StatText("STR: ${stats.strength}")
-                            StatText("END: ${stats.endurance}")
-                            StatText("AGI: ${stats.agility}")
-                        }
-                        Column {
-                            StatText("PER: ${stats.perception}")
-                            StatText("WIL: ${stats.willpower}")
-                            StatText("LUK: ${stats.luck}")
-                        }
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(48.dp))
             
             if (!isOwnProfile) {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = onAttackClick,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        shape = MaterialTheme.shapes.extraSmall
                     ) {
-                        Text("ATTACK")
+                        Text("ATTACK", fontWeight = FontWeight.Bold)
                     }
                     Button(
                         onClick = onMessageClick,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraSmall
                     ) {
-                        Text("MESSAGE")
+                        Text("MESSAGE", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onViewCrewClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraSmall,
+                        enabled = character.crewId != null
+                    ) {
+                        Text("VIEW CREW", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onAddFriendClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text("ADD FRIEND", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -114,9 +130,4 @@ fun ProfileStatRow(label: String, value: String, color: Color = Color.Unspecifie
         Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
         Text(text = value, style = MaterialTheme.typography.bodyLarge, color = color)
     }
-}
-
-@Composable
-fun StatText(text: String) {
-    Text(text = text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 2.dp))
 }

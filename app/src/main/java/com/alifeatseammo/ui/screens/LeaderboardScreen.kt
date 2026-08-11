@@ -1,5 +1,6 @@
 package com.alifeatseammo.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -14,6 +15,7 @@ import com.alifeatseammo.data.model.Character
 fun LeaderboardScreen(
     players: List<Character>,
     onBackClick: () -> Unit,
+    onPlayerClick: (Character) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -37,7 +39,8 @@ fun LeaderboardScreen(
                 ListItem(
                     headlineContent = { Text("${index + 1}. ${player.name}") },
                     supportingContent = { Text("Level ${player.level} | XP: ${player.xp}") },
-                    trailingContent = { Text("${player.gold} Gold") }
+                    trailingContent = { Text("${player.gold} Gold") },
+                    modifier = Modifier.clickable { onPlayerClick(player) }
                 )
                 HorizontalDivider()
             }

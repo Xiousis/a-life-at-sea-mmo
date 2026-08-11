@@ -105,6 +105,38 @@ class GameViewModel(
         gameRepository.attackPlayer(user.uid, target.id)
     }
 
+    fun equipItem(item: Item) {
+        val user = currentUser.value ?: return
+        // TODO: Call Cloud Function
+    }
+
+    fun useItem(item: Item) {
+        val user = currentUser.value ?: return
+        // TODO: Call Cloud Function
+    }
+
+    fun sellItem(item: Item) {
+        val user = currentUser.value ?: return
+        // TODO: Call Cloud Function
+    }
+
+    fun createCrew(name: String, description: String) {
+        val data = hashMapOf("name" to name, "description" to description)
+        viewModelScope.launch {
+            try {
+                gameRepository.createCrew(name, description)
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun joinCrew(crewId: String) {
+        viewModelScope.launch {
+            try {
+                gameRepository.joinCrew(crewId)
+            } catch (e: Exception) {}
+        }
+    }
+
     fun sendMessage(text: String) {
         if (currentUser.value == null) return
         val char = character.value ?: return

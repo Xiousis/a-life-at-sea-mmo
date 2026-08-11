@@ -14,13 +14,18 @@ data class Character(
     val xp: Int = 0,
     val level: Int = 1,
     val bounty: Long = 0,
+    val title: String = "Novice Sailor",
+    val pvpWins: Int = 0,
+    val pvpLosses: Int = 0,
     val energyUpdatedAt: Long = System.currentTimeMillis(),
     val currentLocation: String = "Fogi Tail Island",
     val travelState: TravelState? = null,
     val combatState: CombatState? = null,
     val inventory: List<Item> = emptyList(),
     val equipment: Map<String, Item?> = emptyMap(),
-    val crewId: String? = null
+    val crewId: String? = null,
+    val lastOnline: Long = System.currentTimeMillis(),
+    val isOnline: Boolean = false
 ) {
     fun getCurrentEnergy(): Int {
         val regenRateMs = 3 * 60 * 1000L // 3 minutes
@@ -55,6 +60,16 @@ data class CombatLog(
     val attackerName: String = "",
     val defenderName: String = "",
     val result: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+data class TransactionLog(
+    val id: String = "",
+    val userId: String = "",
+    val action: String = "",
+    val details: String = "",
+    val goldChange: Int = 0,
+    val xpChange: Int = 0,
     val timestamp: Long = System.currentTimeMillis()
 )
 
