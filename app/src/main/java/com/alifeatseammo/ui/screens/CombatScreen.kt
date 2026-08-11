@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,11 +19,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.CombatAction
+import com.alifeatseammo.data.model.EffectType
+import com.alifeatseammo.data.model.StatusEffect
 
 @Composable
 fun CombatScreen(
     character: Character,
-    onActionClick: (CombatAction) -> Unit
+    onActionClick: (CombatAction, String?) -> Unit
 ) {
     val combatState = character.combatState ?: return
     val enemy = combatState.enemy
@@ -63,7 +66,8 @@ fun CombatScreen(
             name = "YOU",
             hp = character.hp,
             maxHp = character.maxHp,
-            barColor = Color(0xFF4CAF50)
+            barColor = Color(0xFF4CAF50),
+            effects = combatState.playerEffects
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -75,7 +79,8 @@ fun CombatScreen(
             name = enemy.name.uppercase(),
             hp = enemy.hp,
             maxHp = enemy.maxHp,
-            barColor = Color(0xFFF44336)
+            barColor = Color(0xFFF44336),
+            effects = combatState.enemyEffects
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -118,14 +123,14 @@ fun CombatScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CombatButton("Attack", Modifier.weight(1f)) { onActionClick(CombatAction.Attack) }
-                CombatButton("Technique", Modifier.weight(1f)) { onActionClick(CombatAction.Technique) }
+                CombatButton("Attack", Modifier.weight(1f)) { onActionClick(CombatAction.Attack, null) }
+                CombatButton("Technique", Modifier.weight(1f)) { onActionClick(CombatAction.Technique, "bash") } // Placeholder tech ID
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CombatButton("Defend", Modifier.weight(1f)) { onActionClick(CombatAction.Defend) }
-                CombatButton("Item", Modifier.weight(1f)) { onActionClick(CombatAction.Item) }
+                CombatButton("Defend", Modifier.weight(1f)) { onActionClick(CombatAction.Defend, null) }
+                CombatButton("Item", Modifier.weight(1f)) { onActionClick(CombatAction.Item, null) }
             }
-            CombatButton("Flee", Modifier.fillMaxWidth()) { onActionClick(CombatAction.Flee) }
+            CombatButton("Flee", Modifier.fillMaxWidth()) { onActionClick(CombatAction.Flee, null) }
         }
 
         Text(
@@ -136,10 +141,33 @@ fun CombatScreen(
 }
 
 @Composable
-fun CombatantStatus(name: String, hp: Int, maxHp: Int, barColor: Color) {
+fun CombatantStatus(name: String, hp: Int, maxHp: Int, barColor: Color, effects: List<StatusEffect> = emptyList()) {
     val percentage = (hp.toFloat() / maxHp.toFloat() * 100).toInt()
     Column(horizontalAlignment = Alignment.Start, modifier = Modifier.fillMaxWidth()) {
-        Text(text = name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                effects.forEach { effect ->
+                    val color = when (effect.type) {
+                        EffectType.Bleed -> Color(0xFFD32F2F)
+                        EffectType.Stun -> Color(0xFFFFEB3B)
+                        EffectType.Weaken -> Color(0xFF7B1FA2)
+                        EffectType.Fortify -> Color(0xFF1976D2)
+                        EffectType.Burn -> Color(0xFFF57C00)
+                        EffectType.Haste -> Color(0xFF388E3C)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .background(color, RoundedCornerShape(2.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = effect.duration.toString(), fontSize = 10.sp, color = if (effect.type == EffectType.Stun) Color.Black else Color.White)
+                    }
+                }
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(text = "HP ", style = MaterialTheme.typography.bodySmall)
             LinearProgressIndicator(

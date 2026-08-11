@@ -198,8 +198,11 @@ export const train = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
     const { statType } = data;
+    // Stronger mapping validation to prevent incorrect fields like 'martialarts'
     const mappedStat = STAT_MAPPING[statType];
-    if (!mappedStat) throw new functions.https.HttpsError("invalid-argument", "Invalid stat type.");
+    if (!mappedStat) {
+        throw new functions.https.HttpsError("invalid-argument", `Invalid stat type: ${statType}. Allowed: ${Object.keys(STAT_MAPPING).join(", ")}`);
+    }
 
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
@@ -213,8 +216,11 @@ export const train = functions.https.onCall(async (data, context) => {
 
         if (energy < 10) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
 
-        const updatedChar = { ...character, energy: energy - 10, energyUpdatedAt, xp: character.xp + 5 };
-        updatedChar.stats[mappedStat] += 1;
+        // Ensure stats object exists
+        const stats = { ...character.stats };
+        stats[mappedStat] = (stats[mappedStat] || 0) + 1;
+
+        const updatedChar = { ...character, energy: energy - 10, energyUpdatedAt, xp: character.xp + 5, stats };
 
         const finalChar = checkLevelUp(updatedChar);
         transaction.set(playerRef, finalChar);
@@ -323,10 +329,24 @@ interface CombatStats {
 }
 
 function calculateCombatStats(charOrEnemy: any): CombatStats {
-    const stats = charOrEnemy.stats;
+    const stats = { ...(charOrEnemy.stats || {}) };
     const level = charOrEnemy.level || 1;
 
-    // Base stats + Equipment bonuses (to be added)
+    // Apply equipment bonuses
+    if (charOrEnemy.equipment) {
+        for (const slot in charOrEnemy.equipment) {
+            const item = charOrEnemy.equipment[slot];
+            if (item && item.statBonus) {
+                for (const stat in item.statBonus) {
+                    if (stats[stat] !== undefined) {
+                        stats[stat] += item.statBonus[stat];
+                    }
+                }
+            }
+        }
+    }
+
+    // Base stats
     let strength = stats.strength || 5;
     let endurance = stats.endurance || 5;
     let agility = stats.agility || 5;
@@ -335,7 +355,7 @@ function calculateCombatStats(charOrEnemy: any): CombatStats {
     let willpower = stats.willpower || 5;
 
     // Derived stats
-    const defense = Math.floor(endurance * 1.5 + (charOrEnemy.level || 1));
+    const defense = Math.floor(endurance * 1.5 + level);
     const accuracy = 80 + agility * 0.5 + perception * 0.5;
     const dodge = agility * 0.8 + luck * 0.2;
     const critChance = 5 + luck * 0.5 + perception * 0.2;
@@ -378,6 +398,9 @@ function generateEnemy(playerLevel: number) {
 
     const maxHp = 40 + (level * 15);
 
+    // Basic drop table logic for random encounters
+    const dropTableId = level > 5 ? "basic_loot" : null;
+
     return {
         name,
         level,
@@ -385,8 +408,85 @@ function generateEnemy(playerLevel: number) {
         maxHp: maxHp,
         stats,
         goldReward: 20 * level,
-        xpReward: 15 * level
+        xpReward: 15 * level,
+        dropTableId
     };
+}
+
+async function processLoot(dropTableId: string): Promise<any[]> {
+    if (!dropTableId) return [];
+
+    const lootTableSnap = await db.collection("gameData").doc("world").collection("lootTables").doc(dropTableId).get();
+    if (!lootTableSnap.exists) return [];
+
+    const lootTable = lootTableSnap.data();
+    const droppedItems: any[] = [];
+
+    for (const entry of (lootTable?.entries || [])) {
+        if (Math.random() <= entry.chance) {
+            const itemSnap = await db.collection("gameData").doc("items").collection("all").doc(entry.itemId).get();
+            if (itemSnap.exists) {
+                const item = itemSnap.data();
+                droppedItems.push({ ...item, id: `${item.id}_${Date.now()}_${Math.floor(Math.random() * 1000)}` });
+            }
+        }
+    }
+
+    return droppedItems;
+}
+
+function processStatusEffects(character: any, effects: any[], logs: string[]): { character: any, activeEffects: any[] } {
+    let updatedChar = { ...character };
+    const activeEffects: any[] = [];
+
+    for (const effect of effects) {
+        if (effect.duration <= 0) continue;
+
+        switch (effect.type) {
+            case "Bleed":
+            case "Burn":
+                const damage = effect.magnitude || 5;
+                updatedChar.hp = Math.max(0, updatedChar.hp - damage);
+                logs.push(`${updatedChar.name || "You"} took ${damage} damage from ${effect.type}.`);
+                break;
+            case "Weaken":
+                // Handled during damage calculation
+                break;
+            case "Fortify":
+                // Handled during defense calculation
+                break;
+        }
+
+        if (effect.duration > 1) {
+            activeEffects.push({ ...effect, duration: effect.duration - 1 });
+        }
+    }
+
+    return { character: updatedChar, activeEffects };
+}
+
+function calculateDamage(attackerStats: CombatStats, defenderStats: CombatStats, attackerEffects: any[], defenderEffects: any[], isCrit: boolean): number {
+    let damage = attackerStats.strength * 2 + (attackerStats.swordsmanship || 0) * 1.5;
+
+    // Apply Weaken effect
+    if (attackerEffects.some(e => e.type === "Weaken")) {
+        damage *= 0.7;
+    }
+
+    let defense = defenderStats.defense;
+    // Apply Fortify effect
+    if (defenderEffects.some(e => e.type === "Fortify")) {
+        defense *= 1.5;
+    }
+
+    damage = Math.max(1, Math.floor(damage - defense * 0.5));
+    damage = Math.floor(damage * (0.9 + Math.random() * 0.2));
+
+    if (isCrit) {
+        damage = Math.floor(damage * 2);
+    }
+
+    return damage;
 }
 
 export const combatAction = functions.https.onCall(async (data, context) => {
@@ -400,125 +500,277 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
-        const combat = character.combatState;
+        let character = snapshot.data() as any;
+        let combat = character.combatState;
         if (!combat || combat.isFinished) throw new functions.https.HttpsError("failed-precondition", "No active combat.");
+        if (!combat.playerTurn) throw new functions.https.HttpsError("failed-precondition", "Not your turn.");
 
         const logs = [...(combat.logs || [])];
         let enemy = combat.enemy;
+        let opponent: any = null;
+        let opponentRef: admin.firestore.DocumentReference | null = null;
+
+        if (combat.isPvP) {
+            opponentRef = db.collection("players").doc(combat.opponentId);
+            const opponentSnap = await transaction.get(opponentRef);
+            if (!opponentSnap.exists) throw new functions.https.HttpsError("not-found", "Opponent not found.");
+            opponent = opponentSnap.data();
+        }
+
         let playerHp = character.hp;
         let playerEnergy = character.energy;
-        let playerWon = false;
         let isFinished = false;
+        let playerWon = false;
 
-        const pStats = calculateCombatStats(character);
-        const eStats = calculateCombatStats(enemy);
+        // Process Player Effects at start of turn
+        const pEffectResult = processStatusEffects({ ...character, hp: playerHp, name: "You" }, combat.playerEffects || [], logs);
+        playerHp = pEffectResult.character.hp;
+        let pActiveEffects = pEffectResult.activeEffects;
 
-        // --- Player Turn ---
-        if (action === "Attack") {
-            const hitRoll = Math.random() * 100;
-            const hitChance = pStats.accuracy - eStats.dodge;
+        if (playerHp <= 0) {
+            isFinished = true;
+            playerWon = false;
+        }
 
-            if (hitRoll < hitChance) {
-                let damage = pStats.strength * 2 + (pStats.swordsmanship || 0) * 1.5;
-                damage = Math.max(1, Math.floor(damage - eStats.defense * 0.5));
-                damage = Math.floor(damage * (0.9 + Math.random() * 0.2));
+        if (!isFinished) {
+            const pStats = calculateCombatStats(character);
+            const targetStats = combat.isPvP ? calculateCombatStats(opponent) : calculateCombatStats(enemy);
+            const targetEffects = combat.isPvP ? (opponent.combatState?.playerEffects || []) : (combat.enemyEffects || []);
 
-                if (Math.random() * 100 < pStats.critChance) {
-                    damage = Math.floor(damage * 2);
-                    logs.push(`CRITICAL! You strike ${enemy.name} for ${damage} damage!`);
-                } else {
-                    logs.push(`You hit ${enemy.name} for ${damage} damage.`);
+            const isStunned = (pActiveEffects || []).some((e: any) => e.type === "Stun");
+
+            if (!isStunned) {
+                // --- Player Action ---
+                if (action === "Attack") {
+                    const hitRoll = Math.random() * 100;
+                    const hitChance = pStats.accuracy - targetStats.dodge;
+
+                    if (hitRoll < hitChance) {
+                        const isCrit = Math.random() * 100 < pStats.critChance;
+                        const damage = calculateDamage(pStats, targetStats, pActiveEffects, targetEffects, isCrit);
+
+                        if (isCrit) logs.push(`CRITICAL! You strike for ${damage} damage!`);
+                        else logs.push(`You hit for ${damage} damage.`);
+
+                        if (combat.isPvP) opponent.hp = Math.max(0, opponent.hp - damage);
+                        else enemy.hp = Math.max(0, enemy.hp - damage);
+                    } else {
+                        logs.push("You missed your attack.");
+                    }
+                } else if (action === "Technique") {
+                    const techSnap = await db.collection("gameData").doc("skills").collection("techniques").doc(techniqueId).get();
+                    if (!techSnap.exists) throw new functions.https.HttpsError("not-found", "Technique not found.");
+
+                    const tech = techSnap.data() as any;
+                    if (playerEnergy < tech.energyCost) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
+                    if ((combat.cooldowns || {})[techniqueId] > 0) throw new functions.https.HttpsError("failed-precondition", "Technique on cooldown.");
+
+                    playerEnergy -= tech.energyCost;
+                    const cooldowns = { ...(combat.cooldowns || {}) };
+                    cooldowns[techniqueId] = tech.cooldown;
+                    combat.cooldowns = cooldowns;
+
+                    let techDamage = Math.floor(pStats.strength * tech.power * 2);
+                    techDamage = Math.max(1, Math.floor(techDamage - targetStats.defense * 0.3));
+
+                    if (combat.isPvP) {
+                        opponent.hp = Math.max(0, opponent.hp - techDamage);
+                        if (tech.effects) {
+                            opponent.combatState.playerEffects = [...(opponent.combatState.playerEffects || []), ...tech.effects];
+                        }
+                    } else {
+                        enemy.hp = Math.max(0, enemy.hp - techDamage);
+                        if (tech.effects) {
+                            combat.enemyEffects = [...(combat.enemyEffects || []), ...tech.effects];
+                        }
+                    }
+                    logs.push(`You use ${tech.name}! Target takes ${techDamage} damage.`);
+                } else if (action === "Defend") {
+                    logs.push("You take a defensive stance.");
+                    combat.defending = true;
+                } else if (action === "Item") {
+                    const inventory = character.inventory || [];
+                    const itemIndex = inventory.findIndex((i: any) => i.id === itemId);
+                    if (itemIndex === -1) throw new functions.https.HttpsError("not-found", "Item not found.");
+
+                    const item = inventory[itemIndex];
+                    if (item.type !== "Consumable") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
+
+                    // Healing logic
+                    const healAmount = item.healAmount || 30;
+                    playerHp = Math.min(character.maxHp, playerHp + healAmount);
+                    logs.push(`You used ${item.name} and recovered ${healAmount} HP.`);
+
+                    // Remove item from inventory
+                    character.inventory.splice(itemIndex, 1);
+                } else if (action === "Flee") {
+                    if (combat.isPvP) throw new functions.https.HttpsError("failed-precondition", "Cannot flee from a duel.");
+                    const fleeChance = 40 + (pStats.agility - targetStats.agility) * 2;
+                    if (Math.random() * 100 < fleeChance) {
+                        transaction.update(playerRef, { combatState: null });
+                        return { fled: true };
+                    } else {
+                        logs.push("You failed to flee!");
+                    }
                 }
-                enemy.hp = Math.max(0, enemy.hp - damage);
             } else {
-                logs.push(`You missed your attack on ${enemy.name}.`);
+                logs.push("You are stunned and cannot move!");
             }
-        } else if (action === "Technique") {
-            // Placeholder Technique Logic
-            const techCost = 15;
-            if (playerEnergy < techCost) {
-                throw new functions.https.HttpsError("failed-precondition", "Not enough energy for this technique.");
-            }
-            playerEnergy -= techCost;
 
-            let techDamage = pStats.strength * 3 + (pStats.martialArts || 0) * 2;
-            techDamage = Math.floor(techDamage * (1.1 + Math.random() * 0.2));
-            enemy.hp = Math.max(0, enemy.hp - techDamage);
-            logs.push(`You use a Technique! ${enemy.name} takes ${techDamage} damage.`);
-        } else if (action === "Defend") {
-            logs.push("You take a defensive stance.");
-            combat.defending = true;
-        } else if (action === "Item") {
-            // Placeholder Item Logic (e.g., Healing Potion)
-            playerHp = Math.min(character.maxHp, playerHp + 30);
-            logs.push("You used a Health Potion and recovered 30 HP.");
-        } else if (action === "Flee") {
-            const fleeChance = 40 + (pStats.agility - eStats.agility) * 2;
-            if (Math.random() * 100 < fleeChance) {
-                transaction.update(playerRef, { combatState: null });
-                return { fled: true };
-            } else {
-                logs.push("You failed to flee!");
+            // Check if win/loss
+            const targetHp = combat.isPvP ? opponent.hp : enemy.hp;
+            if (targetHp <= 0) {
+                logs.push(combat.isPvP ? `You defeated ${opponent.name}!` : `You defeated ${enemy.name}!`);
+                playerWon = true;
+                isFinished = true;
+            } else if (!combat.isPvP) {
+                // --- PvE Enemy Turn ---
+                const eStats = calculateCombatStats(enemy);
+                const eEffectResult = processStatusEffects({ ...enemy }, combat.enemyEffects || [], logs);
+                enemy = eEffectResult.character;
+                let eActiveEffects = eEffectResult.activeEffects;
+                combat.enemyEffects = eActiveEffects;
+
+                if (enemy.hp <= 0) {
+                    logs.push(`The ${enemy.name} succumbed to its wounds!`);
+                    playerWon = true;
+                    isFinished = true;
+                } else {
+                    const eIsStunned = (eActiveEffects || []).some((e: any) => e.type === "Stun");
+                    if (!eIsStunned) {
+                        // Enemy Ability Logic
+                        const useAbility = Math.random() < 0.3;
+                        if (useAbility) {
+                            const abilityDamage = Math.floor(eStats.strength * 2.5);
+                            playerHp = Math.max(0, playerHp - abilityDamage);
+                            logs.push(`${enemy.name} uses a special ability and strikes you for ${abilityDamage} damage!`);
+                        } else {
+                            const eHitRoll = Math.random() * 100;
+                            const eHitChance = eStats.accuracy - pStats.dodge;
+                            if (eHitRoll < eHitChance) {
+                                let eDamage = calculateDamage(eStats, pStats, eActiveEffects, pActiveEffects, false);
+                                if (combat.defending) {
+                                    eDamage = Math.floor(eDamage * 0.5);
+                                    combat.defending = false;
+                                }
+                                playerHp = Math.max(0, playerHp - eDamage);
+                                logs.push(`${enemy.name} hits you for ${eDamage} damage.`);
+                            } else {
+                                logs.push(`${enemy.name} missed its attack.`);
+                            }
+                        }
+                    } else {
+                        logs.push(`${enemy.name} is stunned!`);
+                    }
+
+                    if (playerHp <= 0) {
+                        logs.push("You were defeated...");
+                        isFinished = true;
+                        playerWon = false;
+                    }
+                }
             }
         }
 
-        if (enemy.hp <= 0) {
-            logs.push(`You defeated ${enemy.name}!`);
-            playerWon = true;
-            isFinished = true;
-        } else {
-            // --- Enemy Turn ---
-            const eHitRoll = Math.random() * 100;
-            const eHitChance = eStats.accuracy - pStats.dodge;
-
-            if (eHitRoll < eHitChance) {
-                let eDamage = Math.floor(eStats.strength * 1.8);
-                eDamage = Math.max(1, Math.floor(eDamage - pStats.defense * 0.4));
-
-                if (combat.defending) {
-                    eDamage = Math.floor(eDamage * 0.5);
-                    combat.defending = false;
-                }
-
-                playerHp = Math.max(0, playerHp - eDamage);
-                logs.push(`${enemy.name} hits you for ${eDamage} damage.`);
-            } else {
-                logs.push(`${enemy.name} missed its attack.`);
-            }
-
-            if (playerHp <= 0) {
-                logs.push("You were defeated...");
-                isFinished = true;
-                playerWon = false;
-            }
+        // Update Cooldowns
+        const updatedCooldowns: any = {};
+        for (const [key, val] of Object.entries(combat.cooldowns || {})) {
+            if ((val as number) > 1) updatedCooldowns[key] = (val as number) - 1;
         }
 
         if (isFinished) {
-            let updatedChar = { ...character, hp: playerHp, energy: playerEnergy, combatState: null };
-            if (playerWon) {
-                updatedChar.gold += enemy.goldReward;
-                updatedChar.xp += enemy.xpReward;
-                updatedChar = checkLevelUp(updatedChar);
-                recordLog(transaction, userId, "CombatWin", `Defeated ${enemy.name}`, enemy.goldReward, enemy.xpReward);
-            } else {
-                const goldLost = Math.floor(updatedChar.gold * 0.1);
-                updatedChar.gold -= goldLost;
-                updatedChar.currentLocation = "Fogi Tail Island";
-                updatedChar.hp = character.maxHp;
-                updatedChar.energy = character.maxEnergy; // Recovery on death
-                recordLog(transaction, userId, "CombatLoss", `Defeated by ${enemy.name}`, -goldLost, 0);
-            }
-            transaction.set(playerRef, updatedChar);
-        } else {
-            transaction.update(playerRef, {
-                hp: playerHp,
-                energy: playerEnergy,
-                combatState: { ...combat, enemy, logs, turnCount: (combat.turnCount || 0) + 1 }
-            });
-        }
+            if (combat.isPvP) {
+                // PvP Finish Logic
+                const winner = playerWon ? character : opponent;
+                const loser = playerWon ? opponent : character;
+                const winnerRef = playerWon ? playerRef : opponentRef!;
+                const loserRef = playerWon ? opponentRef! : playerRef;
 
-        return { success: true, logs };
+                const stealAmount = Math.floor(loser.gold * 0.1);
+
+                // Update Winner
+                const winnerUpdate = {
+                    gold: winner.gold + stealAmount,
+                    bounty: (winner.bounty || 0) + 100,
+                    pvpWins: (winner.pvpWins || 0) + 1,
+                    combatState: null,
+                    hp: playerWon ? playerHp : winner.hp,
+                    energy: playerWon ? playerEnergy : winner.energy
+                };
+                transaction.update(winnerRef, winnerUpdate);
+
+                // Update Loser
+                const loserUpdate = {
+                    gold: loser.gold - stealAmount,
+                    pvpLosses: (loser.pvpLosses || 0) + 1,
+                    combatState: null,
+                    hp: playerWon ? loser.hp : playerHp,
+                    energy: playerWon ? loser.energy : playerEnergy,
+                    currentLocation: "Fogi Tail Island" // Respawn
+                };
+                transaction.update(loserRef, loserUpdate);
+
+                recordLog(transaction, winner.id, "PvPWin", `Defeated ${loser.name}`, stealAmount, 0);
+                recordLog(transaction, loser.id, "PvPLoss", `Lost to ${winner.name}`, -stealAmount, 0);
+
+                return { success: true, isFinished: true, playerWon };
+            } else {
+                // PvE Finish Logic
+                let updatedChar = { ...character, hp: playerHp, energy: playerEnergy, combatState: null };
+                const loot = playerWon && enemy.dropTableId ? await processLoot(enemy.dropTableId) : [];
+
+                if (playerWon) {
+                    updatedChar.gold += enemy.goldReward;
+                    updatedChar.xp += enemy.xpReward;
+                    if (loot.length > 0) {
+                        updatedChar.inventory = [...(updatedChar.inventory || []), ...loot];
+                        logs.push(`Loot found: ${loot.map((i: any) => i.name).join(", ")}`);
+                    }
+                    updatedChar = checkLevelUp(updatedChar);
+                    recordLog(transaction, userId, "CombatWin", `Defeated ${enemy.name}`, enemy.goldReward, enemy.xpReward);
+                } else {
+                    const goldLost = Math.floor(updatedChar.gold * 0.1);
+                    updatedChar.gold -= goldLost;
+                    updatedChar.currentLocation = "Fogi Tail Island";
+                    updatedChar.hp = character.maxHp;
+                    updatedChar.energy = character.maxEnergy;
+                    recordLog(transaction, userId, "CombatLoss", `Defeated by ${enemy.name}`, -goldLost, 0);
+                }
+                transaction.set(playerRef, updatedChar);
+                return { success: true, isFinished: true, playerWon, logs };
+            }
+        } else {
+            // Update combat state and swap turns if PvP
+            if (combat.isPvP) {
+                const nextLogs = [...logs, `It is now ${opponent.name}'s turn.`];
+                // Unified opponent HP in enemy field for UI
+                const updatedEnemy = { ...combat.enemy, hp: opponent.hp };
+
+                transaction.update(playerRef, {
+                    hp: playerHp,
+                    energy: playerEnergy,
+                    combatState: { ...combat, enemy: updatedEnemy, playerTurn: false, logs: nextLogs, cooldowns: updatedCooldowns, playerEffects: pActiveEffects }
+                });
+
+                const opponentCombat = {
+                    ...opponent.combatState,
+                    enemy: { ...opponent.combatState.enemy, hp: playerHp }, // Sync attacker's HP to defender
+                    playerTurn: true,
+                    logs: nextLogs
+                };
+                transaction.update(opponentRef!, {
+                    hp: opponent.hp,
+                    combatState: opponentCombat
+                });
+            } else {
+                transaction.update(playerRef, {
+                    hp: playerHp,
+                    energy: playerEnergy,
+                    combatState: { ...combat, enemy, logs, turnCount: (combat.turnCount || 0) + 1, cooldowns: updatedCooldowns, playerEffects: pActiveEffects }
+                });
+            }
+            return { success: true, logs };
+        }
     });
 });
 
@@ -547,40 +799,56 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("failed-precondition", "Target is not at your location.");
         }
 
-        const attackerPower = attacker.stats.strength + attacker.stats.agility + attacker.stats.willpower;
-        const defenderPower = defender.stats.strength + defender.stats.agility + defender.stats.willpower;
-
-        const winChance = 0.5 + (attackerPower - defenderPower) * 0.01;
-        const attackerWon = Math.random() < winChance;
-
-        if (attackerWon) {
-            const stealAmount = Math.floor(defender.gold / 10);
-            transaction.update(attackerRef, {
-                gold: admin.firestore.FieldValue.increment(stealAmount),
-                bounty: admin.firestore.FieldValue.increment(100),
-                pvpWins: admin.firestore.FieldValue.increment(1)
-            });
-            transaction.update(defenderRef, {
-                gold: admin.firestore.FieldValue.increment(-stealAmount),
-                pvpLosses: admin.firestore.FieldValue.increment(1)
-            });
-            recordLog(transaction, userId, "PvPWin", `Defeated ${defender.name}`, stealAmount, 0);
-            recordLog(transaction, defenderId, "PvPLoss", `Defeated by ${attacker.name}`, -stealAmount, 0);
-            return { won: true, goldStolen: stealAmount };
-        } else {
-            const lossAmount = Math.floor(attacker.gold / 10);
-            transaction.update(attackerRef, {
-                gold: admin.firestore.FieldValue.increment(-lossAmount),
-                pvpLosses: admin.firestore.FieldValue.increment(1)
-            });
-            transaction.update(defenderRef, {
-                gold: admin.firestore.FieldValue.increment(lossAmount),
-                pvpWins: admin.firestore.FieldValue.increment(1)
-            });
-            recordLog(transaction, userId, "PvPLoss", `Lost to ${defender.name}`, -lossAmount, 0);
-            recordLog(transaction, defenderId, "PvPWin", `Defended against ${attacker.name}`, lossAmount, 0);
-            return { won: false, goldLost: lossAmount };
+        if (attacker.combatState || attacker.travelState) {
+            throw new functions.https.HttpsError("failed-precondition", "You are already busy.");
         }
+
+        if (defender.combatState || defender.travelState) {
+            throw new functions.https.HttpsError("failed-precondition", "Target is already busy.");
+        }
+
+        const attackerCombat = {
+            opponentId: defenderId,
+            isPvP: true,
+            playerTurn: true,
+            logs: [`You initiated a duel with ${defender.name}!`],
+            enemy: {
+                name: defender.name,
+                level: defender.level,
+                hp: defender.hp,
+                maxHp: defender.maxHp,
+                stats: defender.stats
+            },
+            isFinished: false,
+            turnCount: 0,
+            playerEffects: [],
+            enemyEffects: [],
+            cooldowns: {}
+        };
+
+        const defenderCombat = {
+            opponentId: userId,
+            isPvP: true,
+            playerTurn: false,
+            logs: [`${attacker.name} has challenged you to a duel!`],
+            enemy: {
+                name: attacker.name,
+                level: attacker.level,
+                hp: attacker.hp,
+                maxHp: attacker.maxHp,
+                stats: attacker.stats
+            },
+            isFinished: false,
+            turnCount: 0,
+            playerEffects: [],
+            enemyEffects: [],
+            cooldowns: {}
+        };
+
+        transaction.update(attackerRef, { combatState: attackerCombat });
+        transaction.update(defenderRef, { combatState: defenderCombat });
+
+        return { success: true };
     });
 });
 
@@ -610,8 +878,21 @@ export const completeMission = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("failed-precondition", "Level too low for this mission.");
         }
 
+        if (mission.factionRequirement && mission.factionRequirement !== "Neutral" && character.faction !== mission.factionRequirement) {
+            throw new functions.https.HttpsError("failed-precondition", "You do not belong to the required faction.");
+        }
+
         if (mission.locationId && character.currentLocation !== mission.locationId) {
             throw new functions.https.HttpsError("failed-precondition", "You are not at the required location for this mission.");
+        }
+
+        if (mission.statRequirement) {
+            for (const [stat, value] of Object.entries(mission.statRequirement)) {
+                const charStat = character.stats[STAT_MAPPING[stat] || stat];
+                if ((charStat || 0) < (value as number)) {
+                    throw new functions.https.HttpsError("failed-precondition", `Need ${value} ${stat} for this mission.`);
+                }
+            }
         }
 
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);

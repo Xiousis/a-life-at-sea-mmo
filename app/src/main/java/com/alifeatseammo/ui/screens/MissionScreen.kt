@@ -7,15 +7,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.alifeatseammo.data.model.Character
+import com.alifeatseammo.data.model.Faction
 import com.alifeatseammo.data.model.Mission
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MissionScreen(
+    character: Character,
     missions: List<Mission>,
     onMissionClick: (Mission) -> Unit,
     onBackClick: () -> Unit
 ) {
+    val filteredMissions = missions.filter { 
+        it.factionRequirement == Faction.Neutral || it.factionRequirement == character.faction 
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -35,7 +41,7 @@ fun MissionScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(missions) { mission ->
+            items(filteredMissions) { mission ->
                 MissionItem(mission, onMissionClick)
             }
         }

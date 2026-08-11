@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Item
 import com.alifeatseammo.data.model.ItemType
+import com.alifeatseammo.data.model.Rarity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,16 +145,30 @@ fun InventoryItemCard(
     onUse: () -> Unit,
     onSell: () -> Unit
 ) {
+    val rarityColor = when (item.rarity) {
+        Rarity.Common -> Color.Gray
+        Rarity.Uncommon -> Color(0xFF4CAF50)
+        Rarity.Rare -> Color(0xFF2196F3)
+        Rarity.Epic -> Color(0xFF9C27B0)
+        Rarity.Legendary -> Color(0xFFFF9800)
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        border = if (item.rarity != Rarity.Common) androidx.compose.foundation.BorderStroke(1.dp, rarityColor) else null
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = item.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(text = item.type.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (item.rarity != Rarity.Common) rarityColor else Color.Unspecified
+                )
+                Text(text = "${item.rarity} ${item.type.name}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                 Text(text = item.description, style = MaterialTheme.typography.bodySmall)
             }
             

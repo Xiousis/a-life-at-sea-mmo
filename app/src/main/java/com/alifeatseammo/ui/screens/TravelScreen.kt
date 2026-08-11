@@ -14,14 +14,14 @@ import kotlinx.coroutines.delay
 @Composable
 fun TravelScreen(
     character: Character,
-    onTravelClick: (String, Long) -> Unit,
+    onTravelClick: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
     val islands = listOf(
-        Island("Fogi Tail Island", 0),
-        Island("Ironcrest Isle", 60000), // 1 min
-        Island("Amber Reach", 120000), // 2 min
-        Island("Storm's End", 300000) // 5 min
+        Island("Fogi Tail Island", 10000),
+        Island("Ironcrest Isle", 30000), 
+        Island("Amber Reach", 60000),
+        Island("Tortuga Bay", 120000)
     )
 
     Scaffold(
@@ -45,12 +45,12 @@ fun TravelScreen(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(islands.filter { it.name != character.currentLocation }) { island ->
                         OutlinedCard(
-                            onClick = { onTravelClick(island.name, System.currentTimeMillis() + island.travelTime) },
+                            onClick = { onTravelClick(island.name) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             ListItem(
                                 headlineContent = { Text(island.name) },
-                                supportingContent = { Text("Travel Time: ${island.travelTime / 60000} min") }
+                                supportingContent = { Text("Estimated Time: ${island.travelTime / 1000}s") }
                             )
                         }
                     }

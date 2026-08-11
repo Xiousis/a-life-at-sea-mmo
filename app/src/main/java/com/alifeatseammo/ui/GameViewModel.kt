@@ -53,7 +53,20 @@ class GameViewModel(
     val missions: StateFlow<List<Mission>> = gameRepository.getAvailableMissions()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val chatMessages: StateFlow<List<ChatMessage>> = chatRepository.getMessages()
+    val chatMessages: StateFlow<List<ChatMessage>> = chatRepository.getMessages("global")
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val locations: StateFlow<List<LocationDef>> = gameRepository.getLocations()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val crewChatMessages: StateFlow<List<ChatMessage>> = character
+        .map { it?.crewId }
+        .distinctUntilChanged()
+        .flatMapLatest { crewId ->
+            if (crewId != null) chatRepository.getMessages(crewId)
+            else flowOf(emptyList())
+        }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun signIn() {
@@ -107,7 +120,9 @@ class GameViewModel(
 
     fun attackPlayer(target: Character) {
         val user = currentUser.value ?: return
-        gameRepository.attackPlayer(user.uid, target.id)
+        viewModelScope.launch {
+            gameRepository.attackPlayer(user.uid, target.id)
+        }
     }
 
     fun equipItem(item: Item) {
@@ -136,6 +151,13 @@ class GameViewModel(
         val user = currentUser.value ?: return
         viewModelScope.launch {
             gameRepository.purchaseItem(itemId, shopId)
+        }
+    }
+
+    fun sellItem(item: Item) {
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            gameRepository.sellItem(item.id)
         }
     }
 
@@ -189,10 +211,10 @@ class GameViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    fun sendMessage(text: String) {
+    fun sendMessage(text: String, channelId: String = "global") {
         if (currentUser.value == null) return
         val char = character.value ?: return
-        chatRepository.sendMessage(char.name, text)
+        chatRepository.sendMessage(char.name, text, channelId)
     }
 
     private val allLocations = mapOf(

@@ -7,7 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.alifeatseammo.data.model.Character
+import com.alifeatseammo.data.model.Faction
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,12 +38,31 @@ fun PvPScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(potentialTargets) { target ->
-                OutlinedCard(onClick = { onPlayerClick(target) }) {
+                val isBounty = character.faction == Faction.Navy && target.faction == Faction.Pirate && target.bounty > 1000
+                
+                OutlinedCard(
+                    onClick = { onPlayerClick(target) },
+                    border = if (isBounty) 
+                        androidx.compose.foundation.BorderStroke(2.dp, Color.Red) 
+                    else 
+                        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
                     ListItem(
-                        headlineContent = { Text(target.name) },
-                        supportingContent = { Text("Level ${target.level} | Bounty: ${target.bounty}") },
+                        headlineContent = { 
+                            Row {
+                                Text(target.name)
+                                if (isBounty) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Badge(containerColor = Color.Red) { Text("BOUNTY", color = Color.White) }
+                                }
+                            }
+                        },
+                        supportingContent = { Text("Level ${target.level} | Bounty: ${target.bounty} | ${target.faction}") },
                         trailingContent = {
-                            Button(onClick = { onAttackClick(target) }) {
+                            Button(
+                                onClick = { onAttackClick(target) },
+                                colors = if (isBounty) ButtonDefaults.buttonColors(containerColor = Color.Red) else ButtonDefaults.buttonColors()
+                            ) {
                                 Text("Attack")
                             }
                         }

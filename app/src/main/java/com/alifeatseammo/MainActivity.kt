@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
                         if (currentChar?.combatState != null) {
                             CombatScreen(
                                 character = currentChar,
-                                onActionClick = { action -> viewModel.combatAction(action) }
+                                onActionClick = { action, techId -> viewModel.combatAction(action, techId) }
                             )
                         } else {
                             Scaffold(
@@ -65,8 +65,8 @@ class MainActivity : ComponentActivity() {
                                             icon = { Text("🏠 HUB") }
                                         )
                                         NavigationBarItem(
-                                            selected = currentScreen == Screen.Travel,
-                                            onClick = { currentScreen = Screen.Travel },
+                                            selected = currentScreen == Screen.Travel || currentScreen == Screen.Map,
+                                            onClick = { currentScreen = Screen.Map },
                                             icon = { Text("🗺 SEA") }
                                         )
                                         NavigationBarItem(
@@ -120,21 +120,38 @@ class MainActivity : ComponentActivity() {
                                         }
                                         Screen.Missions -> {
                                             val missions by viewModel.missions.collectAsState()
-                                            MissionScreen(
-                                                missions = missions,
-                                                onMissionClick = {
-                                                    viewModel.completeMission(it)
-                                                    currentScreen = Screen.Dashboard
-                                                },
-                                                onBackClick = { currentScreen = Screen.Dashboard }
-                                            )
+                                            currentChar?.let { char ->
+                                                MissionScreen(
+                                                    character = char,
+                                                    missions = missions,
+                                                    onMissionClick = {
+                                                        viewModel.completeMission(it)
+                                                        currentScreen = Screen.Dashboard
+                                                    },
+                                                    onBackClick = { currentScreen = Screen.Dashboard }
+                                                )
+                                            }
                                         }
                                         Screen.Travel -> {
                                             currentChar?.let {
                                                 TravelScreen(
                                                     character = it,
-                                                    onTravelClick = { dest, arrival ->
-                                                        viewModel.startTravel(dest, arrival)
+                                                    onTravelClick = { dest ->
+                                                        viewModel.startTravel(dest)
+                                                    },
+                                                    onBackClick = { currentScreen = Screen.Dashboard }
+                                                )
+                                            }
+                                        }
+                                        Screen.Map -> {
+                                            val locations by viewModel.locations.collectAsState()
+                                            currentChar?.let { char ->
+                                                MapScreen(
+                                                    character = char,
+                                                    locations = locations,
+                                                    onLocationClick = { loc ->
+                                                        viewModel.startTravel(loc.name)
+                                                        currentScreen = Screen.Travel
                                                     },
                                                     onBackClick = { currentScreen = Screen.Dashboard }
                                                 )
@@ -169,12 +186,17 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                         Screen.Chat -> {
-                                            val messages by viewModel.chatMessages.collectAsState()
-                                            ChatScreen(
-                                                messages = messages,
-                                                onSendMessage = { viewModel.sendMessage(it) },
-                                                onBackClick = { currentScreen = Screen.Dashboard }
-                                            )
+                                            val globalMessages by viewModel.chatMessages.collectAsState()
+                                            val crewMessages by viewModel.crewChatMessages.collectAsState()
+                                            currentChar?.let { char ->
+                                                ChatScreen(
+                                                    globalMessages = globalMessages,
+                                                    crewMessages = crewMessages,
+                                                    crewId = char.crewId,
+                                                    onSendMessage = { text, channel -> viewModel.sendMessage(text, channel) },
+                                                    onBackClick = { currentScreen = Screen.Dashboard }
+                                                )
+                                            }
                                         }
                                         Screen.Combat -> {} // Handled by forced override above
                                         Screen.Training -> {
@@ -306,6 +328,7 @@ sealed class Screen {
     object Dashboard : Screen()
     object Missions : Screen()
     object Travel : Screen()
+    object Map : Screen()
     object Leaderboard : Screen()
     object PvP : Screen()
     object Chat : Screen()

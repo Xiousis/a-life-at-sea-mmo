@@ -8,7 +8,9 @@ data class LocationDef(
     val isSafe: Boolean = true,
     val recommendedLevel: Int = 1,
     val weather: String = "Clear",
-    val actions: List<ActionDef> = emptyList()
+    val actions: List<ActionDef> = emptyList(),
+    val x: Int = 0,
+    val y: Int = 0
 )
 
 data class ActionDef(
@@ -29,6 +31,18 @@ data class EnemyDef(
     val dropTableId: String? = null
 )
 
+data class LootTable(
+    val id: String = "",
+    val entries: List<LootEntry> = emptyList()
+)
+
+data class LootEntry(
+    val itemId: String = "",
+    val chance: Float = 0.1f, // 0.0 to 1.0
+    val minAmount: Int = 1,
+    val maxAmount: Int = 1
+)
+
 data class MissionDef(
     val id: String = "",
     val title: String = "",
@@ -38,5 +52,6 @@ data class MissionDef(
     val goldReward: Int = 0,
     val xpReward: Int = 0,
     val difficulty: Int = 1,
-    val locationId: String = ""
+    val locationId: String = "",
+    val factionRequirement: Faction = Faction.Neutral
 )

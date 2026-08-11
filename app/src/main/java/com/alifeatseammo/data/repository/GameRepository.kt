@@ -21,6 +21,7 @@ interface GameRepository {
     suspend fun equipItem(itemId: String, slot: String): Boolean
     suspend fun unequipItem(slot: String): Boolean
     suspend fun purchaseItem(itemId: String, shopId: String): Boolean
+    suspend fun sellItem(itemId: String): Boolean
     suspend fun joinFaction(userId: String, faction: Faction): Boolean
     fun getPlayersAtLocation(location: String): Flow<List<Character>>
     fun getTopPlayers(limit: Int): Flow<List<Character>>
@@ -156,6 +157,16 @@ class FirestoreGameRepository(
         return try {
             val data = hashMapOf("itemId" to itemId, "shopId" to shopId)
             functions.getHttpsCallable("purchaseItem").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override suspend fun sellItem(itemId: String): Boolean {
+        return try {
+            val data = hashMapOf("itemId" to itemId)
+            functions.getHttpsCallable("sellItem").call(data).await()
             true
         } catch (e: Exception) {
             false
@@ -309,6 +320,20 @@ class MockGameRepository : GameRepository {
     override suspend fun equipItem(itemId: String, slot: String): Boolean = true
     override suspend fun unequipItem(slot: String): Boolean = true
     override suspend fun purchaseItem(itemId: String, shopId: String): Boolean = true
+    override suspend fun sellItem(itemId: String): Boolean {
+        _character.update { char ->
+            char?.let {
+                val item = it.inventory.find { i -> i.id == itemId }
+                if (item != null) {
+                    it.copy(
+                        inventory = it.inventory.filter { i -> i.id != itemId },
+                        gold = it.gold + (item.price / 2)
+                    )
+                } else it
+            }
+        }
+        return true
+    }
     override suspend fun joinFaction(userId: String, faction: Faction): Boolean = true
 
     override fun getPlayersAtLocation(location: String): Flow<List<Character>> = flowOf(emptyList())

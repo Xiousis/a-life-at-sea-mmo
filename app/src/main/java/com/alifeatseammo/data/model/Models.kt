@@ -53,6 +53,10 @@ enum class Faction {
     Neutral, Navy, Pirate
 }
 
+enum class Rarity {
+    Common, Uncommon, Rare, Epic, Legendary
+}
+
 enum class Race {
     Human, Aquaris, Halfling
 }
@@ -108,7 +112,8 @@ data class Mission(
     val energyCost: Int,
     val minLevel: Int,
     val rewards: Reward,
-    val difficulty: Int
+    val difficulty: Int,
+    val factionRequirement: Faction = Faction.Neutral
 )
 
 data class Reward(
@@ -128,12 +133,38 @@ data class Enemy(
 
 data class CombatState(
     val enemy: Enemy = Enemy(),
+    val opponentId: String? = null,
+    val isPvP: Boolean = false,
     val playerTurn: Boolean = true,
     val logs: List<String> = emptyList(),
     val isFinished: Boolean = false,
     val playerWon: Boolean = false,
     val defending: Boolean = false,
-    val turnCount: Int = 0
+    val turnCount: Int = 0,
+    val playerEffects: List<StatusEffect> = emptyList(),
+    val enemyEffects: List<StatusEffect> = emptyList(),
+    val cooldowns: Map<String, Int> = emptyMap()
+)
+
+data class StatusEffect(
+    val type: EffectType = EffectType.Bleed,
+    val duration: Int = 0, // In turns
+    val magnitude: Int = 0,
+    val source: String = ""
+)
+
+enum class EffectType {
+    Bleed, Stun, Weaken, Fortify, Burn, Haste
+}
+
+data class Technique(
+    val id: String = "",
+    val name: String = "",
+    val description: String = "",
+    val energyCost: Int = 0,
+    val cooldown: Int = 0,
+    val power: Float = 1.0f,
+    val effects: List<StatusEffect> = emptyList()
 )
 
 enum class CombatAction {
@@ -145,8 +176,10 @@ data class Item(
     val name: String = "",
     val description: String = "",
     val type: ItemType = ItemType.Miscellaneous,
+    val rarity: Rarity = Rarity.Common,
     val price: Int = 0,
-    val statBonus: Stats = Stats()
+    val statBonus: Stats = Stats(),
+    val levelRequirement: Int = 1
 )
 
 enum class ItemType {

@@ -12,22 +12,35 @@ import com.alifeatseammo.data.repository.ChatMessage
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    messages: List<ChatMessage>,
-    onSendMessage: (String) -> Unit,
+    globalMessages: List<ChatMessage>,
+    crewMessages: List<ChatMessage>,
+    crewId: String?,
+    onSendMessage: (String, String) -> Unit,
     onBackClick: () -> Unit
 ) {
     var text by remember { mutableStateOf("") }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Global Chat") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Text("Back")
+            Column {
+                TopAppBar(
+                    title = { Text("Chat") },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Text("Back")
+                        }
+                    }
+                )
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
+                        Text("Global", modifier = Modifier.padding(16.dp))
+                    }
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, enabled = crewId != null) {
+                        Text("Crew", modifier = Modifier.padding(16.dp))
                     }
                 }
-            )
+            }
         },
         bottomBar = {
             Row(modifier = Modifier.padding(16.dp)) {
@@ -40,7 +53,8 @@ fun ChatScreen(
                 Button(
                     onClick = {
                         if (text.isNotBlank()) {
-                            onSendMessage(text)
+                            val channel = if (selectedTab == 0) "global" else crewId ?: "global"
+                            onSendMessage(text, channel)
                             text = ""
                         }
                     },
@@ -51,6 +65,8 @@ fun ChatScreen(
             }
         }
     ) { padding ->
+        val messages = if (selectedTab == 0) globalMessages else crewMessages
+        
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             reverseLayout = true
