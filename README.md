@@ -48,6 +48,7 @@ cd a-life-at-sea-mmo
 ./gradlew assembleDebug
 ```
 
-## 📄 License
+## 📄 License and Terms
 
-(Add license information here, e.g., MIT, Apache 2.0)
+*   **License**: This project is proprietary. See the [LICENSE](LICENSE) file for details.
+*   **Terms of Service**: By using this software, you agree to the [Terms of Service](TERMS_OF_SERVICE.md).
