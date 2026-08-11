@@ -24,6 +24,28 @@ const STAT_MAPPING: Record<string, string> = {
     "DualBlades": "dualBlades"
 };
 
+const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = {
+    "Fogi Tail Island": { x: 0, y: 0, region: "East Blue" },
+    "Ironcrest Isle": { x: 50, y: 20, region: "East Blue" },
+    "Amber Reach": { x: -30, y: 40, region: "East Blue" },
+    "Tortuga Bay": { x: 10, y: -100, region: "South Blue" },
+    "Crystal Cove": { x: 120, y: 80, region: "Grand Line" },
+};
+
+function calculateTravelTime(from: string, to: string): number {
+    const start = LOCATION_DATA[from] || { x: 0, y: 0, region: "Unknown" };
+    const end = LOCATION_DATA[to] || { x: 0, y: 0, region: "Unknown" };
+
+    const dist = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+    let baseTime = dist * 2000; // 1 unit = 2 seconds
+
+    if (start.region !== end.region) {
+        baseTime += 60000; // Extra minute for inter-region travel
+    }
+
+    return Math.max(10000, Math.floor(baseTime)); // Min 10 seconds
+}
+
 // --- Helper Functions ---
 
 function recordLog(transaction: admin.firestore.Transaction, userId: string, action: string, details: string, goldChange: number = 0, xpChange: number = 0) {
@@ -117,6 +139,7 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
         title: "Novice Sailor",
         pvpWins: 0,
         pvpLosses: 0,
+        faction: "Neutral",
         stats: {
             strength: 5,
             endurance: 5,
@@ -139,6 +162,36 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
 
     await db.collection("players").doc(userId).set(character);
     return { success: true };
+});
+
+export const joinFaction = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { faction } = data; // Navy, Pirate
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = snapshot.data() as any;
+        if (character.faction !== "Neutral") {
+            throw new functions.https.HttpsError("failed-precondition", "You already belong to a faction.");
+        }
+
+        if (faction === "Pirate") {
+            transaction.update(playerRef, { faction: "Pirate", title: "Rogue Sailor" });
+            recordLog(transaction, userId, "JoinFaction", "Became a Pirate", 0, 0);
+        } else if (faction === "Navy") {
+            transaction.update(playerRef, { faction: "Navy", title: "Navy Recruit" });
+            recordLog(transaction, userId, "JoinFaction", "Enlisted in the Navy", 0, 0);
+        } else {
+            throw new functions.https.HttpsError("invalid-argument", "Invalid faction choice.");
+        }
+
+        return { success: true, faction };
+    });
 });
 
 export const train = functions.https.onCall(async (data, context) => {
@@ -176,7 +229,7 @@ export const train = functions.https.onCall(async (data, context) => {
 export const startTravel = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
-    const { destination, arrivalTime } = data;
+    const { destination } = data;
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
 
@@ -189,26 +242,33 @@ export const startTravel = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("failed-precondition", "Player is already busy.");
         }
 
+        if (character.currentLocation === destination) {
+            throw new functions.https.HttpsError("invalid-argument", "Already at destination.");
+        }
+
+        const travelDuration = calculateTravelTime(character.currentLocation, destination);
+        const arrivalTime = Date.now() + travelDuration;
+
         // Potential for random encounter here
-        const travelDuration = arrivalTime - Date.now();
-        if (travelDuration > 30000 && Math.random() < 0.25) {
+        if (travelDuration > 20000 && Math.random() < 0.20) {
             const enemy = generateEnemy(character.level);
             transaction.update(playerRef, {
                 combatState: {
                     enemy: enemy,
                     playerTurn: true,
-                    logs: [`You were ambushed by a ${enemy.name}!`],
+                    logs: [`While traveling to ${destination}, you were ambushed by a ${enemy.name}!`],
                     isFinished: false,
-                    playerWon: false
+                    playerWon: false,
+                    turnCount: 0
                 }
             });
-            return { ambush: true };
+            return { ambush: true, enemy };
         }
 
         transaction.update(playerRef, {
             travelState: { destination, arrivalTime }
         });
-        return { success: true };
+        return { success: true, arrivalTime, travelDuration };
     });
 });
 
@@ -239,21 +299,91 @@ export const finishTravel = functions.https.onCall(async (data, context) => {
 
 // --- Combat Engine ---
 
+// --- Combat Engine ---
+
+interface CombatStats {
+    hp: number;
+    maxHp: number;
+    strength: number;
+    endurance: number;
+    agility: number;
+    perception: number;
+    willpower: number;
+    luck: number;
+    swordsmanship?: number;
+    brawling?: number;
+    gunslinging?: number;
+    spear?: number;
+    martialArts?: number;
+    dualBlades?: number;
+    defense: number;
+    accuracy: number;
+    dodge: number;
+    critChance: number;
+}
+
+function calculateCombatStats(charOrEnemy: any): CombatStats {
+    const stats = charOrEnemy.stats;
+    const level = charOrEnemy.level || 1;
+
+    // Base stats + Equipment bonuses (to be added)
+    let strength = stats.strength || 5;
+    let endurance = stats.endurance || 5;
+    let agility = stats.agility || 5;
+    let perception = stats.perception || 5;
+    let luck = stats.luck || 5;
+    let willpower = stats.willpower || 5;
+
+    // Derived stats
+    const defense = Math.floor(endurance * 1.5 + (charOrEnemy.level || 1));
+    const accuracy = 80 + agility * 0.5 + perception * 0.5;
+    const dodge = agility * 0.8 + luck * 0.2;
+    const critChance = 5 + luck * 0.5 + perception * 0.2;
+
+    return {
+        hp: charOrEnemy.hp,
+        maxHp: charOrEnemy.maxHp,
+        strength,
+        endurance,
+        agility,
+        perception,
+        willpower,
+        luck,
+        swordsmanship: stats.swordsmanship || 0,
+        brawling: stats.brawling || 0,
+        gunslinging: stats.gunslinging || 0,
+        spear: stats.spear || 0,
+        martialArts: stats.martialArts || 0,
+        dualBlades: stats.dualBlades || 0,
+        defense,
+        accuracy,
+        dodge,
+        critChance
+    };
+}
+
 function generateEnemy(playerLevel: number) {
-    const names = ["Sea Serpent", "Pirate Scout", "Feral Crab", "Ghost Ship"];
+    const names = ["Sea Serpent", "Pirate Scout", "Feral Crab", "Ghost Ship", "Navy Enforcer"];
     const name = names[Math.floor(Math.random() * names.length)];
     const level = Math.max(1, playerLevel + Math.floor(Math.random() * 3) - 1);
+
+    const stats = {
+        strength: 5 + level * 2,
+        endurance: 5 + level * 2,
+        agility: 5 + level,
+        perception: 5 + level,
+        willpower: 5 + level,
+        luck: 5 + level / 2
+    };
+
+    const maxHp = 40 + (level * 15);
 
     return {
         name,
         level,
-        hp: 40 + (level * 10),
-        maxHp: 40 + (level * 10),
-        stats: {
-            strength: 5 + level * 2,
-            endurance: 5 + level * 2,
-            agility: 5 + level
-        },
+        hp: maxHp,
+        maxHp: maxHp,
+        stats,
         goldReward: 20 * level,
         xpReward: 15 * level
     };
@@ -262,7 +392,7 @@ function generateEnemy(playerLevel: number) {
 export const combatAction = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
-    const { action } = data; // Attack, Technique, Defend, Item, Flee
+    const { action, techniqueId, itemId } = data;
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
 
@@ -274,26 +404,29 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         const combat = character.combatState;
         if (!combat || combat.isFinished) throw new functions.https.HttpsError("failed-precondition", "No active combat.");
 
-        const logs = [...combat.logs];
+        const logs = [...(combat.logs || [])];
         let enemy = combat.enemy;
         let playerHp = character.hp;
+        let playerEnergy = character.energy;
         let playerWon = false;
         let isFinished = false;
 
-        // RPG Logic
-        const playerAgi = character.stats.agility;
-        const enemyAgi = enemy.stats.agility;
+        const pStats = calculateCombatStats(character);
+        const eStats = calculateCombatStats(enemy);
 
+        // --- Player Turn ---
         if (action === "Attack") {
-            const hitChance = 0.8 + (playerAgi - enemyAgi) * 0.02;
-            if (Math.random() < hitChance) {
-                let damage = character.stats.strength * 2 + (character.stats.swordsmanship || 0) / 2;
-                damage = Math.floor(damage * (0.9 + Math.random() * 0.2)); // Variance
+            const hitRoll = Math.random() * 100;
+            const hitChance = pStats.accuracy - eStats.dodge;
 
-                // Crit chance
-                if (Math.random() < 0.05 + character.stats.luck * 0.01) {
-                    damage *= 2;
-                    logs.push(`CRITICAL HIT! You strike ${enemy.name} for ${damage} damage!`);
+            if (hitRoll < hitChance) {
+                let damage = pStats.strength * 2 + (pStats.swordsmanship || 0) * 1.5;
+                damage = Math.max(1, Math.floor(damage - eStats.defense * 0.5));
+                damage = Math.floor(damage * (0.9 + Math.random() * 0.2));
+
+                if (Math.random() * 100 < pStats.critChance) {
+                    damage = Math.floor(damage * 2);
+                    logs.push(`CRITICAL! You strike ${enemy.name} for ${damage} damage!`);
                 } else {
                     logs.push(`You hit ${enemy.name} for ${damage} damage.`);
                 }
@@ -301,13 +434,28 @@ export const combatAction = functions.https.onCall(async (data, context) => {
             } else {
                 logs.push(`You missed your attack on ${enemy.name}.`);
             }
+        } else if (action === "Technique") {
+            // Placeholder Technique Logic
+            const techCost = 15;
+            if (playerEnergy < techCost) {
+                throw new functions.https.HttpsError("failed-precondition", "Not enough energy for this technique.");
+            }
+            playerEnergy -= techCost;
+
+            let techDamage = pStats.strength * 3 + (pStats.martialArts || 0) * 2;
+            techDamage = Math.floor(techDamage * (1.1 + Math.random() * 0.2));
+            enemy.hp = Math.max(0, enemy.hp - techDamage);
+            logs.push(`You use a Technique! ${enemy.name} takes ${techDamage} damage.`);
         } else if (action === "Defend") {
             logs.push("You take a defensive stance.");
-            // Flag for half damage on next enemy turn
             combat.defending = true;
+        } else if (action === "Item") {
+            // Placeholder Item Logic (e.g., Healing Potion)
+            playerHp = Math.min(character.maxHp, playerHp + 30);
+            logs.push("You used a Health Potion and recovered 30 HP.");
         } else if (action === "Flee") {
-            const fleeChance = 0.5 + (playerAgi - enemyAgi) * 0.05;
-            if (Math.random() < fleeChance) {
+            const fleeChance = 40 + (pStats.agility - eStats.agility) * 2;
+            if (Math.random() * 100 < fleeChance) {
                 transaction.update(playerRef, { combatState: null });
                 return { fled: true };
             } else {
@@ -320,16 +468,21 @@ export const combatAction = functions.https.onCall(async (data, context) => {
             playerWon = true;
             isFinished = true;
         } else {
-            // Enemy Turn
-            const enemyHitChance = 0.7 + (enemyAgi - playerAgi) * 0.02;
-            if (Math.random() < enemyHitChance) {
-                let enemyDamage = Math.floor(enemy.stats.strength * 1.5);
+            // --- Enemy Turn ---
+            const eHitRoll = Math.random() * 100;
+            const eHitChance = eStats.accuracy - pStats.dodge;
+
+            if (eHitRoll < eHitChance) {
+                let eDamage = Math.floor(eStats.strength * 1.8);
+                eDamage = Math.max(1, Math.floor(eDamage - pStats.defense * 0.4));
+
                 if (combat.defending) {
-                    enemyDamage = Math.floor(enemyDamage / 2);
+                    eDamage = Math.floor(eDamage * 0.5);
                     combat.defending = false;
                 }
-                playerHp = Math.max(0, playerHp - enemyDamage);
-                logs.push(`${enemy.name} hits you for ${enemyDamage} damage.`);
+
+                playerHp = Math.max(0, playerHp - eDamage);
+                logs.push(`${enemy.name} hits you for ${eDamage} damage.`);
             } else {
                 logs.push(`${enemy.name} missed its attack.`);
             }
@@ -342,25 +495,26 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         }
 
         if (isFinished) {
-            let updatedChar = { ...character, hp: playerHp, combatState: null };
+            let updatedChar = { ...character, hp: playerHp, energy: playerEnergy, combatState: null };
             if (playerWon) {
                 updatedChar.gold += enemy.goldReward;
                 updatedChar.xp += enemy.xpReward;
                 updatedChar = checkLevelUp(updatedChar);
                 recordLog(transaction, userId, "CombatWin", `Defeated ${enemy.name}`, enemy.goldReward, enemy.xpReward);
             } else {
-                // Death penalty
                 const goldLost = Math.floor(updatedChar.gold * 0.1);
                 updatedChar.gold -= goldLost;
                 updatedChar.currentLocation = "Fogi Tail Island";
-                updatedChar.hp = updatedChar.maxHp;
+                updatedChar.hp = character.maxHp;
+                updatedChar.energy = character.maxEnergy; // Recovery on death
                 recordLog(transaction, userId, "CombatLoss", `Defeated by ${enemy.name}`, -goldLost, 0);
             }
             transaction.set(playerRef, updatedChar);
         } else {
             transaction.update(playerRef, {
                 hp: playerHp,
-                combatState: { ...combat, enemy, logs }
+                energy: playerEnergy,
+                combatState: { ...combat, enemy, logs, turnCount: (combat.turnCount || 0) + 1 }
             });
         }
 
@@ -438,7 +592,7 @@ export const completeMission = functions.https.onCall(async (data, context) => {
     const { missionId } = data;
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
-    const missionRef = db.collection("missions").doc(missionId);
+    const missionRef = db.collection("gameData").document("world").collection("missions").doc(missionId);
 
     return db.runTransaction(async (transaction) => {
         const [playerSnap, missionSnap] = await Promise.all([
@@ -452,8 +606,12 @@ export const completeMission = functions.https.onCall(async (data, context) => {
         const character = playerSnap.data() as any;
         const mission = missionSnap.data() as any;
 
-        if (character.level < mission.minLevel) {
+        if (character.level < (mission.minLevel || 1)) {
             throw new functions.https.HttpsError("failed-precondition", "Level too low for this mission.");
+        }
+
+        if (mission.locationId && character.currentLocation !== mission.locationId) {
+            throw new functions.https.HttpsError("failed-precondition", "You are not at the required location for this mission.");
         }
 
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
@@ -463,15 +621,15 @@ export const completeMission = functions.https.onCall(async (data, context) => {
             ...character,
             energy: energy - mission.energyCost,
             energyUpdatedAt: energyUpdatedAt,
-            gold: character.gold + mission.rewards.gold,
-            xp: character.xp + mission.rewards.xp
+            gold: character.gold + (mission.goldReward || 0),
+            xp: character.xp + (mission.xpReward || 0)
         };
 
         updatedChar = checkLevelUp(updatedChar);
         transaction.set(playerRef, updatedChar);
-        recordLog(transaction, userId, "MissionCompleted", `Completed mission ${missionId}`, mission.rewards.gold, mission.rewards.xp);
+        recordLog(transaction, userId, "MissionCompleted", `Completed mission ${mission.title || missionId}`, mission.goldReward, mission.xpReward);
 
-        return { success: true, rewards: mission.rewards };
+        return { success: true, rewards: { gold: mission.goldReward, xp: mission.xpReward } };
     });
 });
 
@@ -650,15 +808,210 @@ export const acceptFriendRequest = functions.https.onCall(async (data, context) 
     });
 });
 
-export const blockPlayer = functions.https.onCall(async (data, context) => {
+// --- Inventory & Equipment ---
+
+export const equipItem = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { itemId, slot } = data; // slot: Weapon, Armor, Accessory
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = snapshot.data() as any;
+        const inventory = character.inventory || [];
+        const item = inventory.find((i: any) => i.id === itemId);
+
+        if (!item) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
+        if (item.type !== slot) throw new functions.https.HttpsError("invalid-argument", `Item cannot be equipped in ${slot} slot.`);
+
+        const equipment = character.equipment || {};
+        equipment[slot] = item;
+
+        transaction.update(playerRef, { equipment });
+        return { success: true };
+    });
+});
+
+export const unequipItem = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { slot } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = snapshot.data() as any;
+        const equipment = character.equipment || {};
+        delete equipment[slot];
+
+        transaction.update(playerRef, { equipment });
+        return { success: true };
+    });
+});
+
+export const purchaseItem = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { itemId, shopId } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+    const itemRef = db.collection("gameData").document("items").collection("all").doc(itemId);
+
+    return db.runTransaction(async (transaction) => {
+        const [playerSnap, itemSnap] = await Promise.all([
+            transaction.get(playerRef),
+            transaction.get(itemRef)
+        ]);
+
+        if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+        if (!itemSnap.exists) throw new functions.https.HttpsError("not-found", "Item not found.");
+
+        const character = playerSnap.data() as any;
+        const item = itemSnap.data() as any;
+
+        if (character.gold < item.price) {
+            throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
+        }
+
+        const newInventory = [...(character.inventory || []), { ...item, id: `${item.id}_${Date.now()}` }];
+
+        transaction.update(playerRef, {
+            gold: character.gold - item.price,
+            inventory: newInventory
+        });
+
+        recordLog(transaction, userId, "PurchaseItem", `Purchased ${item.name}`, -item.price, 0);
+        return { success: true };
+    });
+});
+
+// --- Crew System Completion ---
+
+export const leaveCrew = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const playerSnap = await transaction.get(playerRef);
+        if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = playerSnap.data() as any;
+        const crewId = character.crewId;
+        if (!crewId) throw new functions.https.HttpsError("failed-precondition", "Player is not in a crew.");
+
+        const crewRef = db.collection("crews").doc(crewId);
+        const crewSnap = await transaction.get(crewRef);
+        if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "Crew not found.");
+
+        const crew = crewSnap.data() as any;
+        if (crew.captainId === userId) {
+            throw new functions.https.HttpsError("failed-precondition", "Captain cannot leave. Disband or promote someone else first.");
+        }
+
+        transaction.update(crewRef, {
+            members: admin.firestore.FieldValue.arrayRemove(userId),
+            totalBounty: admin.firestore.FieldValue.increment(-character.bounty)
+        });
+        transaction.update(playerRef, { crewId: null });
+
+        return { success: true };
+    });
+});
+
+export const inviteToCrew = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
     const { targetId } = data;
-    const userId = context.auth.uid;
+    const senderId = context.auth.uid;
 
-    await db.collection("players").doc(userId).update({
-        blocked: admin.firestore.FieldValue.arrayUnion(targetId)
+    const senderSnap = await db.collection("players").doc(senderId).get();
+    const sender = senderSnap.data() as any;
+    if (!sender.crewId) throw new functions.https.HttpsError("failed-precondition", "You are not in a crew.");
+
+    const inviteRef = db.collection("crewInvites").doc(`${sender.crewId}_${targetId}`);
+    await inviteRef.set({
+        crewId: sender.crewId,
+        crewName: (await db.collection("crews").doc(sender.crewId).get()).data()?.name,
+        senderId,
+        targetId,
+        status: "pending",
+        timestamp: Date.now()
     });
 
     return { success: true };
+});
+
+export const respondToInvite = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { crewId, accept } = data;
+    const userId = context.auth.uid;
+    const inviteRef = db.collection("crewInvites").doc(`${crewId}_${userId}`);
+
+    return db.runTransaction(async (transaction) => {
+        const inviteSnap = await transaction.get(inviteRef);
+        if (!inviteSnap.exists || inviteSnap.data()?.status !== "pending") {
+            throw new functions.https.HttpsError("not-found", "Invite not found.");
+        }
+
+        if (!accept) {
+            transaction.update(inviteRef, { status: "rejected" });
+            return { success: true, accepted: false };
+        }
+
+        const playerRef = db.collection("players").doc(userId);
+        const crewRef = db.collection("crews").doc(crewId);
+        const [playerSnap, crewSnap] = await Promise.all([
+            transaction.get(playerRef),
+            transaction.get(crewRef)
+        ]);
+
+        const character = playerSnap.data() as any;
+        const crew = crewSnap.data() as any;
+
+        if (character.crewId) throw new functions.https.HttpsError("already-exists", "Already in a crew.");
+        if (crew.members.length >= 20) throw new functions.https.HttpsError("resource-exhausted", "Crew is full.");
+
+        transaction.update(crewRef, {
+            members: admin.firestore.FieldValue.arrayUnion(userId),
+            totalBounty: admin.firestore.FieldValue.increment(character.bounty)
+        });
+        transaction.update(playerRef, { crewId });
+        transaction.update(inviteRef, { status: "accepted" });
+
+        return { success: true, accepted: true };
+    });
+});
+
+export const promoteMember = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { targetId, rank } = data; // rank: Officer
+    const captainId = context.auth.uid;
+
+    const playerSnap = await db.collection("players").doc(captainId).get();
+    const captain = playerSnap.data() as any;
+    const crewRef = db.collection("crews").doc(captain.crewId);
+
+    return db.runTransaction(async (transaction) => {
+        const crewSnap = await transaction.get(crewRef);
+        const crew = crewSnap.data() as any;
+
+        if (crew.captainId !== captainId) throw new functions.https.HttpsError("permission-denied", "Only Captain can promote.");
+
+        const roles = crew.roles || {};
+        roles[targetId] = rank;
+        transaction.update(crewRef, { roles });
+
+        return { success: true };
+    });
 });

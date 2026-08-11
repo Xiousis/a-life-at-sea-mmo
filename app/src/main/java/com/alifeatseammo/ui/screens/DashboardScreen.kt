@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.ActionType
 import com.alifeatseammo.data.model.Character
+import com.alifeatseammo.data.model.Faction
 import com.alifeatseammo.data.model.Location
 
 @Composable
@@ -29,7 +30,8 @@ fun DashboardScreen(
     onActionClick: (ActionType) -> Unit,
     onPlayerClick: (Character) -> Unit,
     onMissionsClick: () -> Unit,
-    onMailClick: () -> Unit
+    onMailClick: () -> Unit,
+    onJoinFaction: (Faction) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -71,7 +73,7 @@ fun DashboardScreen(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    text = "Lv. ${character.level} • ${character.race}",
+                    text = "Lv. ${character.level} • ${character.race} • ${character.faction}",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
@@ -97,6 +99,45 @@ fun DashboardScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Faction Recruitment
+        if (character.faction == Faction.Neutral && location != null) {
+            val recruitment = when {
+                location.name == "Blacktooth Island" || location.actions.any { it.type == ActionType.Tavern } -> Faction.Pirate
+                location.name == "Port Haven" || location.actions.any { it.type == ActionType.Docks } -> Faction.Navy
+                else -> null
+            }
+
+            recruitment?.let { faction ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (faction == Faction.Pirate) "JOIN THE PIRATES?" else "ENLIST IN THE NAVY?",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (faction == Faction.Pirate) 
+                                "Leave your civilian life behind and embrace freedom." 
+                                else "Protect these waters and maintain order.",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { onJoinFaction(faction) }) {
+                            Text(if (faction == Faction.Pirate) "Join Pirates" else "Enlist Now")
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
 
         // Location Centerpiece
         location?.let {

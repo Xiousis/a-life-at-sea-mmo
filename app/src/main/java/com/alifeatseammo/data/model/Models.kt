@@ -24,8 +24,11 @@ data class Character(
     val inventory: List<Item> = emptyList(),
     val equipment: Map<String, Item?> = emptyMap(),
     val crewId: String? = null,
+    val faction: Faction = Faction.Neutral,
     val lastOnline: Long = System.currentTimeMillis(),
-    val isOnline: Boolean = false
+    val isOnline: Boolean = false,
+    val friends: List<String> = emptyList(),
+    val blocked: List<String> = emptyList()
 ) {
     fun getCurrentEnergy(): Int {
         val regenRateMs = 3 * 60 * 1000L // 3 minutes
@@ -44,6 +47,10 @@ data class Character(
 
 enum class Gender {
     Male, Female
+}
+
+enum class Faction {
+    Neutral, Navy, Pirate
 }
 
 enum class Race {
@@ -124,7 +131,9 @@ data class CombatState(
     val playerTurn: Boolean = true,
     val logs: List<String> = emptyList(),
     val isFinished: Boolean = false,
-    val playerWon: Boolean = false
+    val playerWon: Boolean = false,
+    val defending: Boolean = false,
+    val turnCount: Int = 0
 )
 
 enum class CombatAction {
@@ -167,38 +176,27 @@ data class Crew(
     val description: String = "",
     val captainId: String = "",
     val members: List<String> = emptyList(),
+    val roles: Map<String, CrewRole> = emptyMap(),
     val totalBounty: Long = 0,
     val level: Int = 1,
     val experience: Long = 0
+)
+
+enum class CrewRole {
+    Captain, Officer, Member
+}
+
+data class CrewInvite(
+    val crewId: String = "",
+    val crewName: String = "",
+    val senderId: String = "",
+    val targetId: String = "",
+    val status: String = "pending",
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 enum class ActionType {
     Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Cave, Fishing
 }
 
-fun Character.checkLevelUp(): Character {
-    val xpNeeded = level * 100
-    return if (xp >= xpNeeded) {
-        val nextLevel = level + 1
-        val newEndurance = stats.endurance + 1
-        val newMaxHp = 50 + (newEndurance * 10)
-        this.copy(
-            level = nextLevel,
-            xp = xp - xpNeeded,
-            maxEnergy = maxEnergy + 5,
-            energy = maxEnergy + 5,
-            maxHp = newMaxHp,
-            hp = newMaxHp,
-            stats = stats.copy(
-                strength = stats.strength + 1,
-                endurance = newEndurance,
-                agility = stats.agility + 1,
-                perception = stats.perception + 1,
-                willpower = stats.willpower + 1,
-                luck = stats.luck + 1
-            )
-        ).checkLevelUp()
-    } else {
-        this
-    }
-}
+fun Character.checkLevelUp(): Character = this // Handled server-side now

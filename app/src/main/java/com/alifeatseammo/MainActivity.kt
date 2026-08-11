@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
                         if (currentChar?.combatState != null) {
                             CombatScreen(
                                 character = currentChar,
-                                onActionClick = { viewModel.combatAction(it) }
+                                onActionClick = { action -> viewModel.combatAction(action) }
                             )
                         } else {
                             Scaffold(
@@ -113,7 +113,8 @@ class MainActivity : ComponentActivity() {
                                                         currentScreen = Screen.Character
                                                     },
                                                     onMissionsClick = { currentScreen = Screen.Missions },
-                                                    onMailClick = { /* TODO */ }
+                                                    onMailClick = { /* TODO */ },
+                                                    onJoinFaction = { viewModel.joinFaction(it) }
                                                 )
                                             }
                                         }
@@ -195,6 +196,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                         Screen.Crew -> {
                                             val crew by profileViewModel.playerCrew.collectAsState()
+                                            val invites by viewModel.crewInvites.collectAsState()
                                             currentChar?.let { char ->
                                                 LaunchedEffect(char.crewId) {
                                                     char.crewId?.let { profileViewModel.loadPlayer(char.id) }
@@ -202,8 +204,13 @@ class MainActivity : ComponentActivity() {
                                                 CrewScreen(
                                                     character = char,
                                                     crew = crew,
+                                                    invites = invites,
                                                     onCreateCrew = { name, desc -> viewModel.createCrew(name, desc) },
                                                     onJoinCrew = { id -> viewModel.joinCrew(id) },
+                                                    onLeaveCrew = { viewModel.leaveCrew() },
+                                                    onInviteToCrew = { id -> viewModel.inviteToCrew(id) },
+                                                    onRespondToInvite = { id, accept -> viewModel.respondToInvite(id, accept) },
+                                                    onPromoteMember = { id, rank -> viewModel.promoteMember(id, rank) },
                                                     onBackClick = { currentScreen = Screen.Dashboard }
                                                 )
                                             }
@@ -254,6 +261,7 @@ class MainActivity : ComponentActivity() {
                                                 InventoryScreen(
                                                     character = char,
                                                     onEquipItem = { viewModel.equipItem(it) },
+                                                    onUnequipItem = { viewModel.unequipItem(it) },
                                                     onUseItem = { viewModel.useItem(it) },
                                                     onSellItem = { viewModel.sellItem(it) },
                                                     onBackClick = { currentScreen = Screen.More }

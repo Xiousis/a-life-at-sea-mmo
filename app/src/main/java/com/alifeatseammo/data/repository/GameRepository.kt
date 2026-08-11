@@ -15,15 +15,16 @@ interface GameRepository {
     suspend fun train(userId: String, statType: StatType): Boolean
     suspend fun completeMission(userId: String, missionId: String): Boolean
     fun getAvailableMissions(): Flow<List<Mission>>
-    fun startTravel(userId: String, destination: String, arrivalTime: Long)
-    fun combatAction(userId: String, action: CombatAction)
-    fun attackPlayer(attackerId: String, defenderId: String)
+    suspend fun startTravel(userId: String, destination: String): Boolean
+    suspend fun combatAction(userId: String, action: CombatAction, techniqueId: String? = null, itemId: String? = null): Boolean
+    suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean
+    suspend fun equipItem(itemId: String, slot: String): Boolean
+    suspend fun unequipItem(slot: String): Boolean
+    suspend fun purchaseItem(itemId: String, shopId: String): Boolean
+    suspend fun joinFaction(userId: String, faction: Faction): Boolean
     fun getPlayersAtLocation(location: String): Flow<List<Character>>
     fun getTopPlayers(limit: Int): Flow<List<Character>>
     fun getPlayerProfile(playerId: String): Flow<Character?>
-    fun getCrew(crewId: String): Flow<Crew?>
-    suspend fun createCrew(name: String, description: String): String?
-    suspend fun joinCrew(crewId: String): Boolean
     fun getLocations(): Flow<List<LocationDef>>
     fun getEnemyDefs(): Flow<List<EnemyDef>>
     fun getMissionDefs(): Flow<List<MissionDef>>
@@ -40,17 +41,13 @@ class FirestoreGameRepository(
             if (snapshot != null && snapshot.exists()) {
                 val character = snapshot.toObject<Character>()
                 if (character != null) {
-                    // Travel Arrival check - The client notifies the server when travel is complete
+                    // Server-authoritative travel finish check
                     val travel = character.travelState
                     if (travel != null && travel.arrivalTime <= System.currentTimeMillis()) {
-                        // We emit the arrival state optimistically, but the server must confirm it
-                        trySend(character.copy(currentLocation = travel.destination, travelState = null))
-                        
-                        // Call Cloud Function to persist arrival
+                        // Notify server to finalize travel
                         functions.getHttpsCallable("finishTravel").call()
-                    } else {
-                        trySend(character)
                     }
+                    trySend(character)
                 } else {
                     trySend(null)
                 }
@@ -101,22 +98,78 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun startTravel(userId: String, destination: String, arrivalTime: Long) {
-        val data = hashMapOf(
-            "destination" to destination,
-            "arrivalTime" to arrivalTime
-        )
-        functions.getHttpsCallable("startTravel").call(data)
+    override suspend fun startTravel(userId: String, destination: String): Boolean {
+        return try {
+            val data = hashMapOf("destination" to destination)
+            functions.getHttpsCallable("startTravel").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
-    override fun combatAction(userId: String, action: CombatAction) {
-        val data = hashMapOf("action" to action.name)
-        functions.getHttpsCallable("combatAction").call(data)
+    override suspend fun combatAction(userId: String, action: CombatAction, techniqueId: String?, itemId: String?): Boolean {
+        return try {
+            val data = hashMapOf(
+                "action" to action.name,
+                "techniqueId" to techniqueId,
+                "itemId" to itemId
+            )
+            functions.getHttpsCallable("combatAction").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
-    override fun attackPlayer(attackerId: String, defenderId: String) {
-        val data = hashMapOf("defenderId" to defenderId)
-        functions.getHttpsCallable("attackPlayer").call(data)
+    override suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean {
+        return try {
+            val data = hashMapOf("defenderId" to defenderId)
+            functions.getHttpsCallable("attackPlayer").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override suspend fun equipItem(itemId: String, slot: String): Boolean {
+        return try {
+            val data = hashMapOf("itemId" to itemId, "slot" to slot)
+            functions.getHttpsCallable("equipItem").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override suspend fun unequipItem(slot: String): Boolean {
+        return try {
+            val data = hashMapOf("slot" to slot)
+            functions.getHttpsCallable("unequipItem").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override suspend fun purchaseItem(itemId: String, shopId: String): Boolean {
+        return try {
+            val data = hashMapOf("itemId" to itemId, "shopId" to shopId)
+            functions.getHttpsCallable("purchaseItem").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override suspend fun joinFaction(userId: String, faction: Faction): Boolean {
+        return try {
+            val data = hashMapOf("faction" to faction.name)
+            functions.getHttpsCallable("joinFaction").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     override fun getPlayersAtLocation(location: String): Flow<List<Character>> = callbackFlow {
@@ -149,35 +202,6 @@ class FirestoreGameRepository(
                 trySend(snapshot?.toObject<Character>())
             }
         awaitClose { subscription.remove() }
-    }
-
-    override fun getCrew(crewId: String): Flow<Crew?> = callbackFlow {
-        val subscription = db.collection("crews").document(crewId)
-            .addSnapshotListener { snapshot, _ ->
-                trySend(snapshot?.toObject<Crew>())
-            }
-        awaitClose { subscription.remove() }
-    }
-
-    override suspend fun createCrew(name: String, description: String): String? {
-        return try {
-            val data = hashMapOf("name" to name, "description" to description)
-            val result = functions.getHttpsCallable("createCrew").call(data).await()
-            val resultData = result.data as? Map<*, *>
-            resultData?.get("crewId") as? String
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    override suspend fun joinCrew(crewId: String): Boolean {
-        return try {
-            val data = hashMapOf("crewId" to crewId)
-            functions.getHttpsCallable("joinCrew").call(data).await()
-            true
-        } catch (e: Exception) {
-            false
-        }
     }
 
     override fun getLocations(): Flow<List<LocationDef>> = callbackFlow {
@@ -279,9 +303,13 @@ class MockGameRepository : GameRepository {
         )
     )
 
-    override fun startTravel(userId: String, destination: String, arrivalTime: Long) {}
-    override fun combatAction(userId: String, action: CombatAction) {}
-    override fun attackPlayer(attackerId: String, defenderId: String) {}
+    override suspend fun startTravel(userId: String, destination: String): Boolean = true
+    override suspend fun combatAction(userId: String, action: CombatAction, techniqueId: String?, itemId: String?): Boolean = true
+    override suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean = true
+    override suspend fun equipItem(itemId: String, slot: String): Boolean = true
+    override suspend fun unequipItem(slot: String): Boolean = true
+    override suspend fun purchaseItem(itemId: String, shopId: String): Boolean = true
+    override suspend fun joinFaction(userId: String, faction: Faction): Boolean = true
 
     override fun getPlayersAtLocation(location: String): Flow<List<Character>> = flowOf(emptyList())
     override fun getTopPlayers(limit: Int): Flow<List<Character>> = flowOf(emptyList())
@@ -299,12 +327,6 @@ class MockGameRepository : GameRepository {
         )
     )
 
-    override fun getCrew(crewId: String): Flow<Crew?> = flowOf(
-        Crew(id = crewId, name = "Black Tide")
-    )
-
-    override suspend fun createCrew(name: String, description: String): String? = "mock-crew-id"
-    override suspend fun joinCrew(crewId: String): Boolean = true
     override fun getLocations(): Flow<List<LocationDef>> = flowOf(emptyList())
     override fun getEnemyDefs(): Flow<List<EnemyDef>> = flowOf(emptyList())
     override fun getMissionDefs(): Flow<List<MissionDef>> = flowOf(emptyList())

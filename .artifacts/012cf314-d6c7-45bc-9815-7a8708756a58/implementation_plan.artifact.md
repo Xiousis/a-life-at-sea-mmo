@@ -1,67 +1,55 @@
-# Player Profile System Implementation Plan
+# Game Engine Hardening and Backend Migration Plan
 
-This plan outlines the steps taken to implement a comprehensive player profile system for the social text MMO.
+This plan outlines the migration of critical game logic from the Android client to Firebase Cloud Functions and the hardening of the Firestore security rules.
 
 ## User Review Required
 
-> [!NOTE]
-> The profile layout has been updated to match the requested design:
-> ☠ RAZOR
-> Level 31
-> Human
-> Bounty: 3,482,900
-> Crew: Black Tide
-> Title: Sea Devil
-> PvP: 81W / 24L
-> [ATTACK] [MESSAGE] [VIEW CREW] [ADD FRIEND]
+> [!IMPORTANT]
+> - **Breaking Changes**: The client will no longer be able to directly modify player stats, gold, xp, or travel/combat state.
+> - **Cloud Functions**: New functions for `createCharacter`, `startTravel`, `finishTravel`, `combatAction`, and `attackPlayer` will be introduced.
+> - **Combat Engine**: A new server-side combat engine will handle accuracy, dodge, critical hits, and damage variance.
 
 ## Proposed Changes
 
-### Data Models
+### Backend (Cloud Functions & Rules)
 
-#### [MODIFY] [Models.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/data/model/Models.kt)
-- Added `title`, `pvpWins`, and `pvpLosses` fields to the `Character` data class.
+#### [MODIFY] [firestore.rules](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/firestore.rules)
+- Tighten rules to deny client-side updates to `hp`, `currentLocation`, `travelState`, `crewId`, and `equipment`.
+- Deny client-side creation of player documents; enforce creation via Cloud Function.
 
-### Repositories
+#### [MODIFY] [index.ts](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/functions/src/index.ts)
+- Implement `createCharacter` with unique name checks.
+- Fix `train` stat mapping bug.
+- Implement server-side level-up logic.
+- Implement `startTravel` and `finishTravel` (arrival) logic.
+- Implement a robust server-side Combat Engine for `combatAction` and `attackPlayer`.
+- Enforce mission/location requirements and cooldowns.
+
+#### [NEW] [firebase.json](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/firebase.json)
+- Add Firebase deployment configuration for Functions and Firestore.
+
+### Android Client
 
 #### [MODIFY] [GameRepository.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/data/repository/GameRepository.kt)
-- Added `getPlayerProfile(playerId: String)` and `getCrew(crewId: String)` to the `GameRepository` interface.
-- Implemented these methods in `FirestoreGameRepository` using Firestore snapshots.
-- Updated `MockGameRepository` for local development and testing.
+- Update `createCharacter`, `startTravel`, `combatAction`, and `attackPlayer` to use `functions.getHttpsCallable()`.
+- Remove local transaction-based logic for these actions.
 
-### ViewModels
+#### [NEW] [InventoryScreen.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/ui/screens/InventoryScreen.kt)
+- Build a full Inventory and Equipment UI.
 
-#### [NEW] [PlayerProfileViewModel.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/ui/PlayerProfileViewModel.kt)
-- Created a dedicated ViewModel to manage fetching and state of a specific player's profile and their associated crew.
-
-### UI Screens
-
-#### [MODIFY] [ProfileScreen.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/ui/screens/ProfileScreen.kt)
-- Redesigned the screen to match the requested pirate-themed aesthetic.
-- Added support for displaying bounty (formatted), crew name, title, and PvP stats.
-- Added action buttons for Attack, Message, View Crew, and Add Friend.
-
-#### [MODIFY] [LeaderboardScreen.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/ui/screens/LeaderboardScreen.kt)
-- Added `onPlayerClick` callback to allow navigating to a player's profile from the leaderboard.
-
-#### [MODIFY] [PvPScreen.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/ui/screens/PvPScreen.kt)
-- Added `onPlayerClick` callback to allow viewing a target's profile before attacking.
-
-#### [MODIFY] [MainActivity.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/MainActivity.kt)
-- Integrated `PlayerProfileViewModel`.
-- Updated navigation logic to use `selectedPlayerId` and fetch the full profile via the ViewModel when entering the Character screen.
-- Wired up `onPlayerClick` from all relevant screens (Dashboard, Leaderboard, PvP).
+#### [NEW] [CrewScreen.kt](file:///C:/Users/buggm/AndroidStudioProjects/AlifeatSeaMMO/app/src/main/java/com/alifeatseammo/ui/screens/CrewScreen.kt)
+- Build a full Crew management UI (Create, Join, Members, Ranks).
 
 ## Verification Plan
 
 ### Automated Tests
-- Build the project to ensure all new dependencies and method signatures are correct.
+- Deploy functions to the Firebase Emulator.
+- Run unit tests for Cloud Functions (if applicable) or verify via manual triggers.
 - `gradle_build(":app:assembleDebug")`
 
 ### Manual Verification
-1.  Open the app and navigate to the Dashboard.
-2.  Click on a player in the "Players Nearby" row.
-3.  Verify the profile displays correctly: Name, Level, Race, Bounty, Crew, Title, PvP Stats.
-4.  Verify the action buttons (Attack, Message, etc.) are present.
-5.  Navigate to the Leaderboard and click a player to verify the profile opens.
-6.  Navigate to the PvP screen and click a target's card to verify the profile opens.
+1.  Attempt to create a character with an existing name (should fail).
+2.  Perform a travel action and verify the arrival is handled by the server.
+3.  Engage in combat and verify the logs show the new RPG mechanics (dodge, crit, etc.).
+4.  Try to manually edit `hp` or `gold` via the client (should fail via Firestore rules).
+5.  Test the new Inventory and Crew UI flows.

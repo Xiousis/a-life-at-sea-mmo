@@ -4,13 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Crew
-import com.alifeatseammo.data.repository.GameRepository
-import com.alifeatseammo.data.repository.FirestoreGameRepository
+import com.alifeatseammo.data.repository.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 
 class PlayerProfileViewModel(
-    private val gameRepository: GameRepository = FirestoreGameRepository()
+    private val gameRepository: GameRepository = FirestoreGameRepository(),
+    private val crewRepository: CrewRepository = FirestoreCrewRepository()
 ) : ViewModel() {
 
     private val _playerId = MutableStateFlow<String?>(null)
@@ -26,7 +26,7 @@ class PlayerProfileViewModel(
         .map { it?.crewId }
         .filterNotNull()
         .distinctUntilChanged()
-        .flatMapLatest { crewId -> gameRepository.getCrew(crewId) }
+        .flatMapLatest { crewId -> crewRepository.getCrew(crewId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun loadPlayer(playerId: String) {

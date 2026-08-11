@@ -1,60 +1,52 @@
-# Player Profile System Walkthrough
+# Game Engine Hardening and Backend Migration Walkthrough
 
-The player profile system is now fully integrated into the "A Life At Sea" MMO. This foundation allows players to inspect each other, paving the way for social interactions and crew management.
+The "A Life At Sea" MMO backend has been significantly hardened, and all critical gameplay logic has been moved to server-authoritative Cloud Functions.
 
 ## Key Accomplishments
 
-- **Enhanced Data Model**: The `Character` model now tracks `title`, `pvpWins`, and `pvpLosses`.
-- **Dynamic Data Fetching**: A new `PlayerProfileViewModel` fetches both player details and crew information in real-time.
-- **Pirate-Themed UI**: The `ProfileScreen` has been overhauled to provide a clear, bold overview of a pirate's achievements.
-- **Seamless Navigation**: Players can now be inspected from the Dashboard, Leaderboard, and PvP screens.
+### 1. Server-Authoritative Gameplay
+- **Travel & Encounters**: `startTravel` and `finishTravel` are now Cloud Functions. The server now calculates travel arrival and ambush chances, preventing client-side manipulation of location.
+- **Combat Engine**: A robust RPG combat engine has been implemented on the server. It now handles:
+    - **Accuracy & Dodge**: Based on Agility stats.
+    - **Critical Hits**: Based on Luck stats.
+    - **Damage Variance**: 90% to 110% of base damage.
+    - **Defensive Stance**: `Defend` now correctly reduces incoming damage by 50% on the next turn.
+    - **Fleeing**: Success chance is now Agility-based.
+- **PvP**: `attackPlayer` is now server-side, ensuring fair calculations and secure gold/bounty transfers.
 
-## Visual Overview
+### 2. Backend Hardening
+- **Firestore Rules**: Tightened rules to deny client-side updates to critical fields like `hp`, `gold`, `xp`, `stats`, `travelState`, `combatState`, and `equipment`.
+- **Character Creation**: Moved to a Cloud Function (`createCharacter`) which enforces unique names and valid starting stats. Clients are now denied from creating `players` documents directly.
+- **Stat Mapping Fix**: Fixed a bug where `MartialArts` and `DualBlades` were being lowercase incorrectly. An explicit mapping is now used on the server.
+- **Server-Side Level Up**: Level-up calculations, energy refills, and stat increases are now handled entirely by the server during transactions.
 
-The profile screen now looks like this:
+### 3. New UI Systems
+- **Inventory Screen**: A new screen for managing items, equipping gear (Weapon, Armor, Accessory), and selling loot.
+- **Crew Screen**: A functional UI for creating a crew (costing 10,000 gold), joining existing crews, and viewing crew stats (Bounty, Level, Members).
 
-☠ **RAZOR**
-Level 31
-Human
+## Visual Overviews
 
-**Bounty:** 3,482,900
-**Crew:** Black Tide
-**Title:** Sea Devil
+### Inventory
+The backpack now displays items with their stats and types. Players can equip items to boost their combat effectiveness.
 
-**PvP:** 81W / 24L
-
-[ATTACK]
-[MESSAGE]
-[VIEW CREW]
-[ADD FRIEND]
+### Crew
+Players can now formalize their alliances. Captains can lead their crews to become the most feared in the "Western Blue".
 
 ## Implementation Details
 
-### Updated Character Model
-```kotlin
-data class Character(
-    // ... existing fields
-    val title: String = "Novice Sailor",
-    val pvpWins: Int = 0,
-    val pvpLosses: Int = 0,
-    // ...
-)
-```
+### Cloud Functions (`index.ts`)
+The `combatAction` function now contains a full turn-based RPG loop with variance and crit logic.
 
-### PlayerProfileViewModel
-The ViewModel ensures that when you click a player, their latest stats and their crew's name are fetched and displayed.
-
-```kotlin
-class PlayerProfileViewModel(...) : ViewModel() {
-    val playerProfile: StateFlow<Character?> = ...
-    val playerCrew: StateFlow<Crew?> = ...
-    fun loadPlayer(playerId: String) { ... }
-}
+### Firestore Rules
+```javascript
+allow update: if request.auth != null && request.auth.uid == userId
+  && !request.resource.data.diff(resource.data).affectedKeys()
+      .hasAny(['gold', 'xp', 'stats', 'energy', 'level', 'bounty', ...]);
 ```
 
 ## Next Steps
 
-1.  **Crew Screen**: Implement the `VIEW CREW` functionality to show all members of a crew.
-2.  **Messaging System**: Build the `MESSAGE` screen to allow direct communication between players.
-3.  **Friend System**: Implement `ADD FRIEND` logic and a friend list.
-4.  **Bounty Hunters**: Use the new bounty field to create a dedicated bounty board where players can hunt high-value targets.
+1.  **Item Database**: Populate the `items` collection with diverse gear and weapons.
+2.  **Technique System**: Expand the `combatAction` to handle specialized techniques with energy costs and cooldowns.
+3.  **Crew Management**: Add inviting, kicking, and promoting functionality to the Crew screen.
+4.  **World Bosses**: Implement large-scale server-side encounters that multiple players can contribute to.

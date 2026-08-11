@@ -20,6 +20,7 @@ import com.alifeatseammo.data.model.ItemType
 fun InventoryScreen(
     character: Character,
     onEquipItem: (Item) -> Unit,
+    onUnequipItem: (String) -> Unit,
     onUseItem: (Item) -> Unit,
     onSellItem: (Item) -> Unit,
     onBackClick: () -> Unit
@@ -51,7 +52,7 @@ fun InventoryScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             
-            EquipmentGrid(character.equipment)
+            EquipmentGrid(character.equipment, onUnequipItem)
             
             Spacer(modifier = Modifier.height(24.dp))
             
@@ -87,7 +88,7 @@ fun InventoryScreen(
 }
 
 @Composable
-fun EquipmentGrid(equipment: Map<String, Item?>) {
+fun EquipmentGrid(equipment: Map<String, Item?>, onUnequip: (String) -> Unit) {
     val slots = listOf("Weapon", "Armor", "Accessory")
     
     Row(
@@ -98,16 +99,19 @@ fun EquipmentGrid(equipment: Map<String, Item?>) {
             EquipmentSlot(
                 slotName = slot,
                 item = equipment[slot],
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onUnequip = { onUnequip(slot) }
             )
         }
     }
 }
 
 @Composable
-fun EquipmentSlot(slotName: String, item: Item?, modifier: Modifier = Modifier) {
+fun EquipmentSlot(slotName: String, item: Item?, modifier: Modifier = Modifier, onUnequip: () -> Unit) {
     OutlinedCard(
         modifier = modifier.height(100.dp),
+        onClick = { if (item != null) onUnequip() },
+        enabled = item != null,
         colors = CardDefaults.cardColors(
             containerColor = if (item != null) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
         )

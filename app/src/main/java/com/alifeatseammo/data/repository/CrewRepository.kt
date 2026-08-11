@@ -1,7 +1,9 @@
 package com.alifeatseammo.data.repository
 
 import com.alifeatseammo.data.model.Crew
+import com.alifeatseammo.data.model.CrewInvite
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.toObject
 import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +15,10 @@ interface CrewRepository {
     suspend fun createCrew(name: String, description: String): Boolean
     suspend fun joinCrew(crewId: String): Boolean
     suspend fun leaveCrew(): Boolean
+    suspend fun inviteToCrew(targetId: String): Boolean
+    suspend fun respondToInvite(crewId: String, accept: Boolean): Boolean
+    suspend fun promoteMember(targetId: String, rank: String): Boolean
+    fun getInvitesForUser(userId: String): Flow<List<CrewInvite>>
 }
 
 class FirestoreCrewRepository(
@@ -60,5 +66,47 @@ class FirestoreCrewRepository(
         } catch (e: Exception) {
             false
         }
+    }
+
+    override suspend fun inviteToCrew(targetId: String): Boolean {
+        return try {
+            val data = hashMapOf("targetId" to targetId)
+            functions.getHttpsCallable("inviteToCrew").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override suspend fun respondToInvite(crewId: String, accept: Boolean): Boolean {
+        return try {
+            val data = hashMapOf("crewId" to crewId, "accept" to accept)
+            functions.getHttpsCallable("respondToInvite").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override suspend fun promoteMember(targetId: String, rank: String): Boolean {
+        return try {
+            val data = hashMapOf("targetId" to targetId, "rank" to rank)
+            functions.getHttpsCallable("promoteMember").call(data).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override fun getInvitesForUser(userId: String): Flow<List<CrewInvite>> = callbackFlow {
+        val subscription = db.collection("crewInvites")
+            .whereEqualTo("targetId", userId)
+            .whereEqualTo("status", "pending")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    trySend(snapshot.documents.mapNotNull { it.toObject<CrewInvite>() })
+                }
+            }
+        awaitClose { subscription.remove() }
     }
 }

@@ -70,6 +70,7 @@ fun ProfileScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ProfileStatRow("Bounty:", String.format(Locale.getDefault(), "%,d", character.bounty), color = MaterialTheme.colorScheme.error)
+                ProfileStatRow("Faction:", character.faction.name)
                 ProfileStatRow("Crew:", crew?.name ?: "None")
                 ProfileStatRow("Title:", character.title)
                 

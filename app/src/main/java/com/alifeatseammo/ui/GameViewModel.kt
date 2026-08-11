@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 class GameViewModel(
     private val authRepository: AuthRepository = FirebaseAuthRepository(),
     private val gameRepository: GameRepository = FirestoreGameRepository(),
-    private val chatRepository: ChatRepository = FirestoreChatRepository()
+    private val chatRepository: ChatRepository = FirestoreChatRepository(),
+    private val crewRepository: CrewRepository = FirestoreCrewRepository()
 ) : ViewModel() {
 
     val currentUser: StateFlow<FirebaseUser?> = authRepository.currentUser
@@ -90,14 +91,18 @@ class GameViewModel(
         }
     }
 
-    fun startTravel(destination: String, arrivalTime: Long) {
+    fun startTravel(destination: String) {
         val user = currentUser.value ?: return
-        gameRepository.startTravel(user.uid, destination, arrivalTime)
+        viewModelScope.launch {
+            gameRepository.startTravel(user.uid, destination)
+        }
     }
 
-    fun combatAction(action: CombatAction) {
+    fun combatAction(action: CombatAction, techniqueId: String? = null, itemId: String? = null) {
         val user = currentUser.value ?: return
-        gameRepository.combatAction(user.uid, action)
+        viewModelScope.launch {
+            gameRepository.combatAction(user.uid, action, techniqueId, itemId)
+        }
     }
 
     fun attackPlayer(target: Character) {
@@ -107,35 +112,82 @@ class GameViewModel(
 
     fun equipItem(item: Item) {
         val user = currentUser.value ?: return
-        // TODO: Call Cloud Function
+        viewModelScope.launch {
+            gameRepository.equipItem(item.id, item.type.name)
+        }
+    }
+
+    fun unequipItem(slot: String) {
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            gameRepository.unequipItem(slot)
+        }
     }
 
     fun useItem(item: Item) {
         val user = currentUser.value ?: return
-        // TODO: Call Cloud Function
+        viewModelScope.launch {
+            // Placeholder: currently using purchase logic or combat action logic
+            // gameRepository.useItem(item.id)
+        }
     }
 
-    fun sellItem(item: Item) {
+    fun purchaseItem(itemId: String, shopId: String) {
         val user = currentUser.value ?: return
-        // TODO: Call Cloud Function
+        viewModelScope.launch {
+            gameRepository.purchaseItem(itemId, shopId)
+        }
     }
 
     fun createCrew(name: String, description: String) {
-        val data = hashMapOf("name" to name, "description" to description)
         viewModelScope.launch {
-            try {
-                gameRepository.createCrew(name, description)
-            } catch (e: Exception) {}
+            crewRepository.createCrew(name, description)
         }
     }
 
     fun joinCrew(crewId: String) {
         viewModelScope.launch {
-            try {
-                gameRepository.joinCrew(crewId)
-            } catch (e: Exception) {}
+            crewRepository.joinCrew(crewId)
         }
     }
+
+    fun leaveCrew() {
+        viewModelScope.launch {
+            crewRepository.leaveCrew()
+        }
+    }
+
+    fun inviteToCrew(targetId: String) {
+        viewModelScope.launch {
+            crewRepository.inviteToCrew(targetId)
+        }
+    }
+
+    fun respondToInvite(crewId: String, accept: Boolean) {
+        viewModelScope.launch {
+            crewRepository.respondToInvite(crewId, accept)
+        }
+    }
+
+    fun promoteMember(targetId: String, rank: String) {
+        viewModelScope.launch {
+            crewRepository.promoteMember(targetId, rank)
+        }
+    }
+
+    fun joinFaction(faction: Faction) {
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            gameRepository.joinFaction(user.uid, faction)
+        }
+    }
+
+    val crewInvites: StateFlow<List<CrewInvite>> = currentUser
+        .flatMapLatest { user ->
+            if (user != null) crewRepository.getInvitesForUser(user.uid)
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun sendMessage(text: String) {
         if (currentUser.value == null) return
