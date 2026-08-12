@@ -33,6 +33,7 @@ fun AppNavigation(
     socialViewModel: SocialViewModel,
     economyViewModel: EconomyViewModel,
     profileViewModel: PlayerProfileViewModel,
+    snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -70,7 +71,7 @@ fun AppNavigation(
                         ActionType.Forge -> navController.navigate(Screen.Professions.createRoute("Blacksmith"))
                         ActionType.Observatory -> navController.navigate(Screen.Professions.createRoute("Navigating"))
                         ActionType.Expedition -> navController.navigate(Screen.Professions.createRoute("TreasureHunting"))
-                        ActionType.Fishing -> navController.navigate(Screen.Professions.createRoute("Fishing"))
+                        ActionType.Fishing -> navController.navigate(Screen.Fishing.route)
                         else -> {}
                     }
                 },
@@ -238,6 +239,7 @@ fun AppNavigation(
                 onEquipItem = { economyViewModel.equipItem(it) },
                 onUnequipItem = { economyViewModel.unequipItem(it) },
                 onUseItem = { economyViewModel.useItem(it) },
+                onCookItem = { economyViewModel.cookFish(it) },
                 onSellItem = { economyViewModel.sellItem(it) },
                 onBackClick = { navController.popBackStack() }
             )
@@ -271,7 +273,7 @@ fun AppNavigation(
             MarketScreen(
                 character = currentChar,
                 marketItems = marketItems,
-                onBuyItem = { economyViewModel.purchaseItem(it.id, "default") },
+                onBuyItem = { economyViewModel.purchaseItem(it.id, currentChar.currentLocation) },
                 onSellItem = { economyViewModel.sellItem(it) },
                 onBackClick = { navController.popBackStack() }
             )
@@ -339,6 +341,12 @@ fun AppNavigation(
         }
         composable(Screen.Traveling.route) {
             TravelingScreen(character = currentChar)
+        }
+        composable(Screen.Fishing.route) {
+            FishingScreen(
+                onBackClick = { navController.popBackStack() },
+                snackbarHostState = snackbarHostState
+            )
         }
         composable(Screen.Combat.route) {
             CombatScreen(

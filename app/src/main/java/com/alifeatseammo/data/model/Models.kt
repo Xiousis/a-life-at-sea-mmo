@@ -216,7 +216,7 @@ data class Item(
 )
 
 enum class ItemType {
-    Weapon, Armor, Accessory, Consumable, Miscellaneous
+    Weapon, Armor, Accessory, Consumable, Tool, Miscellaneous, Fish, Food
 }
 
 data class Crew(

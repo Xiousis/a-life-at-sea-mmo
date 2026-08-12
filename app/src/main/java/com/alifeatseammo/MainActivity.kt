@@ -4,23 +4,42 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
-import com.alifeatseammo.ui.MainScaffold
-import com.alifeatseammo.ui.CharacterState
-import com.alifeatseammo.ui.GameViewModel
 import com.alifeatseammo.ui.AuthViewModel
+import com.alifeatseammo.ui.CharacterState
 import com.alifeatseammo.ui.CombatViewModel
-import com.alifeatseammo.ui.TravelViewModel
-import com.alifeatseammo.ui.SocialViewModel
 import com.alifeatseammo.ui.EconomyViewModel
+import com.alifeatseammo.ui.GameViewModel
+import com.alifeatseammo.ui.MainScaffold
 import com.alifeatseammo.ui.PlayerProfileViewModel
-import com.alifeatseammo.ui.screens.*
+import com.alifeatseammo.ui.SocialViewModel
+import com.alifeatseammo.ui.TravelViewModel
+import com.alifeatseammo.ui.screens.CharacterCreationScreen
+import com.alifeatseammo.ui.screens.CombatScreen
+import com.alifeatseammo.ui.screens.LoginScreen
+import com.alifeatseammo.ui.screens.TravelingScreen
 import com.alifeatseammo.ui.theme.ALifeAtSeaMMOTheme
 import com.alifeatseammo.util.MusicManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -82,7 +101,7 @@ class MainActivity : ComponentActivity() {
                                         authViewModel.createCharacter(name, gender, race)
                                     },
                                     onClearError = { authViewModel.clearCreateCharacterResult() },
-                                    onLogout = { authViewModel.signOut() }
+                                    onLogout = { authViewModel.signOut() },
                                 )
                             }
                             is CharacterState.Loaded -> {
@@ -118,6 +137,17 @@ class MainActivity : ComponentActivity() {
                                         profileViewModel = profileViewModel,
                                         snackbarHostState = snackbarHostState
                                     )
+                                }
+                            }
+                            is CharacterState.Error -> {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(text = "Error: ${state.message}", color = MaterialTheme.colorScheme.error)
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Button(onClick = { authViewModel.signOut() }) {
+                                            Text("Back to Login")
+                                        }
+                                    }
                                 }
                             }
                         }

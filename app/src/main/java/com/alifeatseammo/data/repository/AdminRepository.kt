@@ -1,6 +1,7 @@
 package com.alifeatseammo.data.repository
 
 import com.alifeatseammo.data.model.*
+import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.toObject
 import com.google.firebase.functions.FirebaseFunctions
@@ -57,7 +58,8 @@ class FirestoreAdminRepository(
             val data = hashMapOf("userId" to userId, "reason" to reason, "durationHours" to durationHours)
             functions.getHttpsCallable("adminMutePlayer").call(data).await()
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("AdminRepository", "Error muting player $userId", e)
             false
         }
     }
@@ -67,7 +69,8 @@ class FirestoreAdminRepository(
             val data = hashMapOf("userId" to userId, "reason" to reason)
             functions.getHttpsCallable("adminBanPlayer").call(data).await()
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("AdminRepository", "Error banning player $userId", e)
             false
         }
     }
@@ -77,7 +80,8 @@ class FirestoreAdminRepository(
             val data = hashMapOf("userId" to userId, "location" to location)
             functions.getHttpsCallable("adminTeleportPlayer").call(data).await()
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("AdminRepository", "Error teleporting player $userId to $location", e)
             false
         }
     }
@@ -87,7 +91,8 @@ class FirestoreAdminRepository(
             val data = hashMapOf("userId" to userId, "amount" to amount, "reason" to reason)
             functions.getHttpsCallable("adminAdjustGold").call(data).await()
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("AdminRepository", "Error adjusting gold for player $userId", e)
             false
         }
     }
@@ -97,7 +102,8 @@ class FirestoreAdminRepository(
             val data = hashMapOf("message" to message)
             functions.getHttpsCallable("adminSendAnnouncement").call(data).await()
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("AdminRepository", "Error sending announcement", e)
             false
         }
     }
@@ -106,7 +112,8 @@ class FirestoreAdminRepository(
         return try {
             functions.getHttpsCallable("seedWorld").call().await()
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("AdminRepository", "Error seeding world", e)
             false
         }
     }

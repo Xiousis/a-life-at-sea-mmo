@@ -43,4 +43,18 @@ data class LootEntry(
     val maxAmount: Int = 1
 )
 
+data class FishDef(
+    val id: String = "",
+    val name: String = "",
+    val rarity: Rarity = Rarity.Common,
+    val baseDifficulty: Float = 1.0f,
+    val movementPattern: FishingMovementPattern = FishingMovementPattern.Steady,
+    val value: Int = 10,
+    val xpReward: Int = 5
+)
+
+enum class FishingMovementPattern {
+    Steady, Sinker, Floater, Darting
+}
+
 

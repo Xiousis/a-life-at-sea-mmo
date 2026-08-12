@@ -2,6 +2,7 @@ package com.alifeatseammo.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.alifeatseammo.data.model.*
 import com.alifeatseammo.data.repository.*
 import com.google.firebase.auth.FirebaseUser
@@ -17,6 +18,7 @@ sealed class CharacterState {
     object Loading : CharacterState()
     object NoCharacter : CharacterState()
     data class Loaded(val character: Character) : CharacterState()
+    data class Error(val message: String) : CharacterState()
 }
 
 @HiltViewModel
@@ -34,6 +36,10 @@ class GameViewModel @Inject constructor(
             if (user != null) {
                 gameRepository.getCharacter(user.uid)
                     .map { if (it == null) CharacterState.NoCharacter else CharacterState.Loaded(it) }
+                    .catch { e ->
+                        Log.e("GameViewModel", "Error fetching character", e)
+                        emit(CharacterState.Error(e.message ?: "Unknown error"))
+                    }
             } else flowOf(CharacterState.NoCharacter)
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, CharacterState.Loading)
@@ -88,7 +94,9 @@ class GameViewModel @Inject constructor(
             while (true) {
                 try {
                     gameRepository.heartbeat() 
-                } catch (e: Exception) {}
+                } catch (e: Exception) {
+                    Log.e("GameViewModel", "Heartbeat failed", e)
+                }
                 delay(30000) 
             }
         }

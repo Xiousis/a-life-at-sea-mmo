@@ -43,6 +43,8 @@ interface GameRepository {
     suspend fun deleteMail(mailId: String): Boolean
     suspend fun claimMailRewards(mailId: String): Boolean
     fun getMarketItems(): Flow<List<Item>>
+    suspend fun catchFish(fishId: String): Boolean
+    suspend fun cookFish(itemId: String): Boolean
 }
 
 class FirestoreGameRepository(
@@ -54,10 +56,8 @@ class FirestoreGameRepository(
         val docRef = db.collection("players").document(userId)
         val subscription = docRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
-                // Log the error and don't send anything, or send a specific error state if needed
-                // For now, sending null might trigger "NoCharacter", so we should be careful.
-                // However, without a dedicated Error state in the Flow, logging is our best bet.
-                android.util.Log.e("FirestoreGameRepository", "Error fetching character", error)
+                android.util.Log.e("FirestoreGameRepository", "Error fetching character for $userId", error)
+                close(error)
                 return@addSnapshotListener
             }
             
@@ -318,6 +318,16 @@ class FirestoreGameRepository(
             }
         awaitClose { subscription.remove() }
     }
+
+    override suspend fun catchFish(fishId: String): Boolean {
+        functions.getHttpsCallable("catchFish").call(hashMapOf("fishId" to fishId)).await()
+        return true
+    }
+
+    override suspend fun cookFish(itemId: String): Boolean {
+        functions.getHttpsCallable("cookFish").call(hashMapOf("itemId" to itemId)).await()
+        return true
+    }
 }
 
 @Suppress("unused")
@@ -400,7 +410,28 @@ class MockGameRepository : GameRepository {
     override suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean = true
     override suspend fun equipItem(itemId: String, slot: String): Boolean = true
     override suspend fun unequipItem(slot: String): Boolean = true
-    override suspend fun purchaseItem(itemId: String, shopId: String): Boolean = true
+    override suspend fun purchaseItem(itemId: String, shopId: String): Boolean {
+        _character.update { char ->
+            char?.let {
+                // Find item in market (mocking it by just checking ID)
+                val item = listOf(
+                    Item("rod_1", "Old Fishing Rod", "A simple wooden rod. Good enough to catch basic fish.", ItemType.Tool, Rarity.Common, 100),
+                    Item("potion_1", "Health Potion", "Restores 30 HP.", ItemType.Consumable, Rarity.Common, 50),
+                    Item("sword_1", "Iron Cutlass", "A standard pirate sword.", ItemType.Weapon, Rarity.Common, 250, Stats(strength = 5)),
+                    Item("armor_1", "Leather Vest", "Provides basic protection.", ItemType.Armor, Rarity.Common, 200, Stats(endurance = 3)),
+                    Item("bread_1", "Stale Bread", "Hard as a rock, but it's food.", ItemType.Food, Rarity.Common, 10)
+                ).find { it.id == itemId }
+
+                if (item != null && it.gold >= item.price) {
+                    it.copy(
+                        inventory = it.inventory + item,
+                        gold = it.gold - item.price
+                    )
+                } else it
+            }
+        }
+        return true
+    }
     override suspend fun purchaseShip(shipId: String): Boolean = true
     override suspend fun sellItem(itemId: String): Boolean {
         _character.update { char ->
@@ -466,7 +497,9 @@ class MockGameRepository : GameRepository {
                     ActionDef(ActionType.Docks, "Docks", "⚓"),
                     ActionDef(ActionType.Tavern, "Tavern", "🍺"),
                     ActionDef(ActionType.Kitchen, "Kitchen", "🍳"),
-                    ActionDef(ActionType.Training, "Training", "🥋")
+                    ActionDef(ActionType.Training, "Training", "🥋"),
+                    ActionDef(ActionType.Market, "General Store", "🛍️"),
+                    ActionDef(ActionType.Fishing, "Fishing", "🎣")
                 ),
                 x = 0, y = 0
             ),
@@ -479,7 +512,7 @@ class MockGameRepository : GameRepository {
                     ActionDef(ActionType.Docks, "Docks", "⚓"),
                     ActionDef(ActionType.Shipyard, "Shipyard", "🔨"),
                     ActionDef(ActionType.Forge, "Forge", "🔥"),
-                    ActionDef(ActionType.Market, "Market", "💰")
+                    ActionDef(ActionType.Market, "Ironcrest Market", "💰")
                 ),
                 x = 200, y = -100
             ),
@@ -491,6 +524,8 @@ class MockGameRepository : GameRepository {
                 actions = listOf(
                     ActionDef(ActionType.Docks, "Docks", "⚓"),
                     ActionDef(ActionType.Expedition, "Expedition", "🗺️"),
+                    ActionDef(ActionType.Market, "Amber Trading Post", "🏹"),
+                    ActionDef(ActionType.Fishing, "Fishing", "🎣"),
                     ActionDef(ActionType.Work, "Work", "⚓")
                 ),
                 x = -150, y = 300
@@ -515,5 +550,58 @@ class MockGameRepository : GameRepository {
     override suspend fun markMailAsRead(mailId: String): Boolean = true
     override suspend fun deleteMail(mailId: String): Boolean = true
     override suspend fun claimMailRewards(mailId: String): Boolean = true
-    override fun getMarketItems(): Flow<List<Item>> = flowOf(emptyList())
+    override fun getMarketItems(): Flow<List<Item>> = flowOf(
+        listOf(
+            Item("rod_1", "Old Fishing Rod", "A simple wooden rod. Good enough to catch basic fish.", ItemType.Tool, Rarity.Common, 100),
+            Item("potion_1", "Health Potion", "Restores 30 HP.", ItemType.Consumable, Rarity.Common, 50),
+            Item("sword_1", "Iron Cutlass", "A standard pirate sword.", ItemType.Weapon, Rarity.Common, 250, Stats(strength = 5)),
+            Item("armor_1", "Leather Vest", "Provides basic protection.", ItemType.Armor, Rarity.Common, 200, Stats(endurance = 3)),
+            Item("bread_1", "Stale Bread", "Hard as a rock, but it's food.", ItemType.Food, Rarity.Common, 10)
+        )
+    )
+
+    override suspend fun catchFish(fishId: String): Boolean {
+        _character.update { char ->
+            char?.let {
+                val fishItem = Item(
+                    id = "fish_${System.currentTimeMillis()}",
+                    name = fishId.replaceFirstChar { it.uppercase() },
+                    description = "A fresh fish caught from the sea.",
+                    type = ItemType.Fish,
+                    price = 20
+                )
+                it.copy(
+                    inventory = it.inventory + fishItem,
+                    professionStats = it.professionStats.copy(fishing = it.professionStats.fishing + 1)
+                ).checkLevelUp()
+            }
+        }
+        return true
+    }
+
+    override suspend fun cookFish(itemId: String): Boolean {
+        _character.update { char ->
+            char?.let {
+                if (it.professionStats.cooking < 5) return@let it // Requires level 5 cooking
+                
+                val fishIndex = it.inventory.indexOfFirst { item -> item.id == itemId && item.type == ItemType.Fish }
+                if (fishIndex != -1) {
+                    val newInventory = it.inventory.toMutableList()
+                    val fish = newInventory[fishIndex]
+                    newInventory[fishIndex] = Item(
+                        id = "cooked_${fish.id}",
+                        name = "Cooked ${fish.name}",
+                        description = "Deliciously prepared ${fish.name}.",
+                        type = ItemType.Food,
+                        price = fish.price * 2
+                    )
+                    it.copy(
+                        inventory = newInventory,
+                        professionStats = it.professionStats.copy(cooking = it.professionStats.cooking + 1)
+                    )
+                } else it
+            }
+        }
+        return true
+    }
 }

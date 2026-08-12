@@ -14,6 +14,8 @@ import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.util.MusicManager
 import kotlinx.coroutines.delay
 
+import java.util.Locale
+
 @Composable
 fun TravelingScreen(
     character: Character,
@@ -22,11 +24,11 @@ fun TravelingScreen(
     val context = LocalContext.current
     val travelState = character.travelState ?: return
     
-    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val isFinished = currentTime >= travelState.arrivalTime
 
     LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+        MusicManager.play(context, R.raw.life_at_sea_traveling_music)
     }
 
     LaunchedEffect(travelState.arrivalTime) {
@@ -73,7 +75,7 @@ fun TravelingScreen(
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = String.format("Arrival in %02d:%02d", remainingSec / 60, remainingSec % 60),
+            text = String.format(Locale.getDefault(), "Arrival in %02d:%02d", remainingSec / 60, remainingSec % 60),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Medium
         )

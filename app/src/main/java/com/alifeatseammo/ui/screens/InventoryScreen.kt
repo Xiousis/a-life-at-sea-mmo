@@ -23,6 +23,7 @@ fun InventoryScreen(
     onEquipItem: (Item) -> Unit,
     onUnequipItem: (String) -> Unit,
     onUseItem: (Item) -> Unit,
+    onCookItem: (Item) -> Unit,
     onSellItem: (Item) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -79,6 +80,7 @@ fun InventoryScreen(
                             item = item,
                             onEquip = { onEquipItem(item) },
                             onUse = { onUseItem(item) },
+                            onCook = { onCookItem(item) },
                             onSell = { onSellItem(item) }
                         )
                     }
@@ -143,6 +145,7 @@ fun InventoryItemCard(
     item: Item,
     onEquip: () -> Unit,
     onUse: () -> Unit,
+    onCook: () -> Unit,
     onSell: () -> Unit
 ) {
     val rarityColor = when (item.rarity) {
@@ -179,9 +182,14 @@ fun InventoryItemCard(
                             Text("Equip", fontSize = 12.sp)
                         }
                     }
-                    ItemType.Consumable -> {
+                    ItemType.Consumable, ItemType.Food -> {
                         Button(onClick = onUse, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
-                            Text("Use", fontSize = 12.sp)
+                            Text(if (item.type == ItemType.Food) "Eat" else "Use", fontSize = 12.sp)
+                        }
+                    }
+                    ItemType.Fish -> {
+                        Button(onClick = onCook, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                            Text("Cook", fontSize = 12.sp)
                         }
                     }
                     else -> {}

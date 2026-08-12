@@ -91,6 +91,7 @@ fun MainScaffold(
             socialViewModel = socialViewModel,
             economyViewModel = economyViewModel,
             profileViewModel = profileViewModel,
+            snackbarHostState = snackbarHostState,
             modifier = Modifier.padding(padding)
         )
     }

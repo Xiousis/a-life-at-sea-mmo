@@ -70,6 +70,16 @@ class EconomyViewModel @Inject constructor(
         }
     }
 
+    fun cookFish(item: Item) {
+        viewModelScope.launch {
+            try {
+                gameRepository.cookFish(item.id)
+            } catch (e: Exception) {
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
     fun sellItem(item: Item) {
         viewModelScope.launch {
             try {
