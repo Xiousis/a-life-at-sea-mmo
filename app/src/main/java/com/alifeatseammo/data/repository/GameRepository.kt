@@ -11,7 +11,7 @@ import kotlinx.coroutines.tasks.await
 
 interface GameRepository {
     fun getCharacter(userId: String): Flow<Character?>
-    fun createCharacter(userId: String, name: String, gender: Gender, race: Race)
+    suspend fun createCharacter(userId: String, name: String, gender: Gender, race: Race): Boolean
     suspend fun train(userId: String, statType: StatType): Boolean
     suspend fun completeMission(userId: String, missionId: String): Boolean
     fun getAvailableMissions(): Flow<List<Mission>>
@@ -22,25 +22,38 @@ interface GameRepository {
     suspend fun equipItem(itemId: String, slot: String): Boolean
     suspend fun unequipItem(slot: String): Boolean
     suspend fun purchaseItem(itemId: String, shopId: String): Boolean
+    suspend fun purchaseShip(shipId: String): Boolean
     suspend fun sellItem(itemId: String): Boolean
     suspend fun useItem(itemId: String): Boolean
     suspend fun joinFaction(userId: String, faction: Faction): Boolean
+    suspend fun startHealing(): Boolean
+    suspend fun instantHeal(): Boolean
     fun getPlayersAtLocation(location: String): Flow<List<Character>>
     fun getTopPlayers(limit: Int): Flow<List<Character>>
     fun getPlayerProfile(playerId: String): Flow<Character?>
     fun getLocations(): Flow<List<LocationDef>>
     fun getEnemyDefs(): Flow<List<EnemyDef>>
     fun getMissionDefs(): Flow<List<Mission>>
+    fun getMailMessages(userId: String): Flow<List<MailMessage>>
+    fun getMarketItems(): Flow<List<Item>>
 }
 
 class FirestoreGameRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance(),
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1"),
 ) : GameRepository {
     
     override fun getCharacter(userId: String): Flow<Character?> = callbackFlow {
         val docRef = db.collection("players").document(userId)
-        val subscription = docRef.addSnapshotListener { snapshot, _ ->
+        val subscription = docRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                // Log the error and don't send anything, or send a specific error state if needed
+                // For now, sending null might trigger "NoCharacter", so we should be careful.
+                // However, without a dedicated Error state in the Flow, logging is our best bet.
+                android.util.Log.e("FirestoreGameRepository", "Error fetching character", error)
+                return@addSnapshotListener
+            }
+            
             if (snapshot?.exists() == true) {
                 val character = snapshot.toObject<Character>()
                 if (character != null) {
@@ -61,33 +74,26 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun createCharacter(userId: String, name: String, gender: Gender, race: Race) {
+    override suspend fun createCharacter(userId: String, name: String, gender: Gender, race: Race): Boolean {
         val data = hashMapOf(
             "name" to name,
             "gender" to gender.name,
             "race" to race.name
         )
-        functions.getHttpsCallable("createCharacter").call(data)
+        functions.getHttpsCallable("createCharacter").call(data).await()
+        return true
     }
 
     override suspend fun train(userId: String, statType: StatType): Boolean {
-        return try {
-            val data = hashMapOf("statType" to statType.name)
-            functions.getHttpsCallable("train").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("statType" to statType.name)
+        functions.getHttpsCallable("train").call(data).await()
+        return true
     }
 
     override suspend fun completeMission(userId: String, missionId: String): Boolean {
-        return try {
-            val data = hashMapOf("missionId" to missionId)
-            functions.getHttpsCallable("completeMission").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("missionId" to missionId)
+        functions.getHttpsCallable("completeMission").call(data).await()
+        return true
     }
 
     override fun getAvailableMissions(): Flow<List<Mission>> = callbackFlow {
@@ -102,106 +108,82 @@ class FirestoreGameRepository(
     }
 
     override suspend fun startTravel(userId: String, destination: String): Boolean {
-        return try {
-            val data = hashMapOf("destination" to destination)
-            functions.getHttpsCallable("startTravel").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("destination" to destination)
+        functions.getHttpsCallable("startTravel").call(data).await()
+        return true
     }
 
     override suspend fun finishTravel(): Boolean {
-        return try {
-            functions.getHttpsCallable("finishTravel").call().await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        functions.getHttpsCallable("finishTravel").call().await()
+        return true
     }
 
     override suspend fun combatAction(userId: String, action: CombatAction, techniqueId: String?, itemId: String?): Boolean {
-        return try {
-            val data = hashMapOf(
-                "action" to action.name,
-                "techniqueId" to techniqueId,
-                "itemId" to itemId
-            )
-            functions.getHttpsCallable("combatAction").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf(
+            "action" to action.name,
+            "techniqueId" to techniqueId,
+            "itemId" to itemId
+        )
+        functions.getHttpsCallable("combatAction").call(data).await()
+        return true
     }
 
     override suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean {
-        return try {
-            val data = hashMapOf("defenderId" to defenderId)
-            functions.getHttpsCallable("attackPlayer").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("defenderId" to defenderId)
+        functions.getHttpsCallable("attackPlayer").call(data).await()
+        return true
     }
 
     override suspend fun equipItem(itemId: String, slot: String): Boolean {
-        return try {
-            val data = hashMapOf("itemId" to itemId, "slot" to slot)
-            functions.getHttpsCallable("equipItem").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("itemId" to itemId, "slot" to slot)
+        functions.getHttpsCallable("equipItem").call(data).await()
+        return true
     }
 
     override suspend fun unequipItem(slot: String): Boolean {
-        return try {
-            val data = hashMapOf("slot" to slot)
-            functions.getHttpsCallable("unequipItem").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("slot" to slot)
+        functions.getHttpsCallable("unequipItem").call(data).await()
+        return true
     }
 
     override suspend fun purchaseItem(itemId: String, shopId: String): Boolean {
-        return try {
-            val data = hashMapOf("itemId" to itemId, "shopId" to shopId)
-            functions.getHttpsCallable("purchaseItem").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("itemId" to itemId, "shopId" to shopId)
+        functions.getHttpsCallable("purchaseItem").call(data).await()
+        return true
+    }
+
+    override suspend fun purchaseShip(shipId: String): Boolean {
+        val data = hashMapOf("shipId" to shipId)
+        functions.getHttpsCallable("purchaseShip").call(data).await()
+        return true
     }
 
     override suspend fun sellItem(itemId: String): Boolean {
-        return try {
-            val data = hashMapOf("itemId" to itemId)
-            functions.getHttpsCallable("sellItem").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("itemId" to itemId)
+        functions.getHttpsCallable("sellItem").call(data).await()
+        return true
     }
 
     override suspend fun useItem(itemId: String): Boolean {
-        return try {
-            val data = hashMapOf("itemId" to itemId)
-            functions.getHttpsCallable("useItem").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("itemId" to itemId)
+        functions.getHttpsCallable("useItem").call(data).await()
+        return true
     }
 
     override suspend fun joinFaction(userId: String, faction: Faction): Boolean {
-        return try {
-            val data = hashMapOf("faction" to faction.name)
-            functions.getHttpsCallable("joinFaction").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("faction" to faction.name)
+        functions.getHttpsCallable("joinFaction").call(data).await()
+        return true
+    }
+
+    override suspend fun startHealing(): Boolean {
+        functions.getHttpsCallable("startHealing").call().await()
+        return true
+    }
+
+    override suspend fun instantHeal(): Boolean {
+        functions.getHttpsCallable("instantHeal").call().await()
+        return true
     }
 
     override fun getPlayersAtLocation(location: String): Flow<List<Character>> = callbackFlow {
@@ -266,6 +248,28 @@ class FirestoreGameRepository(
             }
         awaitClose { subscription.remove() }
     }
+
+    override fun getMailMessages(userId: String): Flow<List<MailMessage>> = callbackFlow {
+        val subscription = db.collection("players").document(userId).collection("mail")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, _ ->
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<MailMessage>() })
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getMarketItems(): Flow<List<Item>> = callbackFlow {
+        val subscription = db.collection("gameData").document("items").collection("all")
+            .limit(20)
+            .addSnapshotListener { snapshot, _ ->
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Item>() })
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
 }
 
 @Suppress("unused")
@@ -274,13 +278,14 @@ class MockGameRepository : GameRepository {
     
     override fun getCharacter(userId: String): Flow<Character?> = _character.asStateFlow()
 
-    override fun createCharacter(userId: String, name: String, gender: Gender, race: Race) {
+    override suspend fun createCharacter(userId: String, name: String, gender: Gender, race: Race): Boolean {
         _character.value = Character(
             id = userId,
             name = name,
             gender = gender,
             race = race
         )
+        return true
     }
 
     override suspend fun train(userId: String, statType: StatType): Boolean {
@@ -343,6 +348,7 @@ class MockGameRepository : GameRepository {
     override suspend fun equipItem(itemId: String, slot: String): Boolean = true
     override suspend fun unequipItem(slot: String): Boolean = true
     override suspend fun purchaseItem(itemId: String, shopId: String): Boolean = true
+    override suspend fun purchaseShip(shipId: String): Boolean = true
     override suspend fun sellItem(itemId: String): Boolean {
         _character.update { char ->
             char?.let {
@@ -373,6 +379,8 @@ class MockGameRepository : GameRepository {
         return true
     }
     override suspend fun joinFaction(userId: String, faction: Faction): Boolean = true
+    override suspend fun startHealing(): Boolean = true
+    override suspend fun instantHeal(): Boolean = true
 
     override fun getPlayersAtLocation(location: String): Flow<List<Character>> = flowOf(emptyList())
     override fun getTopPlayers(limit: Int): Flow<List<Character>> = flowOf(emptyList())
@@ -393,4 +401,6 @@ class MockGameRepository : GameRepository {
     override fun getLocations(): Flow<List<LocationDef>> = flowOf(emptyList())
     override fun getEnemyDefs(): Flow<List<EnemyDef>> = flowOf(emptyList())
     override fun getMissionDefs(): Flow<List<Mission>> = flowOf(emptyList())
+    override fun getMailMessages(userId: String): Flow<List<MailMessage>> = flowOf(emptyList())
+    override fun getMarketItems(): Flow<List<Item>> = flowOf(emptyList())
 }

@@ -17,11 +17,12 @@ interface AdminRepository {
     suspend fun teleportPlayer(userId: String, location: String): Boolean
     suspend fun adjustGold(userId: String, amount: Int, reason: String): Boolean
     suspend fun sendGlobalAnnouncement(message: String): Boolean
+    suspend fun seedWorld(): Boolean
 }
 
 class FirestoreAdminRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance()
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
 ) : AdminRepository {
 
     override fun searchPlayers(query: String): Flow<List<Character>> = callbackFlow {
@@ -95,6 +96,15 @@ class FirestoreAdminRepository(
         return try {
             val data = hashMapOf("message" to message)
             functions.getHttpsCallable("adminSendAnnouncement").call(data).await()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    override suspend fun seedWorld(): Boolean {
+        return try {
+            functions.getHttpsCallable("seedWorld").call().await()
             true
         } catch (_: Exception) {
             false

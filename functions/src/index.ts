@@ -9,6 +9,8 @@ const db = admin.firestore();
 const ENERGY_REGEN_RATE_MS = 3 * 60 * 1000; // 1 energy per 3 minutes
 const MAX_ENERGY = 100;
 const INVENTORY_CAPACITY = 20;
+const TURN_TIMEOUT_MS = 60 * 1000; // 1 minute per turn
+const HEALING_DURATION_MS = 2 * 60 * 1000; // 2 minutes
 
 const STAT_MAPPING: Record<string, string> = {
     "Strength": "strength",
@@ -29,11 +31,16 @@ const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = 
     "Fogi Tail Island": { x: 0, y: 0, region: "East Blue" },
     "Ironcrest Isle": { x: 50, y: 20, region: "East Blue" },
     "Amber Reach": { x: -30, y: 40, region: "East Blue" },
+    "Sunken Reef": { x: 10, y: 15, region: "East Blue" },
     "Tortuga Bay": { x: 10, y: -100, region: "South Blue" },
+    "Pirate\u0027s Den": { x: 40, y: -120, region: "South Blue" },
+    "Navy Outpost": { x: -80, y: -50, region: "South Blue" },
     "Crystal Cove": { x: 120, y: 80, region: "Grand Line" },
+    "Volcano Peak": { x: 200, y: 150, region: "Grand Line" },
+    "Whispering Woods": { x: -150, y: 180, region: "Grand Line" },
 };
 
-function calculateTravelTime(from: string, to: string): number {
+function calculateTravelTime(from: string, to: string, speedMultiplier: number = 1.0): number {
     const start = LOCATION_DATA[from] || { x: 0, y: 0, region: "Unknown" };
     const end = LOCATION_DATA[to] || { x: 0, y: 0, region: "Unknown" };
 
@@ -44,7 +51,7 @@ function calculateTravelTime(from: string, to: string): number {
         baseTime += 60000; // Extra minute for inter-region travel
     }
 
-    return Math.max(10000, Math.floor(baseTime)); // Min 10 seconds
+    return Math.max(10000, Math.floor(baseTime / speedMultiplier)); // Min 10 seconds
 }
 
 // --- Helper Functions ---
@@ -103,6 +110,17 @@ function checkLevelUp(character: any) {
     return { ...character, level, xp, stats, maxEnergy, energy, maxHp, hp, leveledUp };
 }
 
+function processHealing(character: any): any {
+    if (character.healingState && character.healingState.endTime <= Date.now()) {
+        return {
+            ...character,
+            hp: character.maxHp,
+            healingState: null
+        };
+    }
+    return character;
+}
+
 // --- Player Management ---
 
 export const createCharacter = functions.https.onCall(async (data, context) => {
@@ -139,7 +157,7 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
     }
 
     // Race/Gender Validation
-    const allowedRaces = ["Human", "Fishman", "Mink", "Skypiean", "Cyborg"];
+    const allowedRaces = ["Human", "Abyssal", "Beastkin", "Celestian", "Automaton"];
     const allowedGenders = ["Male", "Female", "Other"];
     if (!allowedRaces.includes(race)) throw new functions.https.HttpsError("invalid-argument", "Invalid race.");
     if (!allowedGenders.includes(gender)) throw new functions.https.HttpsError("invalid-argument", "Invalid gender.");
@@ -183,7 +201,10 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
         inventory: [],
         equipment: {},
         travelState: null,
-        combatState: null
+        combatState: null,
+        learnedTechniques: ["bash"],
+        healingState: null,
+        ship: { id: "row_boat", name: "Row Boat", price: 0, speedMultiplier: 1.0 }
     };
 
     await db.collection("players").doc(userId).set(character);
@@ -207,9 +228,15 @@ export const joinFaction = functions.https.onCall(async (data, context) => {
         }
 
         if (faction === "Pirate") {
+            if (character.currentLocation !== "Pirate\u0027s Den") {
+                throw new functions.https.HttpsError("failed-precondition", "You must be at the Pirate\u0027s Den to join the Pirates.");
+            }
             transaction.update(playerRef, { faction: "Pirate", title: "Rogue Sailor" });
             recordLog(transaction, userId, "JoinFaction", "Became a Pirate", 0, 0);
         } else if (faction === "Navy") {
+            if (character.currentLocation !== "Navy Outpost") {
+                throw new functions.https.HttpsError("failed-precondition", "You must be at the Navy Outpost to enlist in the Navy.");
+            }
             transaction.update(playerRef, { faction: "Navy", title: "Navy Recruit" });
             recordLog(transaction, userId, "JoinFaction", "Enlisted in the Navy", 0, 0);
         } else {
@@ -237,7 +264,13 @@ export const train = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        character = processHealing(character);
+
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to train. Visit an infirmary.");
+        }
+
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
 
         if (energy < 10) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
@@ -269,7 +302,17 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        character = processHealing(character);
+
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to travel. Visit an infirmary.");
+        }
+
+        if (character.healingState) {
+            throw new functions.https.HttpsError("failed-precondition", "You cannot travel while resting in the infirmary.");
+        }
+
         if (character.travelState || character.combatState) {
             throw new functions.https.HttpsError("failed-precondition", "Player is already busy.");
         }
@@ -282,20 +325,28 @@ export const startTravel = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("invalid-argument", "Invalid destination.");
         }
 
-        const travelDuration = calculateTravelTime(character.currentLocation, destination);
+        const speedMultiplier = character.ship?.speedMultiplier || 1.0;
+        const travelDuration = calculateTravelTime(character.currentLocation, destination, speedMultiplier);
         const arrivalTime = Date.now() + travelDuration;
 
-        // Potential for random encounter here
-        if (travelDuration > 20000 && Math.random() < 0.20) {
+        // Potential for random encounter here (Pirates, Monsters)
+        if (travelDuration > 10000 && Math.random() < 0.25) {
+            const enemyNames = ["Sea Monster", "Ghost Pirate", "Giant Squid", "Rogue Sloop", "Storm Elemental"];
+            const enemyName = enemyNames[Math.floor(Math.random() * enemyNames.length)];
             const enemy = generateEnemy(character.level);
+            enemy.name = enemyName;
+
             transaction.update(playerRef, {
                 combatState: {
                     enemy: enemy,
                     playerTurn: true,
-                    logs: [`While traveling to ${destination}, you were ambushed by a ${enemy.name}!`],
+                    logs: [`While sailing to ${destination}, you encountered a ${enemy.name}!`],
                     isFinished: false,
                     playerWon: false,
-                    turnCount: 0
+                    turnCount: 0,
+                    intendedDestination: destination,
+                    intendedArrivalTime: arrivalTime,
+                    intendedStartTime: Date.now()
                 }
             });
             return { ambush: true, enemy };
@@ -333,7 +384,40 @@ export const finishTravel = functions.https.onCall(async (data, context) => {
     });
 });
 
-// --- Combat Engine ---
+export const purchaseShip = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { shipId } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    const SHIPS: Record<string, { name: string, price: number, speedMultiplier: number }> = {
+        "row_boat": { name: "Row Boat", price: 0, speedMultiplier: 1.0 },
+        "sloop": { name: "Sloop", price: 500, speedMultiplier: 1.5 },
+        "caravel": { name: "Caravel", price: 2500, speedMultiplier: 2.0 },
+        "galleon": { name: "Galleon", price: 10000, speedMultiplier: 3.0 }
+    };
+
+    const ship = SHIPS[shipId];
+    if (!ship) throw new functions.https.HttpsError("invalid-argument", "Invalid ship ID.");
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = snapshot.data() as any;
+        if (character.gold < ship.price) throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
+        if (character.ship?.id === shipId) throw new functions.https.HttpsError("failed-precondition", "You already own this ship.");
+
+        transaction.update(playerRef, {
+            gold: character.gold - ship.price,
+            ship: { id: shipId, ...ship }
+        });
+
+        recordLog(transaction, userId, "PurchaseShip", `Purchased ${ship.name}`, -ship.price, 0);
+        return { success: true };
+    });
+});
 
 // --- Combat Engine ---
 
@@ -358,7 +442,7 @@ interface CombatStats {
     critChance: number;
 }
 
-function calculateCombatStats(charOrEnemy: any): CombatStats {
+function calculateCombatStats(charOrEnemy: any, currentEffects: any[] = []): CombatStats {
     const stats = { ...(charOrEnemy.stats || {}) };
     const level = charOrEnemy.level || 1;
 
@@ -385,10 +469,16 @@ function calculateCombatStats(charOrEnemy: any): CombatStats {
     let willpower = stats.willpower || 5;
 
     // Derived stats
-    const defense = Math.floor(endurance * 1.5 + level);
-    const accuracy = 80 + agility * 0.5 + perception * 0.5;
-    const dodge = agility * 0.8 + luck * 0.2;
-    const critChance = 5 + luck * 0.5 + perception * 0.2;
+    let defense = Math.floor(endurance * 1.5 + level);
+    let accuracy = 80 + agility * 0.5 + perception * 0.5;
+    let dodge = agility * 0.8 + luck * 0.2;
+    let critChance = 5 + luck * 0.5 + perception * 0.2;
+
+    // Apply effects
+    if (currentEffects.some(e => e.type === "Haste")) {
+        dodge += 10;
+        accuracy += 10;
+    }
 
     return {
         hp: charOrEnemy.hp,
@@ -457,7 +547,12 @@ async function processLoot(dropTableId: string): Promise<any[]> {
             const itemSnap = await db.collection("gameData").doc("items").collection("all").doc(entry.itemId).get();
             if (itemSnap.exists) {
                 const item = itemSnap.data();
-                droppedItems.push({ ...item, id: `${item.id}_${Date.now()}_${Math.floor(Math.random() * 1000)}` });
+                if (item) {
+                    const amount = Math.floor(Math.random() * ((entry.maxAmount || 1) - (entry.minAmount || 1) + 1)) + (entry.minAmount || 1);
+                    for (let i = 0; i < amount; i++) {
+                        droppedItems.push({ ...item, id: `${item.id}_${Date.now()}_${Math.floor(Math.random() * 10000)}` });
+                    }
+                }
             }
         }
     }
@@ -478,12 +573,6 @@ function processStatusEffects(character: any, effects: any[], logs: string[]): {
                 const damage = effect.magnitude || 5;
                 updatedChar.hp = Math.max(0, updatedChar.hp - damage);
                 logs.push(`${updatedChar.name || "You"} took ${damage} damage from ${effect.type}.`);
-                break;
-            case "Weaken":
-                // Handled during damage calculation
-                break;
-            case "Fortify":
-                // Handled during defense calculation
                 break;
         }
 
@@ -533,6 +622,17 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         let character = snapshot.data() as any;
         let combat = character.combatState;
         if (!combat || combat.isFinished) throw new functions.https.HttpsError("failed-precondition", "No active combat.");
+
+        // Turn Timeout Check
+        const now = Date.now();
+        if (combat.turnExpiresAt && now > combat.turnExpiresAt) {
+            combat.logs.push(`${combat.playerTurn ? "You" : "Opponent"} took too long! Forfeiting turn.`);
+            combat.playerTurn = !combat.playerTurn;
+            combat.turnExpiresAt = now + TURN_TIMEOUT_MS;
+            transaction.update(playerRef, { combatState: combat });
+            return { success: true, timeout: true };
+        }
+
         if (!combat.playerTurn) throw new functions.https.HttpsError("failed-precondition", "Not your turn.");
 
         const logs = [...(combat.logs || [])];
@@ -563,8 +663,8 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         }
 
         if (!isFinished) {
-            const pStats = calculateCombatStats(character);
-            const targetStats = combat.isPvP ? calculateCombatStats(opponent) : calculateCombatStats(enemy);
+            const pStats = calculateCombatStats(character, pActiveEffects);
+            const targetStats = combat.isPvP ? calculateCombatStats(opponent, opponent.combatState?.playerEffects || []) : calculateCombatStats(enemy, combat.enemyEffects || []);
             const targetEffects = combat.isPvP ? (opponent.combatState?.playerEffects || []) : (combat.enemyEffects || []);
 
             const isStunned = (pActiveEffects || []).some((e: any) => e.type === "Stun");
@@ -588,6 +688,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                         logs.push("You missed your attack.");
                     }
                 } else if (action === "Technique") {
+                    if (!techniqueId) throw new functions.https.HttpsError("invalid-argument", "Missing technique ID.");
                     const techSnap = await db.collection("gameData").doc("skills").collection("techniques").doc(techniqueId).get();
                     if (!techSnap.exists) throw new functions.https.HttpsError("not-found", "Technique not found.");
 
@@ -619,9 +720,10 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     logs.push("You take a defensive stance.");
                     combat.defending = true;
                 } else if (action === "Item") {
+                    if (!itemId) throw new functions.https.HttpsError("invalid-argument", "Missing item ID.");
                     const inventory = character.inventory || [];
                     const itemIndex = inventory.findIndex((i: any) => i.id === itemId);
-                    if (itemIndex === -1) throw new functions.https.HttpsError("not-found", "Item not found.");
+                    if (itemIndex === -1) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
 
                     const item = inventory[itemIndex];
                     if (item.type !== "Consumable") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
@@ -655,7 +757,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 isFinished = true;
             } else if (!combat.isPvP) {
                 // --- PvE Enemy Turn ---
-                const eStats = calculateCombatStats(enemy);
+                const eStats = calculateCombatStats(enemy, combat.enemyEffects || []);
                 const eEffectResult = processStatusEffects({ ...enemy }, combat.enemyEffects || [], logs);
                 enemy = eEffectResult.character;
                 let eActiveEffects = eEffectResult.activeEffects;
@@ -742,7 +844,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     gold: loser.gold - stealAmount,
                     pvpLosses: (loser.pvpLosses || 0) + 1,
                     combatState: null,
-                    hp: playerWon ? loser.hp : playerHp,
+                    hp: playerWon ? 0 : playerHp, // Ensure loser ends with 0 HP if playerWon, otherwise take attacker's HP
                     energy: playerWon ? loser.energy : playerEnergy,
                     currentLocation: "Fogi Tail Island" // Respawn
                 };
@@ -775,12 +877,23 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                         }
                     }
                     updatedChar = checkLevelUp(updatedChar);
+
+                    // Ambush Restoration
+                    if (combat.intendedDestination) {
+                        updatedChar.travelState = {
+                            destination: combat.intendedDestination,
+                            arrivalTime: combat.intendedArrivalTime,
+                            startTime: combat.intendedStartTime
+                        };
+                        logs.push(`You defeated the ambush and continue your journey to ${combat.intendedDestination}.`);
+                    }
+
                     recordLog(transaction, userId, "CombatWin", `Defeated ${enemy.name}`, enemy.goldReward, enemy.xpReward);
                 } else {
                     const goldLost = Math.floor(updatedChar.gold * 0.1);
                     updatedChar.gold -= goldLost;
                     updatedChar.currentLocation = "Fogi Tail Island";
-                    updatedChar.hp = character.maxHp;
+                    updatedChar.hp = 0; // Set to 0 HP on defeat
                     updatedChar.energy = character.maxEnergy;
                     recordLog(transaction, userId, "CombatLoss", `Defeated by ${enemy.name}`, -goldLost, 0);
                 }
@@ -791,21 +904,21 @@ export const combatAction = functions.https.onCall(async (data, context) => {
             // Update combat state and swap turns if PvP
             if (combat.isPvP) {
                 const nextLogs = [...logs, `It is now ${opponent.name}'s turn.`];
-                // Unified opponent HP in enemy field for UI
                 const updatedEnemy = { ...combat.enemy, hp: opponent.hp };
 
                 transaction.update(playerRef, {
                     hp: playerHp,
                     energy: playerEnergy,
                     inventory: character.inventory,
-                    combatState: { ...combat, enemy: updatedEnemy, playerTurn: false, logs: nextLogs, cooldowns: updatedCooldowns, playerEffects: pActiveEffects }
+                    combatState: { ...combat, enemy: updatedEnemy, playerTurn: false, logs: nextLogs, cooldowns: updatedCooldowns, playerEffects: pActiveEffects, turnExpiresAt: now + TURN_TIMEOUT_MS }
                 });
 
                 const opponentCombat = {
                     ...opponent.combatState,
                     enemy: { ...opponent.combatState.enemy, hp: playerHp }, // Sync attacker's HP to defender
                     playerTurn: true,
-                    logs: nextLogs
+                    logs: nextLogs,
+                    turnExpiresAt: now + TURN_TIMEOUT_MS
                 };
                 transaction.update(opponentRef!, {
                     hp: opponent.hp,
@@ -842,24 +955,31 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("not-found", "Player not found.");
         }
 
-        const attacker = attackerSnap.data() as any;
+        let attacker = attackerSnap.data() as any;
+        attacker = processHealing(attacker);
+
+        if (attacker.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to fight. Visit an infirmary.");
+        }
+
         const defender = defenderSnap.data() as any;
 
-        if (userId === defenderId) {
-            throw new functions.https.HttpsError("invalid-argument", "You cannot attack yourself.");
-        }
+        if (userId === defenderId) throw new functions.https.HttpsError("invalid-argument", "You cannot attack yourself.");
+
+        if (!defender.isOnline) throw new functions.https.HttpsError("failed-precondition", "Target is currently offline.");
 
         if (attacker.currentLocation !== defender.currentLocation) {
             throw new functions.https.HttpsError("failed-precondition", "Target is not at your location.");
         }
 
-        if (attacker.combatState || attacker.travelState) {
-            throw new functions.https.HttpsError("failed-precondition", "You are already busy.");
+        // Safe zone check
+        const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(attacker.currentLocation));
+        if (locationSnap.exists && locationSnap.data()?.isSafe) {
+            throw new functions.https.HttpsError("failed-precondition", "PvP is not allowed in safe zones.");
         }
 
-        if (defender.combatState || defender.travelState) {
-            throw new functions.https.HttpsError("failed-precondition", "Target is already busy.");
-        }
+        if (attacker.combatState || attacker.travelState) throw new functions.https.HttpsError("failed-precondition", "You are already busy.");
+        if (defender.combatState || defender.travelState) throw new functions.https.HttpsError("failed-precondition", "Target is already busy.");
 
         const attackerCombat = {
             opponentId: defenderId,
@@ -877,7 +997,8 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
             turnCount: 0,
             playerEffects: [],
             enemyEffects: [],
-            cooldowns: {}
+            cooldowns: {},
+            turnExpiresAt: Date.now() + TURN_TIMEOUT_MS
         };
 
         const defenderCombat = {
@@ -896,12 +1017,68 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
             turnCount: 0,
             playerEffects: [],
             enemyEffects: [],
-            cooldowns: {}
+            cooldowns: {},
+            turnExpiresAt: Date.now() + TURN_TIMEOUT_MS
         };
 
+        transaction.update(attackerRef, attacker); // Apply processHealing changes
         transaction.update(attackerRef, { combatState: attackerCombat });
         transaction.update(defenderRef, { combatState: defenderCombat });
 
+        return { success: true };
+    });
+});
+
+export const startHealing = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+        const character = snapshot.data() as any;
+
+        if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
+        if (character.healingState) throw new functions.https.HttpsError("failed-precondition", "You are already resting.");
+
+        // Check if current location has an infirmary
+        const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
+        const location = locationSnap.data();
+        const hasInfirmary = location?.actions?.some((a: any) => a.type === "Infirmary");
+        if (!hasInfirmary) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary at your current location.");
+
+        const endTime = Date.now() + HEALING_DURATION_MS;
+        transaction.update(playerRef, { healingState: { endTime } });
+        return { success: true, endTime };
+    });
+});
+
+export const instantHeal = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+        const character = snapshot.data() as any;
+
+        if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
+        if (character.gold < 50) throw new functions.https.HttpsError("failed-precondition", "Not enough gold for instant treatment.");
+
+        // Check if current location has an infirmary
+        const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
+        const location = locationSnap.data();
+        const hasInfirmary = location?.actions?.some((a: any) => a.type === "Infirmary");
+        if (!hasInfirmary) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary at your current location.");
+
+        transaction.update(playerRef, {
+            hp: character.maxHp,
+            gold: admin.firestore.FieldValue.increment(-50),
+            healingState: null
+        });
+        recordLog(transaction, userId, "InstantHeal", "Paid for immediate treatment", -50, 0);
         return { success: true };
     });
 });
@@ -925,7 +1102,13 @@ export const completeMission = functions.https.onCall(async (data, context) => {
         if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         if (!missionSnap.exists) throw new functions.https.HttpsError("not-found", "Mission not found.");
 
-        const character = playerSnap.data() as any;
+        let character = playerSnap.data() as any;
+        character = processHealing(character);
+
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to go on missions. Visit an infirmary.");
+        }
+
         const mission = missionSnap.data() as any;
 
         if (character.level < (mission.minLevel || 1)) {
@@ -1039,10 +1222,70 @@ export const joinCrew = functions.https.onCall(async (data, context) => {
 export const heartbeat = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
     const userId = context.auth.uid;
-    await db.collection("players").doc(userId).update({
-        lastOnline: Date.now(),
-        isOnline: true
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) return { success: false };
+
+        let character = snapshot.data() as any;
+        character = processHealing(character);
+
+        transaction.update(playerRef, {
+            ...character,
+            lastOnline: Date.now(),
+            isOnline: true
+        });
+        return { success: true };
     });
+});
+
+export const seedWorld = functions.https.onCall(async (data, context) => {
+    // Basic admin check (could be refined)
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const batch = db.batch();
+
+    const locations = [
+        { name: "Fogi Tail Island", region: "East Blue", description: "A peaceful starting island with clear blue waters.", isSafe: true, weather: "Sunny", x: 0, y: 0, actions: [{ type: "Training", label: "Dojo", icon: "🥋" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Medical Clinic", icon: "🏥" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: true, weather: "Foggy", x: 50, y: 20, actions: [{ type: "Market", label: "Blacksmith", icon: "⚒" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 10, y: 15, actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Tortuga Bay", region: "South Blue", description: "A bustling pirate haven filled with taverns and mystery.", isSafe: true, weather: "Tropical", x: 10, y: -100, actions: [{ type: "Tavern", label: "The Salty Dog", icon: "🍻" }, { type: "Market", label: "Bazaar", icon: "💰" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Pirate Doctor", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Pirate\u0027s Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 40, y: -120, actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Navy Outpost", region: "South Blue", description: "A strictly regulated military base maintaining order.", isSafe: true, weather: "Clear", x: -80, y: -50, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Navy Hospital", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Crystal Cove", region: "Grand Line", description: "An island made of glowing crystals and mysterious energy.", isSafe: false, weather: "Shimmering", x: 120, y: 80, actions: [{ type: "BlackMarket", label: "Crystal Trader", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 200, y: 150, actions: [{ type: "Training", label: "Extreme Training", icon: "🔥" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -150, y: 180, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
+    ];
+
+    for (const loc of locations) {
+        const ref = db.collection("gameData").doc("world").collection("locations").doc(loc.name);
+        batch.set(ref, { ...loc, id: loc.name });
+    }
+
+    await batch.commit();
+    return { success: true, count: locations.length };
+});
+
+export const sendMessage = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { message, channelId } = data;
+    const userId = context.auth.uid;
+
+    const playerSnap = await db.collection("players").doc(userId).get();
+    if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+    const player = playerSnap.data() as any;
+
+    const chatRef = db.collection("chat").doc();
+    await chatRef.set({
+        senderId: userId,
+        senderName: player.name,
+        message: message,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        channelId: channelId || "global"
+    });
+
     return { success: true };
 });
 
@@ -1242,6 +1485,11 @@ export const equipItem = functions.https.onCall(async (data, context) => {
         if (!item) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
         if (item.type !== slot) throw new functions.https.HttpsError("invalid-argument", `Item cannot be equipped in ${slot} slot.`);
 
+        // Level Requirement Check
+        if (character.level < (item.levelRequirement || 1)) {
+            throw new functions.https.HttpsError("failed-precondition", "Level too low to equip this item.");
+        }
+
         const equipment = character.equipment || {};
         equipment[slot] = item;
 
@@ -1332,6 +1580,13 @@ export const sellItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         const character = snapshot.data() as any;
+
+        // Protection: Check if item is equipped
+        const isEquipped = Object.values(character.equipment || {}).some((i: any) => i && i.id === itemId);
+        if (isEquipped) {
+            throw new functions.https.HttpsError("failed-precondition", "Cannot sell equipped items. Unequip it first.");
+        }
+
         const inventory = character.inventory || [];
         const itemIndex = inventory.findIndex((i: any) => i.id === itemId);
 
@@ -1397,10 +1652,10 @@ export const leaveCrew = functions.https.onCall(async (data, context) => {
     const playerRef = db.collection("players").doc(userId);
 
     return db.runTransaction(async (transaction) => {
-        const playerSnap = await transaction.get(playerRef);
-        if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = playerSnap.data() as any;
+        const character = snapshot.data() as any;
         const crewId = character.crewId;
         if (!crewId) throw new functions.https.HttpsError("failed-precondition", "Player is not in a crew.");
 

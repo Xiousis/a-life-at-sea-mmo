@@ -49,6 +49,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "chat",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "channelId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

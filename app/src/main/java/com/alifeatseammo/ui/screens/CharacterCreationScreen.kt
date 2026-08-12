@@ -8,19 +8,34 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Gender
 import com.alifeatseammo.data.model.Race
+import com.alifeatseammo.data.repository.AuthResult
+import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CharacterCreationScreen(
-    onCharacterCreated: (String, Gender, Race) -> Unit
+    creationResult: AuthResult?,
+    onCharacterCreated: (String, Gender, Race) -> Unit,
+    onClearError: () -> Unit,
+    onLogout: () -> Unit
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+    }
+
     var name by remember { mutableStateOf("") }
     var selectedGender by remember { mutableStateOf(Gender.Male) }
     var selectedRace by remember { mutableStateOf(Race.Human) }
     var expanded by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var localError by remember { mutableStateOf<String?>(null) }
+
+    val isLoading = creationResult is AuthResult.Loading
+    val serverError = (creationResult as? AuthResult.Error)?.message
 
     fun validateName(input: String): String? {
         val trimmed = input.trim()
@@ -41,16 +56,32 @@ fun CharacterCreationScreen(
         Text(text = "Begin Your Adventure", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(32.dp))
 
+        if (serverError != null) {
+            Text(
+                text = serverError,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Button(onClick = onClearError, modifier = Modifier.padding(bottom = 16.dp)) {
+                Text("Dismiss Server Error")
+            }
+        }
+
         OutlinedTextField(
             value = name,
             onValueChange = { 
                 name = it
-                error = null
+                localError = null
             },
             label = { Text("Character Name") },
-            isError = error != null,
-            supportingText = { error?.let { Text(it) } },
-            modifier = Modifier.fillMaxWidth()
+            isError = localError != null || serverError != null,
+            supportingText = { 
+                if (localError != null) Text(localError!!)
+                else if (serverError != null) Text(serverError)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -65,7 +96,8 @@ fun CharacterCreationScreen(
                     selected = selectedGender == gender,
                     onClick = { selectedGender = gender },
                     label = { Text(gender.name) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    enabled = !isLoading
                 )
             }
         }
@@ -74,8 +106,8 @@ fun CharacterCreationScreen(
 
         Text(text = "Race", style = MaterialTheme.typography.titleSmall)
         ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded },
+            expanded = expanded && !isLoading,
+            onExpandedChange = { if (!isLoading) expanded = !expanded },
             modifier = Modifier.fillMaxWidth()
         ) {
             OutlinedTextField(
@@ -85,7 +117,8 @@ fun CharacterCreationScreen(
                 label = { Text("Select Race") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier.menuAnchor(),
-                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                enabled = !isLoading
             )
             ExposedDropdownMenu(
                 expanded = expanded,
@@ -105,18 +138,31 @@ fun CharacterCreationScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Button(
-            onClick = {
-                val validationError = validateName(name)
-                if (validationError == null) {
-                    onCharacterCreated(name.trim(), selectedGender, selectedRace)
-                } else {
-                    error = validationError
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
+        if (isLoading) {
+            CircularProgressIndicator()
+        } else {
+            Button(
+                onClick = {
+                    val validationError = validateName(name)
+                    if (validationError == null) {
+                        onCharacterCreated(name.trim(), selectedGender, selectedRace)
+                    } else {
+                        localError = validationError
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Set Sail")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextButton(
+            onClick = onLogout,
+            enabled = !isLoading
         ) {
-            Text("Set Sail")
+            Text("Sign Out / Back to Login")
         }
     }
 }

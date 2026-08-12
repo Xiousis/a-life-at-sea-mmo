@@ -11,6 +11,7 @@ kotlin = "2.2.10"
 composeBom = "2026.02.01"
 googleGmsGoogleServices = "4.5.0"
 firebaseBom = "34.17.0"
+firebaseAppDistribution = "5.3.0"
 navigationCompose = "2.8.8"
 kotlinxSerializationJson = "1.8.0"
 
@@ -44,4 +45,5 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-gms-google-services = { id = "com.google.gms.google-services", version.ref = "googleGmsGoogleServices" }
+firebase-appdistribution = { id = "com.google.firebase.appdistribution", version.ref = "firebaseAppDistribution" }
 

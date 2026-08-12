@@ -6,6 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,6 +19,7 @@ import com.alifeatseammo.ui.GameViewModel
 import com.alifeatseammo.ui.PlayerProfileViewModel
 import com.alifeatseammo.ui.screens.*
 import com.alifeatseammo.ui.theme.ALifeAtSeaMMOTheme
+import com.alifeatseammo.util.MusicManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,8 +35,18 @@ class MainActivity : ComponentActivity() {
                     val characterState by viewModel.characterState.collectAsState()
                     val user by viewModel.currentUser.collectAsState()
                     val authResult by viewModel.authResult.collectAsState()
+                    val creationResult by viewModel.createCharacterResult.collectAsState()
+                    val errorMsg by viewModel.errorMessage.collectAsState()
+                    val snackbarHostState = remember { SnackbarHostState() }
                     var currentScreen by remember { mutableStateOf<Screen>(Screen.Dashboard) }
                     var selectedPlayerId by remember { mutableStateOf<String?>(null) }
+
+                    LaunchedEffect(errorMsg) {
+                        errorMsg?.let {
+                            snackbarHostState.showSnackbar(it)
+                            viewModel.clearErrorMessage()
+                        }
+                    }
 
                     LaunchedEffect(selectedPlayerId) {
                         selectedPlayerId?.let { profileViewModel.loadPlayer(it) }
@@ -56,19 +69,30 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             is com.alifeatseammo.ui.CharacterState.NoCharacter -> {
-                                CharacterCreationScreen { name, gender, race ->
-                                    viewModel.createCharacter(name, gender, race)
-                                }
+                                CharacterCreationScreen(
+                                    creationResult = creationResult,
+                                    onCharacterCreated = { name, gender, race ->
+                                        viewModel.createCharacter(name, gender, race)
+                                    },
+                                    onClearError = { viewModel.clearCreateCharacterResult() },
+                                    onLogout = { viewModel.signOut() }
+                                )
                             }
                             is com.alifeatseammo.ui.CharacterState.Loaded -> {
                                 val currentChar = state.character
                                 if (currentChar.combatState != null) {
                                     CombatScreen(
                                         character = currentChar,
-                                        onActionClick = { action, techId -> viewModel.combatAction(action, techId) }
+                                        onActionClick = { action, techId, itemId -> viewModel.combatAction(action, techId, itemId) }
+                                    )
+                                } else if (currentChar.travelState != null) {
+                                    TravelingScreen(
+                                        character = currentChar,
+                                        onArrival = { viewModel.finishTravel() }
                                     )
                                 } else {
                                     Scaffold(
+                                        snackbarHost = { SnackbarHost(snackbarHostState) },
                                         bottomBar = {
                                             NavigationBar {
                                                 NavigationBarItem(
@@ -104,18 +128,23 @@ class MainActivity : ComponentActivity() {
                                                 Screen.Dashboard -> {
                                                     val location by viewModel.currentLocationInfo.collectAsState()
                                                     val playersNearby by viewModel.playersAtLocation.collectAsState()
+                                                    val missions by viewModel.missions.collectAsState()
                                                     DashboardScreen(
                                                         character = currentChar,
                                                         location = location,
                                                         playersNearby = playersNearby,
+                                                        playerCount = playersNearby.size,
+                                                        missionCount = missions.size,
                                                         onActionClick = { actionType ->
                                                             when (actionType) {
                                                                 ActionType.Training -> currentScreen = Screen.Training
                                                                 ActionType.Docks -> currentScreen = Screen.Travel
                                                                 ActionType.Bounties -> currentScreen = Screen.Leaderboard
                                                                 ActionType.Crew -> currentScreen = Screen.Crew
-                                                                ActionType.Market -> { /* Placeholder for Market */ }
-                                                                ActionType.Tavern -> { /* Placeholder for Tavern */ }
+                                                                ActionType.Market -> currentScreen = Screen.Market
+                                                                ActionType.Tavern -> currentScreen = Screen.Tavern
+                                                                ActionType.Infirmary -> currentScreen = Screen.Infirmary
+                                                                ActionType.Shipyard -> currentScreen = Screen.Shipyard
                                                                 else -> {}
                                                             }
                                                         },
@@ -124,7 +153,7 @@ class MainActivity : ComponentActivity() {
                                                             currentScreen = Screen.Character
                                                         },
                                                         onMissionsClick = { currentScreen = Screen.Missions },
-                                                        onMailClick = { /* Placeholder for Mail */ },
+                                                        onMailClick = { currentScreen = Screen.Mail },
                                                         onJoinFaction = { viewModel.joinFaction(it) }
                                                     )
                                                 }
@@ -205,21 +234,13 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                                 Screen.Combat -> {} // Handled by forced override above
+                                                Screen.Traveling -> {} // Handled by forced override above
                                                 Screen.Training -> {
-                                                    // Training Room implementation
-                                                    Column(modifier = Modifier.padding(16.dp)) {
-                                                        Text("Training Room", style = MaterialTheme.typography.headlineMedium)
-                                                        Spacer(modifier = Modifier.height(16.dp))
-                                                        val stats = listOf(StatType.Strength, StatType.Endurance, StatType.Agility)
-                                                        stats.forEach { stat ->
-                                                            Button(onClick = { viewModel.train(stat) }) {
-                                                                Text("Train $stat")
-                                                            }
-                                                        }
-                                                        Button(onClick = { currentScreen = Screen.Dashboard }) {
-                                                            Text("Back")
-                                                        }
-                                                    }
+                                                    TrainingScreen(
+                                                        character = currentChar,
+                                                        onTrainClick = { viewModel.train(it) },
+                                                        onBackClick = { currentScreen = Screen.Dashboard }
+                                                    )
                                                 }
                                                 Screen.Crew -> {
                                                     val crew by profileViewModel.playerCrew.collectAsState()
@@ -271,6 +292,7 @@ class MainActivity : ComponentActivity() {
                                                 }
                                                 Screen.More -> {
                                                     MoreScreen(
+                                                        isGuest = user?.isAnonymous ?: false,
                                                         onMenuItemClick = { item ->
                                                             when (item.label) {
                                                                 "Character" -> {
@@ -281,8 +303,10 @@ class MainActivity : ComponentActivity() {
                                                                 "Skills" -> currentScreen = Screen.Skills
                                                                 "Leaderboard" -> currentScreen = Screen.Leaderboard
                                                                 "Chat" -> currentScreen = Screen.Chat
+                                                                "Mail" -> currentScreen = Screen.Mail
                                                                 "Settings" -> currentScreen = Screen.Settings
                                                                 "Help" -> currentScreen = Screen.Help
+                                                                "Upgrade Account" -> currentScreen = Screen.UpgradeAccount
                                                             }
                                                         }
                                                     )
@@ -298,14 +322,75 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                                 Screen.Skills -> {
-                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                        Text("Skills Screen")
-                                                    }
+                                                    SkillsScreen(
+                                                        character = currentChar,
+                                                        onBackClick = { currentScreen = Screen.More }
+                                                    )
+                                                }
+                                                Screen.Tavern -> {
+                                                    TavernScreen(
+                                                        character = currentChar,
+                                                        onBackClick = { currentScreen = Screen.Dashboard }
+                                                    )
+                                                }
+                                                Screen.Market -> {
+                                                    val marketItems by viewModel.marketItems.collectAsState()
+                                                    MarketScreen(
+                                                        character = currentChar,
+                                                        marketItems = marketItems,
+                                                        onBuyItem = { viewModel.purchaseItem(it.id, "default") },
+                                                        onSellItem = { viewModel.sellItem(it) },
+                                                        onBackClick = { currentScreen = Screen.Dashboard }
+                                                    )
+                                                }
+                                                Screen.Mail -> {
+                                                    val mailMessages by viewModel.mailMessages.collectAsState()
+                                                    MailScreen(
+                                                        messages = mailMessages,
+                                                        onClaimRewards = { /* viewModel.claimMailRewards(it) */ },
+                                                        onDeleteMail = { /* viewModel.deleteMail(it) */ },
+                                                        onBackClick = { currentScreen = Screen.Dashboard }
+                                                    )
+                                                }
+                                                Screen.UpgradeAccount -> {
+                                                    UpgradeAccountScreen(
+                                                        authResult = authResult,
+                                                        onUpgrade = { email, password -> viewModel.upgradeGuestAccount(email, password) },
+                                                        onBackClick = { currentScreen = Screen.More },
+                                                        onClearError = { viewModel.clearAuthResult() }
+                                                    )
+                                                }
+                                                Screen.Infirmary -> {
+                                                    InfirmaryScreen(
+                                                        character = currentChar,
+                                                        onStartRest = { viewModel.startHealing() },
+                                                        onInstantHeal = { viewModel.instantHeal() },
+                                                        onBackClick = { currentScreen = Screen.Dashboard }
+                                                    )
+                                                }
+                                                Screen.Shipyard -> {
+                                                    val availableShips = listOf(
+                                                        com.alifeatseammo.data.model.Ship("row_boat", "Row Boat", 0, 1.0f),
+                                                        com.alifeatseammo.data.model.Ship("sloop", "Sloop", 500, 1.5f),
+                                                        com.alifeatseammo.data.model.Ship("caravel", "Caravel", 2500, 2.0f),
+                                                        com.alifeatseammo.data.model.Ship("galleon", "Galleon", 10000, 3.0f)
+                                                    )
+                                                    ShipyardScreen(
+                                                        character = currentChar,
+                                                        availableShips = availableShips,
+                                                        onBuyShip = { viewModel.purchaseShip(it.id) },
+                                                        onBackClick = { currentScreen = Screen.Dashboard }
+                                                    )
                                                 }
                                                 Screen.Settings -> {
                                                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                             Text("Settings Screen")
+                                                            Spacer(modifier = Modifier.height(16.dp))
+                                                            Button(onClick = { viewModel.seedWorld() }) {
+                                                                Text("Seed World Data")
+                                                            }
+                                                            Spacer(modifier = Modifier.height(8.dp))
                                                             Button(onClick = { viewModel.signOut() }) {
                                                                 Text("Logout")
                                                             }
@@ -339,6 +424,21 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onPause() {
+        super.onPause()
+        MusicManager.pause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        MusicManager.resume()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        MusicManager.release()
+    }
 }
 
 sealed class Screen {
@@ -359,4 +459,11 @@ sealed class Screen {
     object Settings : Screen()
     object Help : Screen()
     object CrewProfile : Screen()
+    object Tavern : Screen()
+    object Market : Screen()
+    object Mail : Screen()
+    object UpgradeAccount : Screen()
+    object Infirmary : Screen()
+    object Traveling : Screen()
+    object Shipyard : Screen()
 }

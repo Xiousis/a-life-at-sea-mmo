@@ -8,7 +8,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Character
+import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -16,6 +19,11 @@ fun TavernScreen(
     character: Character,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+    }
+
     var rumorText by remember { mutableStateOf("The tavern is lively tonight. You might hear something interesting if you stay a while.") }
 
     Scaffold(

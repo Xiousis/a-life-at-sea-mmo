@@ -29,7 +29,9 @@ data class Character(
     val isOnline: Boolean = false,
     val friends: List<String> = emptyList(),
     val blocked: List<String> = emptyList(),
-    val learnedTechniques: List<String> = emptyList()
+    val learnedTechniques: List<String> = emptyList(),
+    val healingState: HealingState? = null,
+    val ship: Ship = Ship()
 ) {
     fun getCurrentEnergy(): Int {
         val regenRateMs = 3 * 60 * 1000L // 3 minutes
@@ -55,7 +57,20 @@ data class CharacterPrivate(
     val equipment: Map<String, Item?> = emptyMap(),
     val friends: List<String> = emptyList(),
     val blocked: List<String> = emptyList(),
-    val learnedTechniques: List<String> = emptyList()
+    val learnedTechniques: List<String> = emptyList(),
+    val healingState: HealingState? = null,
+    val ship: Ship = Ship()
+)
+
+data class HealingState(
+    val endTime: Long = 0
+)
+
+data class Ship(
+    val id: String = "row_boat",
+    val name: String = "Row Boat",
+    val price: Int = 0,
+    val speedMultiplier: Float = 1.0f
 )
 
 enum class Gender {
@@ -71,7 +86,7 @@ enum class Rarity {
 }
 
 enum class Race {
-    Human, Fishman, Mink, Skypiean, Cyborg
+    Human, Abyssal, Beastkin, Celestian, Automaton
 }
 
 data class TravelState(
@@ -219,7 +234,7 @@ data class MailMessage(
 )
 
 enum class ActionType {
-    Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Cave, Fishing
+    Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Cave, Fishing, Infirmary
 }
 
 fun Character.checkLevelUp(): Character = this // Handled server-side now

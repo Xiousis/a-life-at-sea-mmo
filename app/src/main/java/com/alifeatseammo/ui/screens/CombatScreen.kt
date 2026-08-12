@@ -8,8 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,19 +16,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.alifeatseammo.data.model.Character
-import com.alifeatseammo.data.model.CombatAction
-import com.alifeatseammo.data.model.EffectType
-import com.alifeatseammo.data.model.StatusEffect
+import androidx.compose.ui.platform.LocalContext
+import com.alifeatseammo.R
+import com.alifeatseammo.data.model.*
+import com.alifeatseammo.util.MusicManager
 
 @Composable
 fun CombatScreen(
     character: Character,
-    onActionClick: (CombatAction, String?) -> Unit
+    onActionClick: (CombatAction, String?, String?) -> Unit
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+    }
+
     val combatState = character.combatState ?: return
     val enemy = combatState.enemy
     val listState = rememberLazyListState()
+    
+    var showTechniques by remember { mutableStateOf(false) }
+    var showItems by remember { mutableStateOf(false) }
 
     LaunchedEffect(combatState.logs.size) {
         if (combatState.logs.isNotEmpty()) {
@@ -122,20 +129,80 @@ fun CombatScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val isPlayerTurn = combatState.playerTurn
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CombatButton("Attack", Modifier.weight(1f)) { onActionClick(CombatAction.Attack, null) }
-                CombatButton("Technique", Modifier.weight(1f)) { onActionClick(CombatAction.Technique, "bash") } // Placeholder tech ID
+                CombatButton("Attack", Modifier.weight(1f), enabled = isPlayerTurn) { onActionClick(CombatAction.Attack, null, null) }
+                CombatButton("Technique", Modifier.weight(1f), enabled = isPlayerTurn) { showTechniques = true }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CombatButton("Defend", Modifier.weight(1f)) { onActionClick(CombatAction.Defend, null) }
-                CombatButton("Item", Modifier.weight(1f)) { onActionClick(CombatAction.Item, null) }
+                CombatButton("Defend", Modifier.weight(1f), enabled = isPlayerTurn) { onActionClick(CombatAction.Defend, null, null) }
+                CombatButton("Item", Modifier.weight(1f), enabled = isPlayerTurn) { showItems = true }
             }
-            CombatButton("Flee", Modifier.fillMaxWidth()) { onActionClick(CombatAction.Flee, null) }
+            CombatButton("Flee", Modifier.fillMaxWidth(), enabled = isPlayerTurn) { onActionClick(CombatAction.Flee, null, null) }
         }
 
         Text(
             text = "────────────────────────",
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+        )
+    }
+
+    if (showTechniques) {
+        AlertDialog(
+            onDismissRequest = { showTechniques = false },
+            title = { Text("Choose Technique") },
+            text = {
+                Column {
+                    if (character.learnedTechniques.isEmpty()) {
+                        Text("No techniques learned.")
+                    } else {
+                        character.learnedTechniques.forEach { techId ->
+                            Button(
+                                onClick = {
+                                    onActionClick(CombatAction.Technique, techId, null)
+                                    showTechniques = false
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Text(techId.replaceFirstChar { it.uppercase() })
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTechniques = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showItems) {
+        AlertDialog(
+            onDismissRequest = { showItems = false },
+            title = { Text("Use Item") },
+            text = {
+                val consumables = character.inventory.filter { it.type == ItemType.Consumable }
+                Column {
+                    if (consumables.isEmpty()) {
+                        Text("No consumables available.")
+                    } else {
+                        consumables.forEach { item ->
+                            Button(
+                                onClick = {
+                                    onActionClick(CombatAction.Item, null, item.id)
+                                    showItems = false
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Text(item.name)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showItems = false }) { Text("Cancel") }
+            }
         )
     }
 }
@@ -189,10 +256,11 @@ fun CombatantStatus(name: String, hp: Int, maxHp: Int, barColor: Color, effects:
 }
 
 @Composable
-fun CombatButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun CombatButton(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         modifier = modifier,
+        enabled = enabled,
         shape = MaterialTheme.shapes.extraSmall,
         contentPadding = PaddingValues(12.dp)
     ) {

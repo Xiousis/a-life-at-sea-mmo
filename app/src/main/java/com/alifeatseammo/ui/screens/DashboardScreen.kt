@@ -17,10 +17,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
 import com.alifeatseammo.data.model.ActionType
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Faction
 import com.alifeatseammo.data.model.LocationDef
+import com.alifeatseammo.R
+import com.alifeatseammo.util.MusicManager
 
 @Composable
 fun DashboardScreen(
@@ -35,6 +39,11 @@ fun DashboardScreen(
     onMailClick: () -> Unit,
     onJoinFaction: (Faction) -> Unit
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -104,11 +113,9 @@ fun DashboardScreen(
 
         // Faction Recruitment
         if (character.faction == Faction.Neutral && location != null) {
-            val recruitment = when {
-                location.name == "Port Haven" -> Faction.Navy
-                location.name == "Blacktooth Island" -> Faction.Pirate
-                location.actions.any { it.type == ActionType.Docks } -> Faction.Navy
-                location.actions.any { it.type == ActionType.Tavern } -> Faction.Pirate
+            val recruitment = when (location.name) {
+                "Navy Outpost" -> Faction.Navy
+                "Pirate\u0027s Den" -> Faction.Pirate
                 else -> null
             }
 

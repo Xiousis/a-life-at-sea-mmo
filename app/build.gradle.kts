@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.gms.google.services)
+    alias(libs.plugins.firebase.appdistribution)
     kotlin("plugin.serialization") version "2.2.10"
 }
 
@@ -25,6 +26,13 @@ android {
         release {
             optimization {
                 enable = false
+            }
+        }
+        debug {
+            firebaseAppDistribution {
+                artifactType = "APK"
+                releaseNotes = "New features and bug fixes for A Life at Sea MMO!"
+                testers = "oscali11@gmail.com"
             }
         }
     }

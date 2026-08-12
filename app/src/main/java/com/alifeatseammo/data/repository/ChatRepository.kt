@@ -25,15 +25,19 @@ interface ChatRepository {
 
 class FirestoreChatRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance()
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
 ) : ChatRepository {
 
     override fun getMessages(channelId: String): Flow<List<ChatMessage>> = callbackFlow {
         val subscription = db.collection("chat")
             .whereEqualTo("channelId", channelId)
-            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .orderBy("timestamp", Query.Direction.ASCENDING) // Change to Ascending for easier auto-scroll logic
             .limit(50)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("ChatRepository", "Error fetching messages for $channelId", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<ChatMessage>() })
                 }

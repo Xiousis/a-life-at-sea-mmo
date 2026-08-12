@@ -7,8 +7,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 
+import com.alifeatseammo.R
 import com.alifeatseammo.data.repository.AuthResult
+import com.alifeatseammo.util.MusicManager
 
 @Composable
 fun LoginScreen(
@@ -19,6 +22,11 @@ fun LoginScreen(
     onForgotPassword: (String) -> Unit,
     onClearError: () -> Unit
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+    }
+
     var isSignUp by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }

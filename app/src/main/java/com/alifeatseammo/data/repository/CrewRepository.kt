@@ -23,7 +23,7 @@ interface CrewRepository {
 
 class FirestoreCrewRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance()
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
 ) : CrewRepository {
 
     override fun getCrew(crewId: String): Flow<Crew?> = callbackFlow {

@@ -20,6 +20,16 @@ fun ChatScreen(
 ) {
     var text by remember { mutableStateOf("") }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    val currentMessages = if (selectedTab == 0) globalMessages else crewMessages
+
+    // Auto-scroll to bottom when new messages arrive
+    LaunchedEffect(currentMessages.size) {
+        if (currentMessages.isNotEmpty()) {
+            listState.animateScrollToItem(currentMessages.size - 1)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -65,13 +75,12 @@ fun ChatScreen(
             }
         }
     ) { padding ->
-        val messages = if (selectedTab == 0) globalMessages else crewMessages
-        
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            reverseLayout = true
+            reverseLayout = false // Newer messages at the bottom
         ) {
-            items(messages) { msg ->
+            items(currentMessages) { msg ->
                 Card(modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text(text = msg.senderName, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)

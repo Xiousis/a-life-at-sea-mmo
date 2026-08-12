@@ -12,8 +12,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+
+import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.LocationDef
+import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,6 +27,11 @@ fun MapScreen(
     onLocationClick: (LocationDef) -> Unit,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+    }
+
     var selectedLocation by remember { mutableStateOf<LocationDef?>(null) }
 
     Scaffold(

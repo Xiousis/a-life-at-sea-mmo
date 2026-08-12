@@ -1,4 +1,4 @@
-import * as functionsTest from "firebase-functions-test";
+import functionsTest from "firebase-functions-test";
 import { expect } from "chai";
 import "mocha";
 import * as myFunctions from "./index";

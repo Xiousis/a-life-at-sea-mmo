@@ -23,6 +23,7 @@ fun MoreScreen(
         MoreMenuItem("Skills", "📜"),
         MoreMenuItem("Leaderboard", "🏆"),
         MoreMenuItem("Chat", "💬"),
+        MoreMenuItem("Mail", "✉"),
         MoreMenuItem("Settings", "⚙"),
         MoreMenuItem("Help", "❓")
     )

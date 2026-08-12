@@ -8,8 +8,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Faction
+import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,6 +23,11 @@ fun PvPScreen(
     onPlayerClick: (Character) -> Unit,
     onBackClick: () -> Unit,
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
