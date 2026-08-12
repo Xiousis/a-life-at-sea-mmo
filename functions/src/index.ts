@@ -11,6 +11,8 @@ const MAX_ENERGY = 100;
 const INVENTORY_CAPACITY = 20;
 const TURN_TIMEOUT_MS = 60 * 1000; // 1 minute per turn
 const HEALING_DURATION_MS = 2 * 60 * 1000; // 2 minutes
+const TRAINING_DURATION_MS = 20 * 1000; // 20 seconds
+const TRAINING_GOLD_COST = 50;
 
 const STAT_MAPPING: Record<string, string> = {
     "Strength": "strength",
@@ -24,7 +26,13 @@ const STAT_MAPPING: Record<string, string> = {
     "Gunslinging": "gunslinging",
     "Spear": "spear",
     "MartialArts": "martialArts",
-    "DualBlades": "dualBlades"
+    "Sniper": "sniper",
+    "MysticArts": "mysticArts",
+    "Cooking": "cooking",
+    "Navigating": "navigating",
+    "TreasureHunting": "treasureHunting",
+    "Blacksmith": "blacksmith",
+    "Fishing": "fishing"
 };
 
 const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = {
@@ -33,8 +41,10 @@ const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = 
     "Amber Reach": { x: -30, y: 40, region: "East Blue" },
     "Sunken Reef": { x: 10, y: 15, region: "East Blue" },
     "Tortuga Bay": { x: 10, y: -100, region: "South Blue" },
-    "Pirate\u0027s Den": { x: 40, y: -120, region: "South Blue" },
-    "Navy Outpost": { x: -80, y: -50, region: "South Blue" },
+    "Pirate\u0027s Den": { x: 350, y: -350, region: "South Blue" },
+    "Navy Outpost Aqua": { x: -80, y: -50, region: "South Blue" },
+    "Navy Outpost Terra": { x: -300, y: 200, region: "Grand Line" },
+    "Navy Outpost Ignis": { x: 400, y: 300, region: "Grand Line" },
     "Crystal Cove": { x: 120, y: 80, region: "Grand Line" },
     "Volcano Peak": { x: 200, y: 150, region: "Grand Line" },
     "Whispering Woods": { x: -150, y: 180, region: "Grand Line" },
@@ -91,10 +101,10 @@ function checkLevelUp(character: any) {
     while (xp >= xpNeeded) {
         level++;
         xp -= xpNeeded;
-        maxEnergy += 5;
+        maxEnergy += 100;
         energy = maxEnergy;
         stats.endurance += 1;
-        maxHp = 50 + (stats.endurance * 10);
+        maxHp += 100;
         hp = maxHp;
 
         stats.strength += 1;
@@ -172,6 +182,7 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
         xp: 0,
         gold: 100,
         bounty: 0,
+        infamy: 0,
         hp: 100,
         maxHp: 100,
         energy: 100,
@@ -196,7 +207,15 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
             gunslinging: 0,
             spear: 0,
             martialArts: 0,
-            dualBlades: 0
+            sniper: 0,
+            mysticArts: 0
+        },
+        professionStats: {
+            cooking: 0,
+            navigating: 0,
+            treasureHunting: 0,
+            blacksmith: 0,
+            fishing: 0
         },
         inventory: [],
         equipment: {},
@@ -234,8 +253,8 @@ export const joinFaction = functions.https.onCall(async (data, context) => {
             transaction.update(playerRef, { faction: "Pirate", title: "Rogue Sailor" });
             recordLog(transaction, userId, "JoinFaction", "Became a Pirate", 0, 0);
         } else if (faction === "Navy") {
-            if (character.currentLocation !== "Navy Outpost") {
-                throw new functions.https.HttpsError("failed-precondition", "You must be at the Navy Outpost to enlist in the Navy.");
+            if (character.currentLocation !== "Navy Outpost Aqua") {
+                throw new functions.https.HttpsError("failed-precondition", "You must be at the Navy Outpost Aqua to enlist in the Navy.");
             }
             transaction.update(playerRef, { faction: "Navy", title: "Navy Recruit" });
             recordLog(transaction, userId, "JoinFaction", "Enlisted in the Navy", 0, 0);
@@ -265,27 +284,83 @@ export const train = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
         character = processHealing(character);
 
         if (character.hp <= 0) {
             throw new functions.https.HttpsError("failed-precondition", "You are too injured to train. Visit an infirmary.");
         }
 
+        if (character.trainingState) {
+             throw new functions.https.HttpsError("failed-precondition", "You are already training.");
+        }
+
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
 
         if (energy < 10) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
+        if (character.gold < TRAINING_GOLD_COST) throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
+
+        const endTime = Date.now() + TRAINING_DURATION_MS;
+
+        transaction.update(playerRef, {
+            energy: energy - 10,
+            energyUpdatedAt,
+            gold: admin.firestore.FieldValue.increment(-TRAINING_GOLD_COST),
+            trainingState: { endTime, statType }
+        });
+
+        recordLog(transaction, userId, "TrainStart", `Started training ${statType}`, -TRAINING_GOLD_COST, 0);
+
+        return { success: true, endTime };
+    });
+});
+
+export const finishTraining = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        const training = character.trainingState;
+        if (!training) throw new functions.https.HttpsError("failed-precondition", "No active training session.");
+        if (training.endTime > Date.now()) throw new functions.https.HttpsError("failed-precondition", "Training not yet complete.");
+
+        const statType = training.statType;
+        const mappedStat = STAT_MAPPING[statType];
 
         // Ensure stats object exists
         const stats = { ...character.stats };
-        stats[mappedStat] = (stats[mappedStat] || 0) + 1;
+        const pStats = { ...(character.professionStats || {}) };
 
-        const updatedChar = { ...character, energy: energy - 10, energyUpdatedAt, xp: character.xp + 5, stats };
+        if (stats[mappedStat] !== undefined) {
+            stats[mappedStat] = (stats[mappedStat] || 0) + 1;
+        } else if (pStats[mappedStat] !== undefined) {
+            pStats[mappedStat] = (pStats[mappedStat] || 0) + 1;
+        } else {
+            // Fallback for new stats
+            const combatStats = ["swordsmanship", "brawling", "gunslinging", "spear", "martialArts", "sniper", "mysticArts"];
+            if (combatStats.includes(mappedStat)) {
+                stats[mappedStat] = (stats[mappedStat] || 0) + 1;
+            } else {
+                pStats[mappedStat] = (pStats[mappedStat] || 0) + 1;
+            }
+        }
 
+        const updatedChar = { ...character, xp: character.xp + 5, stats, professionStats: pStats, trainingState: null };
         const finalChar = checkLevelUp(updatedChar);
-        transaction.set(playerRef, finalChar);
-        recordLog(transaction, userId, "Train", `Trained ${statType}`, 0, 5);
 
-        return { success: true, newEnergy: finalChar.energy };
+        transaction.set(playerRef, finalChar);
+        recordLog(transaction, userId, "TrainFinish", `Finished training ${statType}`, 0, 5);
+
+        return { success: true };
     });
 });
 
@@ -303,6 +378,8 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
         character = processHealing(character);
 
         if (character.hp <= 0) {
@@ -313,7 +390,7 @@ export const startTravel = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("failed-precondition", "You cannot travel while resting in the infirmary.");
         }
 
-        if (character.travelState || character.combatState) {
+        if (character.travelState || character.combatState || character.trainingState) {
             throw new functions.https.HttpsError("failed-precondition", "Player is already busy.");
         }
 
@@ -331,10 +408,7 @@ export const startTravel = functions.https.onCall(async (data, context) => {
 
         // Potential for random encounter here (Pirates, Monsters)
         if (travelDuration > 10000 && Math.random() < 0.25) {
-            const enemyNames = ["Sea Monster", "Ghost Pirate", "Giant Squid", "Rogue Sloop", "Storm Elemental"];
-            const enemyName = enemyNames[Math.floor(Math.random() * enemyNames.length)];
             const enemy = generateEnemy(character.level);
-            enemy.name = enemyName;
 
             transaction.update(playerRef, {
                 combatState: {
@@ -369,7 +443,9 @@ export const finishTravel = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
         const travel = character.travelState;
 
         if (!travel || travel.arrivalTime > Date.now()) {
@@ -381,6 +457,32 @@ export const finishTravel = functions.https.onCall(async (data, context) => {
             travelState: null
         });
         return { success: true, newLocation: travel.destination };
+    });
+});
+
+export const finishHealing = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        if (!character.healingState) throw new functions.https.HttpsError("failed-precondition", "No active healing state.");
+        if (character.healingState.endTime > Date.now()) {
+            throw new functions.https.HttpsError("failed-precondition", "Healing not yet complete.");
+        }
+
+        transaction.update(playerRef, {
+            hp: character.maxHp,
+            healingState: null
+        });
+        return { success: true };
     });
 });
 
@@ -406,6 +508,17 @@ export const purchaseShip = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         const character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        // Validate location has a shipyard
+        const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
+        const location = locationSnap.data();
+        const hasShipyard = location?.actions?.some((a: any) => a.type === "Shipyard");
+
+        if (!hasShipyard) {
+            throw new functions.https.HttpsError("failed-precondition", "There is no shipyard at your current location.");
+        }
+
         if (character.gold < ship.price) throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
         if (character.ship?.id === shipId) throw new functions.https.HttpsError("failed-precondition", "You already own this ship.");
 
@@ -435,7 +548,8 @@ interface CombatStats {
     gunslinging?: number;
     spear?: number;
     martialArts?: number;
-    dualBlades?: number;
+    sniper?: number;
+    mysticArts?: number;
     defense: number;
     accuracy: number;
     dodge: number;
@@ -494,7 +608,8 @@ function calculateCombatStats(charOrEnemy: any, currentEffects: any[] = []): Com
         gunslinging: stats.gunslinging || 0,
         spear: stats.spear || 0,
         martialArts: stats.martialArts || 0,
-        dualBlades: stats.dualBlades || 0,
+        sniper: stats.sniper || 0,
+        mysticArts: stats.mysticArts || 0,
         defense,
         accuracy,
         dodge,
@@ -503,9 +618,23 @@ function calculateCombatStats(charOrEnemy: any, currentEffects: any[] = []): Com
 }
 
 function generateEnemy(playerLevel: number) {
-    const names = ["Sea Serpent", "Pirate Scout", "Feral Crab", "Ghost Ship", "Navy Enforcer"];
-    const name = names[Math.floor(Math.random() * names.length)];
-    const level = Math.max(1, playerLevel + Math.floor(Math.random() * 3) - 1);
+    const seaMobs = [
+        { name: "Sea Serpent", minLevel: 1, maxLevel: 10, dropTableId: "basic_sea_loot" },
+        { name: "Pirate Scout", minLevel: 3, maxLevel: 15, dropTableId: "basic_sea_loot" },
+        { name: "Giant Squid", minLevel: 10, maxLevel: 25, dropTableId: "rare_sea_loot" },
+        { name: "Ghost Pirate", minLevel: 15, maxLevel: 40, dropTableId: "rare_sea_loot" },
+        { name: "Feral Crab", minLevel: 1, maxLevel: 5, dropTableId: "basic_sea_loot" },
+        { name: "Rogue Sloop", minLevel: 5, maxLevel: 20, dropTableId: "basic_sea_loot" },
+        { name: "Navy Enforcer", minLevel: 8, maxLevel: 30, dropTableId: "rare_sea_loot" }
+    ];
+
+    // Filter mobs by player level
+    const possibleMobs = seaMobs.filter(m => playerLevel >= m.minLevel - 2); // Allow slightly higher level mobs
+    const mobDef = possibleMobs.length > 0
+        ? possibleMobs[Math.floor(Math.random() * possibleMobs.length)]
+        : seaMobs[0];
+
+    const level = Math.max(1, Math.min(mobDef.maxLevel, playerLevel + Math.floor(Math.random() * 3) - 1));
 
     const stats = {
         strength: 5 + level * 2,
@@ -518,18 +647,15 @@ function generateEnemy(playerLevel: number) {
 
     const maxHp = 40 + (level * 15);
 
-    // Basic drop table logic for random encounters
-    const dropTableId = level > 5 ? "basic_loot" : null;
-
     return {
-        name,
+        name: mobDef.name,
         level,
         hp: maxHp,
         maxHp: maxHp,
         stats,
         goldReward: 20 * level,
         xpReward: 15 * level,
-        dropTableId
+        dropTableId: mobDef.dropTableId
     };
 }
 
@@ -620,6 +746,8 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
         let combat = character.combatState;
         if (!combat || combat.isFinished) throw new functions.https.HttpsError("failed-precondition", "No active combat.");
 
@@ -689,6 +817,12 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     }
                 } else if (action === "Technique") {
                     if (!techniqueId) throw new functions.https.HttpsError("invalid-argument", "Missing technique ID.");
+
+                    // Technique validation
+                    if (!character.learnedTechniques || !character.learnedTechniques.includes(techniqueId)) {
+                        throw new functions.https.HttpsError("failed-precondition", "You have not learned this technique.");
+                    }
+
                     const techSnap = await db.collection("gameData").doc("skills").collection("techniques").doc(techniqueId).get();
                     if (!techSnap.exists) throw new functions.https.HttpsError("not-found", "Technique not found.");
 
@@ -818,22 +952,29 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 const winnerRef = playerWon ? playerRef : opponentRef!;
                 const loserRef = playerWon ? opponentRef! : playerRef;
 
-                const stealAmount = Math.floor(loser.gold * 0.1);
+                const stealAmount = Math.floor(loser.gold * 0.15);
+                const collectedBounty = loser.bounty || 0;
+                const totalGoldGained = stealAmount + collectedBounty;
 
                 // Update Winner
                 const winnerUpdate: any = {
-                    gold: winner.gold + stealAmount,
-                    bounty: (winner.bounty || 0) + 100,
+                    gold: winner.gold + totalGoldGained,
                     pvpWins: (winner.pvpWins || 0) + 1,
                     combatState: null,
                     hp: playerWon ? playerHp : winner.hp,
                     energy: playerWon ? playerEnergy : winner.energy
                 };
+
+                // Only Pirates increase their bounty through victory
+                if (winner.faction === "Pirate") {
+                    winnerUpdate.bounty = (winner.bounty || 0) + 100;
+                }
+
                 if (playerWon) winnerUpdate.inventory = character.inventory;
                 transaction.update(winnerRef, winnerUpdate);
 
                 // Update Winner's Crew Bounty
-                if (winner.crewId) {
+                if (winner.crewId && winner.faction === "Pirate") {
                     transaction.update(db.collection("crews").doc(winner.crewId), {
                         totalBounty: admin.firestore.FieldValue.increment(100)
                     });
@@ -842,6 +983,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 // Update Loser
                 const loserUpdate: any = {
                     gold: loser.gold - stealAmount,
+                    bounty: 0, // Bounty is collected, reset it
                     pvpLosses: (loser.pvpLosses || 0) + 1,
                     combatState: null,
                     hp: playerWon ? 0 : playerHp, // Ensure loser ends with 0 HP if playerWon, otherwise take attacker's HP
@@ -851,10 +993,10 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 if (!playerWon) loserUpdate.inventory = character.inventory;
                 transaction.update(loserRef, loserUpdate);
 
-                recordLog(transaction, winner.id, "PvPWin", `Defeated ${loser.name}`, stealAmount, 0);
+                recordLog(transaction, winner.id, "PvPWin", `Defeated ${loser.name} and collected ${collectedBounty}B bounty`, totalGoldGained, 0);
                 recordLog(transaction, loser.id, "PvPLoss", `Lost to ${winner.name}`, -stealAmount, 0);
 
-                return { success: true, isFinished: true, playerWon };
+                return { success: true, isFinished: true, playerWon, bountyCollected: collectedBounty };
             } else {
                 // PvE Finish Logic
                 let updatedChar = { ...character, hp: playerHp, energy: playerEnergy, combatState: null };
@@ -966,6 +1108,11 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
 
         if (userId === defenderId) throw new functions.https.HttpsError("invalid-argument", "You cannot attack yourself.");
 
+        // Block list check
+        if (defender.blocked && defender.blocked.includes(userId)) {
+            throw new functions.https.HttpsError("permission-denied", "You have been blocked by this player.");
+        }
+
         if (!defender.isOnline) throw new functions.https.HttpsError("failed-precondition", "Target is currently offline.");
 
         if (attacker.currentLocation !== defender.currentLocation) {
@@ -980,6 +1127,40 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
 
         if (attacker.combatState || attacker.travelState) throw new functions.https.HttpsError("failed-precondition", "You are already busy.");
         if (defender.combatState || defender.travelState) throw new functions.https.HttpsError("failed-precondition", "Target is already busy.");
+
+        // Faction-based attack rules and infamy
+        let infamyGain = 0;
+        let kickFromFaction = false;
+        let changeToPirate = false;
+
+        if (attacker.faction === "Navy") {
+            if (defender.faction === "Neutral") {
+                infamyGain = 10;
+            } else if (defender.faction === "Navy") {
+                throw new functions.https.HttpsError("failed-precondition", "You cannot attack fellow Navy members.");
+            }
+            // Navy vs Pirate is fine
+        } else if (attacker.faction === "Neutral") {
+            if (defender.faction === "Navy") {
+                infamyGain = 10;
+            }
+            // Neutral vs Pirate is fine, Neutral vs Neutral is fine (Pirates can attack anyone)
+        }
+        // Pirate vs anyone is fine
+
+        if (infamyGain > 0) {
+            attacker.infamy = (attacker.infamy || 0) + infamyGain;
+            if (attacker.infamy >= 100) {
+                attacker.infamy = 0;
+                if (attacker.faction === "Navy") {
+                    attacker.faction = "Neutral";
+                    attacker.title = "Dishonored Sailor";
+                } else if (attacker.faction === "Neutral") {
+                    attacker.faction = "Pirate";
+                    attacker.title = "Outlaw";
+                }
+            }
+        }
 
         const attackerCombat = {
             opponentId: defenderId,
@@ -1021,7 +1202,7 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
             turnExpiresAt: Date.now() + TURN_TIMEOUT_MS
         };
 
-        transaction.update(attackerRef, attacker); // Apply processHealing changes
+        transaction.update(attackerRef, attacker); // Apply processHealing, infamy and faction changes
         transaction.update(attackerRef, { combatState: attackerCombat });
         transaction.update(defenderRef, { combatState: defenderCombat });
 
@@ -1038,6 +1219,7 @@ export const startHealing = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         const character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
 
         if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
         if (character.healingState) throw new functions.https.HttpsError("failed-precondition", "You are already resting.");
@@ -1063,6 +1245,7 @@ export const instantHeal = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         const character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
 
         if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
         if (character.gold < 50) throw new functions.https.HttpsError("failed-precondition", "Not enough gold for instant treatment.");
@@ -1103,6 +1286,8 @@ export const completeMission = functions.https.onCall(async (data, context) => {
         if (!missionSnap.exists) throw new functions.https.HttpsError("not-found", "Mission not found.");
 
         let character = playerSnap.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
         character = processHealing(character);
 
         if (character.hp <= 0) {
@@ -1229,6 +1414,8 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) return { success: false };
 
         let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
         character = processHealing(character);
 
         transaction.update(playerRef, {
@@ -1241,8 +1428,9 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
 });
 
 export const seedWorld = functions.https.onCall(async (data, context) => {
-    // Basic admin check (could be refined)
+    // Basic admin check
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    await checkAdmin(context);
 
     const batch = db.batch();
 
@@ -1251,8 +1439,10 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: true, weather: "Foggy", x: 50, y: 20, actions: [{ type: "Market", label: "Blacksmith", icon: "⚒" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 10, y: 15, actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Tortuga Bay", region: "South Blue", description: "A bustling pirate haven filled with taverns and mystery.", isSafe: true, weather: "Tropical", x: 10, y: -100, actions: [{ type: "Tavern", label: "The Salty Dog", icon: "🍻" }, { type: "Market", label: "Bazaar", icon: "💰" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Pirate Doctor", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Pirate\u0027s Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 40, y: -120, actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Navy Outpost", region: "South Blue", description: "A strictly regulated military base maintaining order.", isSafe: true, weather: "Clear", x: -80, y: -50, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Navy Hospital", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Pirate\u0027s Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 350, y: -350, actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Navy Outpost Aqua", region: "South Blue", description: "A strictly regulated military base maintaining order.", isSafe: true, weather: "Clear", x: -80, y: -50, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Navy Hospital", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Navy Outpost Terra", region: "Grand Line", description: "A frontier navy post watching over the Grand Line entrance.", isSafe: true, weather: "Windy", x: -300, y: 200, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Navy Outpost Ignis", region: "Grand Line", description: "A strategic outpost near the volcanic islands.", isSafe: true, weather: "Hot", x: 400, y: 300, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Crystal Cove", region: "Grand Line", description: "An island made of glowing crystals and mysterious energy.", isSafe: false, weather: "Shimmering", x: 120, y: 80, actions: [{ type: "BlackMarket", label: "Crystal Trader", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 200, y: 150, actions: [{ type: "Training", label: "Extreme Training", icon: "🔥" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -150, y: 180, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
@@ -1263,8 +1453,57 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         batch.set(ref, { ...loc, id: loc.name });
     }
 
+    const enemies = [
+        { id: "sea_serpent", name: "Sea Serpent", minLevel: 1, maxLevel: 10, hp: 60, stats: { strength: 8, endurance: 8, agility: 5 }, goldRewardMin: 10, goldRewardMax: 30, xpReward: 20, dropTableId: "basic_sea_loot" },
+        { id: "pirate_scout", name: "Pirate Scout", minLevel: 3, maxLevel: 15, hp: 80, stats: { strength: 10, endurance: 8, agility: 10 }, goldRewardMin: 20, goldRewardMax: 50, xpReward: 35, dropTableId: "basic_sea_loot" },
+        { id: "giant_squid", name: "Giant Squid", minLevel: 10, maxLevel: 25, hp: 200, stats: { strength: 20, endurance: 20, agility: 5 }, goldRewardMin: 100, goldRewardMax: 200, xpReward: 100, dropTableId: "rare_sea_loot" },
+        { id: "ghost_ship", name: "Ghost Pirate", minLevel: 15, maxLevel: 40, hp: 350, stats: { strength: 25, endurance: 25, agility: 15 }, goldRewardMin: 300, goldRewardMax: 600, xpReward: 250, dropTableId: "rare_sea_loot" }
+    ];
+
+    for (const enemy of enemies) {
+        const ref = db.collection("gameData").doc("world").collection("enemies").doc(enemy.id);
+        batch.set(ref, enemy);
+    }
+
+    const items = [
+        { id: "fish_scales", name: "Fish Scales", description: "Shiny scales from a sea creature.", type: "Miscellaneous", rarity: "Common", price: 5 },
+        { id: "sea_shell", name: "Sea Shell", description: "A pretty shell from the ocean floor.", type: "Miscellaneous", rarity: "Common", price: 10 },
+        { id: "rusty_cutlass", name: "Rusty Cutlass", description: "An old, worn-out sword.", type: "Weapon", rarity: "Common", price: 50, levelRequirement: 1, statBonus: { strength: 2 } },
+        { id: "old_boots", name: "Old Boots", description: "Waterlogged but still wearable.", type: "Armor", rarity: "Common", price: 40, levelRequirement: 1, statBonus: { endurance: 2 } },
+        { id: "pearl", name: "Pearl", description: "A rare and valuable gem from a Giant Squid.", type: "Miscellaneous", rarity: "Rare", price: 200 }
+    ];
+
+    for (const item of items) {
+        const ref = db.collection("gameData").doc("items").collection("all").doc(item.id);
+        batch.set(ref, item);
+    }
+
+    const lootTables = [
+        {
+            id: "basic_sea_loot",
+            entries: [
+                { itemId: "fish_scales", chance: 0.6, minAmount: 1, maxAmount: 3 },
+                { itemId: "sea_shell", chance: 0.4, minAmount: 1, maxAmount: 2 },
+                { itemId: "rusty_cutlass", chance: 0.05, minAmount: 1, maxAmount: 1 }
+            ]
+        },
+        {
+            id: "rare_sea_loot",
+            entries: [
+                { itemId: "pearl", chance: 0.2, minAmount: 1, maxAmount: 1 },
+                { itemId: "old_boots", chance: 0.1, minAmount: 1, maxAmount: 1 },
+                { itemId: "fish_scales", chance: 0.5, minAmount: 2, maxAmount: 5 }
+            ]
+        }
+    ];
+
+    for (const table of lootTables) {
+        const ref = db.collection("gameData").doc("world").collection("lootTables").doc(table.id);
+        batch.set(ref, table);
+    }
+
     await batch.commit();
-    return { success: true, count: locations.length };
+    return { success: true, count: locations.length + enemies.length + items.length + lootTables.length };
 });
 
 export const sendMessage = functions.https.onCall(async (data, context) => {
@@ -1276,6 +1515,11 @@ export const sendMessage = functions.https.onCall(async (data, context) => {
     const playerSnap = await db.collection("players").doc(userId).get();
     if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
     const player = playerSnap.data() as any;
+
+    if (player.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+    if (player.mutedUntil && player.mutedUntil > Date.now()) {
+        throw new functions.https.HttpsError("permission-denied", `You are muted until ${new Date(player.mutedUntil).toLocaleString()}. Reason: ${player.muteReason || "None"}`);
+    }
 
     const chatRef = db.collection("chat").doc();
     await chatRef.set({
@@ -1292,9 +1536,21 @@ export const sendMessage = functions.https.onCall(async (data, context) => {
 // --- Admin Tools ---
 
 export async function checkAdmin(context: functions.https.CallableContext) {
-    if (!context.auth?.token.admin) {
-        throw new functions.https.HttpsError("permission-denied", "User is not an admin.");
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    // Check if user has admin claim
+    if (context.auth.token.admin) return;
+
+    // Fallback: Hardcoded check for "Sedna" as the primary admin
+    const userId = context.auth.uid;
+    const playerSnap = await db.collection("players").doc(userId).get();
+    if (playerSnap.exists && (playerSnap.data() as any).nameLower === "sedna") {
+        // Grant admin claim permanently for this user
+        await admin.auth().setCustomUserClaims(userId, { admin: true });
+        return;
     }
+
+    throw new functions.https.HttpsError("permission-denied", "User is not an admin.");
 }
 
 export const adminAdjustGold = functions.https.onCall(async (data, context) => {
@@ -1362,6 +1618,13 @@ export const adminBanPlayer = functions.https.onCall(async (data, context) => {
 
 // --- Social Functions ---
 
+export const explicitLogout = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    const userId = context.auth.uid;
+    await db.collection("players").doc(userId).update({ isOnline: false });
+    return { success: true };
+});
+
 export const sendFriendRequest = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
@@ -1369,6 +1632,14 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
     const senderId = context.auth.uid;
 
     if (senderId === targetId) throw new functions.https.HttpsError("invalid-argument", "Cannot add yourself.");
+
+    const targetSnap = await db.collection("players").doc(targetId).get();
+    if (!targetSnap.exists) throw new functions.https.HttpsError("not-found", "Target player not found.");
+    const target = targetSnap.data() as any;
+
+    if (target.blocked && target.blocked.includes(senderId)) {
+        throw new functions.https.HttpsError("permission-denied", "You have been blocked by this player.");
+    }
 
     const requestRef = db.collection("friendRequests").doc(`${senderId}_${targetId}`);
     const existing = await requestRef.get();
@@ -1541,10 +1812,15 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
         // Validate location has a market
         const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
         const location = locationSnap.data();
-        const hasMarket = location?.actions?.some((a: any) => a.type === "Market" || a.type === "BlackMarket");
+        const marketAction = location?.actions?.find((a: any) => a.type === "Market" || a.type === "BlackMarket");
 
-        if (!hasMarket) {
+        if (!marketAction) {
             throw new functions.https.HttpsError("failed-precondition", "There is no market at your current location.");
+        }
+
+        // shopId validation (simplified for now, but enforces the concept)
+        if (shopId === "BlackMarket" && marketAction.type !== "BlackMarket") {
+             throw new functions.https.HttpsError("failed-precondition", "This item is only available in a Black Market.");
         }
 
         if (character.gold < item.price) {
@@ -1740,6 +2016,63 @@ export const respondToInvite = functions.https.onCall(async (data, context) => {
         transaction.update(inviteRef, { status: "accepted" });
 
         return { success: true, accepted: true };
+    });
+});
+
+export const markMailAsRead = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    const { mailId } = data;
+    const userId = context.auth.uid;
+    await db.collection("players").doc(userId).collection("mail").doc(mailId).update({ isRead: true });
+    return { success: true };
+});
+
+export const deleteMail = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    const { mailId } = data;
+    const userId = context.auth.uid;
+    await db.collection("players").doc(userId).collection("mail").doc(mailId).delete();
+    return { success: true };
+});
+
+export const claimMailRewards = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    const { mailId } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+    const mailRef = playerRef.collection("mail").doc(mailId);
+
+    return db.runTransaction(async (transaction) => {
+        const [playerSnap, mailSnap] = await Promise.all([
+            transaction.get(playerRef),
+            transaction.get(mailRef)
+        ]);
+
+        if (!playerSnap.exists || !mailSnap.exists) throw new functions.https.HttpsError("not-found", "Not found.");
+        const mail = mailSnap.data() as any;
+        if (mail.claimed) throw new functions.https.HttpsError("failed-precondition", "Rewards already claimed.");
+        if (!mail.rewards) throw new functions.https.HttpsError("failed-precondition", "No rewards to claim.");
+
+        const character = playerSnap.data() as any;
+        const rewards = mail.rewards;
+
+        const updates: any = {
+            gold: character.gold + (rewards.gold || 0),
+            xp: character.xp + (rewards.xp || 0),
+        };
+
+        if (rewards.items) {
+             const inventory = character.inventory || [];
+             if (inventory.length + rewards.items.length > INVENTORY_CAPACITY) {
+                  throw new functions.https.HttpsError("resource-exhausted", "Inventory full.");
+             }
+             updates.inventory = [...inventory, ...rewards.items.map((i: any) => ({ ...i, id: `${i.id}_${Date.now()}_${Math.random()}` }))];
+        }
+
+        transaction.update(playerRef, updates);
+        transaction.update(mailRef, { claimed: true, isRead: true });
+
+        return { success: true };
     });
 });
 

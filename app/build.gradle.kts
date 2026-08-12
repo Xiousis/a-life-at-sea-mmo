@@ -3,7 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.gms.google.services)
     alias(libs.plugins.firebase.appdistribution)
-    kotlin("plugin.serialization") version "2.2.10"
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
+    kotlin("plugin.serialization") version "2.0.21"
 }
 
 android {
@@ -16,8 +18,8 @@ android {
         applicationId = "com.alifeatseammo"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -59,6 +61,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
     implementation(libs.firebase.ai)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)

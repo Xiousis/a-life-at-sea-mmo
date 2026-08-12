@@ -8,6 +8,7 @@ import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 import java.util.Date
 
 data class ChatMessage(
@@ -20,7 +21,7 @@ data class ChatMessage(
 
 interface ChatRepository {
     fun getMessages(channelId: String = "global"): Flow<List<ChatMessage>>
-    fun sendMessage(senderName: String, text: String, channelId: String = "global")
+    suspend fun sendMessage(senderName: String, text: String, channelId: String = "global"): Boolean
 }
 
 class FirestoreChatRepository(
@@ -45,11 +46,17 @@ class FirestoreChatRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun sendMessage(senderName: String, text: String, channelId: String) {
-        val data = hashMapOf(
-            "message" to text,
-            "channelId" to channelId
-        )
-        functions.getHttpsCallable("sendMessage").call(data)
+    override suspend fun sendMessage(senderName: String, text: String, channelId: String): Boolean {
+        return try {
+            val data = hashMapOf(
+                "message" to text,
+                "channelId" to channelId
+            )
+            functions.getHttpsCallable("sendMessage").call(data).await()
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("ChatRepository", "Failed to send message", e)
+            throw e
+        }
     }
 }

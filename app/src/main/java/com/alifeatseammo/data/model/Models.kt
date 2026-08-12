@@ -14,6 +14,7 @@ data class Character(
     val xp: Int = 0,
     val level: Int = 1,
     val bounty: Long = 0,
+    val infamy: Int = 0,
     val title: String = "Novice Sailor",
     val pvpWins: Int = 0,
     val pvpLosses: Int = 0,
@@ -30,7 +31,9 @@ data class Character(
     val friends: List<String> = emptyList(),
     val blocked: List<String> = emptyList(),
     val learnedTechniques: List<String> = emptyList(),
+    val professionStats: ProfessionStats = ProfessionStats(),
     val healingState: HealingState? = null,
+    val trainingState: TrainingState? = null,
     val ship: Ship = Ship()
 ) {
     fun getCurrentEnergy(): Int {
@@ -50,6 +53,7 @@ data class CharacterPrivate(
     val maxEnergy: Int = 100,
     val gold: Int = 0,
     val xp: Int = 0,
+    val infamy: Int = 0,
     val energyUpdatedAt: Long = System.currentTimeMillis(),
     val travelState: TravelState? = null,
     val combatState: CombatState? = null,
@@ -58,12 +62,19 @@ data class CharacterPrivate(
     val friends: List<String> = emptyList(),
     val blocked: List<String> = emptyList(),
     val learnedTechniques: List<String> = emptyList(),
+    val professionStats: ProfessionStats = ProfessionStats(),
     val healingState: HealingState? = null,
+    val trainingState: TrainingState? = null,
     val ship: Ship = Ship()
 )
 
 data class HealingState(
     val endTime: Long = 0
+)
+
+data class TrainingState(
+    val endTime: Long = 0,
+    val statType: StatType = StatType.Strength
 )
 
 data class Ship(
@@ -119,12 +130,22 @@ data class Stats(
     val gunslinging: Int = 0,
     val spear: Int = 0,
     val martialArts: Int = 0,
-    val dualBlades: Int = 0
+    val sniper: Int = 0,
+    val mysticArts: Int = 0
+)
+
+data class ProfessionStats(
+    val cooking: Int = 0,
+    val navigating: Int = 0,
+    val treasureHunting: Int = 0,
+    val blacksmith: Int = 0,
+    val fishing: Int = 0
 )
 
 enum class StatType {
     Strength, Endurance, Agility, Perception, Willpower, Luck,
-    Swordsmanship, Brawling, Gunslinging, Spear, MartialArts, DualBlades
+    Swordsmanship, Brawling, Gunslinging, Spear, MartialArts, Sniper, MysticArts,
+    Cooking, Navigating, TreasureHunting, Blacksmith, Fishing
 }
 
 data class Mission(
@@ -234,7 +255,8 @@ data class MailMessage(
 )
 
 enum class ActionType {
-    Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Cave, Fishing, Infirmary
+    Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Cave, Fishing, Infirmary, Work,
+    Kitchen, Forge, Observatory, Expedition
 }
 
 fun Character.checkLevelUp(): Character = this // Handled server-side now

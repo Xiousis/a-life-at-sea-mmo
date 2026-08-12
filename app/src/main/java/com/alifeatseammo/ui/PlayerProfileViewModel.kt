@@ -4,13 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Crew
-import com.alifeatseammo.data.repository.*
+import com.alifeatseammo.data.repository.CrewRepository
+import com.alifeatseammo.data.repository.GameRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import javax.inject.Inject
 
-class PlayerProfileViewModel(
-    private val gameRepository: GameRepository = FirestoreGameRepository(),
-    private val crewRepository: CrewRepository = FirestoreCrewRepository()
+@HiltViewModel
+class PlayerProfileViewModel @Inject constructor(
+    private val gameRepository: GameRepository,
+    private val crewRepository: CrewRepository
 ) : ViewModel() {
 
     private val _playerId = MutableStateFlow<String?>(null)

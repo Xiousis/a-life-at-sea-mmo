@@ -17,12 +17,13 @@ import kotlinx.coroutines.delay
 @Composable
 fun TravelingScreen(
     character: Character,
-    onArrival: () -> Unit
+    onCompleteClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val travelState = character.travelState ?: return
     
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    val isFinished = currentTime >= travelState.arrivalTime
 
     LaunchedEffect(Unit) {
         MusicManager.play(context, R.raw.life_at_sea_menu_sound)
@@ -32,7 +33,7 @@ fun TravelingScreen(
         while (true) {
             currentTime = System.currentTimeMillis()
             if (currentTime >= travelState.arrivalTime) {
-                onArrival()
+                // The ViewModel now handles completion authoritatively
                 break
             }
             delay(1000)
@@ -76,6 +77,16 @@ fun TravelingScreen(
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Medium
         )
+
+        if (isFinished) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = onCompleteClick,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("Complete Voyage")
+            }
+        }
         
         Spacer(modifier = Modifier.height(32.dp))
         

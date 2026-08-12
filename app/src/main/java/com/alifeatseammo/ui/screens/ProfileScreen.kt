@@ -71,6 +71,9 @@ fun ProfileScreen(
             ) {
                 ProfileStatRow("Bounty:", String.format(Locale.getDefault(), "%,d", character.bounty), color = MaterialTheme.colorScheme.error)
                 ProfileStatRow("Faction:", character.faction.name)
+                if (character.infamy > 0) {
+                    ProfileStatRow("Infamy:", "${character.infamy}/100", color = MaterialTheme.colorScheme.error)
+                }
                 ProfileStatRow("Crew:", crew?.name ?: "None")
                 ProfileStatRow("Title:", character.title)
                 

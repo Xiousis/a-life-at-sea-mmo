@@ -5,16 +5,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.StatType
@@ -22,8 +20,9 @@ import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrainingScreen(
+fun ProfessionsScreen(
     character: Character,
+    skillFilter: String = "all",
     onTrainClick: (StatType) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -47,7 +46,7 @@ fun TrainingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Combat Training") },
+                title = { Text(if (skillFilter == "all") "Jobs & Professions" else "$skillFilter Practice") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -62,10 +61,9 @@ fun TrainingScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // Energy Header
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -73,25 +71,22 @@ fun TrainingScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("Current Status", style = MaterialTheme.typography.labelMedium)
+                        Text("Work Status", style = MaterialTheme.typography.labelMedium)
                         Text("⚡ ${character.getCurrentEnergy()} / ${character.maxEnergy}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text("💰 ${character.gold} Gold", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
                     if (isTraining) {
                         Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = if (remainingMs > 0) "Training..." else "Completing...",
-                                style = MaterialTheme.typography.labelSmall
-                            )
+                            Text("Working...", style = MaterialTheme.typography.labelSmall)
                             Text(
                                 text = String.format("%02ds", remainingMs / 1000),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Black,
-                                color = if (remainingMs > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     } else {
-                        Text("🥋", fontSize = 32.sp)
+                        Text("⚓", fontSize = 32.sp)
                     }
                 }
                 if (isTraining) {
@@ -104,56 +99,31 @@ fun TrainingScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
             
-            Text("Select Attribute to Train", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Each session costs 10 Energy + 50 Gold and takes 20s.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            Text("Select a Profession to Practice", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Practicing costs 10 Energy + 50 Gold and takes 20s.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            var selectedTab by remember { mutableStateOf(0) }
-            val tabs = listOf("Attributes", "Combat")
-
-            SecondaryTabRow(selectedTabIndex = selectedTab) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = { Text(title) }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val stats = when (selectedTab) {
-                0 -> listOf(
-                    StatType.Strength to "Physical power and damage.",
-                    StatType.Endurance to "Health and defense.",
-                    StatType.Agility to "Speed and dodge chance.",
-                    StatType.Perception to "Accuracy and critical hits.",
-                    StatType.Willpower to "Energy recovery and resistance.",
-                    StatType.Luck to "Loot find and critical chance."
-                )
-                else -> listOf(
-                    StatType.Swordsmanship to "Mastery of the blade.",
-                    StatType.Brawling to "Unarmed combat skills.",
-                    StatType.Gunslinging to "Pistols and revolvers.",
-                    StatType.Spear to "Polearms and spears.",
-                    StatType.MartialArts to "Advanced fighting techniques.",
-                    StatType.Sniper to "Long-range precision.",
-                    StatType.MysticArts to "Coming soon..."
-                )
+            val professions = listOf(
+                StatType.Cooking to "Prepare meals to restore HP.",
+                StatType.Navigating to "Faster travel times.",
+                StatType.TreasureHunting to "Better loot from chests.",
+                StatType.Blacksmith to "Craft and repair gear.",
+                StatType.Fishing to "Catch fish in the open sea."
+            ).filter { 
+                skillFilter == "all" || it.first.name.equals(skillFilter, ignoreCase = true)
             }
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(stats) { (type, desc) ->
-                    TrainingRow(
+                items(professions) { (type, desc) ->
+                    ProfessionRow(
                         label = type.name,
-                        value = getStatValue(character, type),
+                        value = getProfessionValue(character, type),
                         description = desc,
                         canAfford = character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining,
-                        onTrain = { onTrainClick(type) }
+                        onPractice = { onTrainClick(type) }
                     )
                 }
             }
@@ -161,13 +131,24 @@ fun TrainingScreen(
     }
 }
 
+private fun getProfessionValue(character: Character, type: StatType): Int {
+    return when(type) {
+        StatType.Cooking -> character.professionStats.cooking
+        StatType.Navigating -> character.professionStats.navigating
+        StatType.TreasureHunting -> character.professionStats.treasureHunting
+        StatType.Blacksmith -> character.professionStats.blacksmith
+        StatType.Fishing -> character.professionStats.fishing
+        else -> 0
+    }
+}
+
 @Composable
-fun TrainingRow(
+fun ProfessionRow(
     label: String,
     value: Int,
     description: String,
     canAfford: Boolean,
-    onTrain: () -> Unit
+    onPractice: () -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth()
@@ -178,39 +159,16 @@ fun TrainingRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(text = "Current: $value", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text(text = "Level: $value", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             }
             Button(
-                onClick = onTrain,
+                onClick = onPractice,
                 enabled = canAfford,
                 shape = MaterialTheme.shapes.small
             ) {
-                Text("TRAIN")
+                Text("PRACTICE")
             }
         }
-    }
-}
-
-fun getStatValue(character: Character, type: StatType): Int {
-    return when(type) {
-        StatType.Strength -> character.stats.strength
-        StatType.Endurance -> character.stats.endurance
-        StatType.Agility -> character.stats.agility
-        StatType.Perception -> character.stats.perception
-        StatType.Willpower -> character.stats.willpower
-        StatType.Luck -> character.stats.luck
-        StatType.Swordsmanship -> character.stats.swordsmanship
-        StatType.Brawling -> character.stats.brawling
-        StatType.Gunslinging -> character.stats.gunslinging
-        StatType.Spear -> character.stats.spear
-        StatType.MartialArts -> character.stats.martialArts
-        StatType.Sniper -> character.stats.sniper
-        StatType.MysticArts -> character.stats.mysticArts
-        StatType.Cooking -> character.professionStats.cooking
-        StatType.Navigating -> character.professionStats.navigating
-        StatType.TreasureHunting -> character.professionStats.treasureHunting
-        StatType.Blacksmith -> character.professionStats.blacksmith
-        StatType.Fishing -> character.professionStats.fishing
     }
 }

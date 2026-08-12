@@ -62,63 +62,39 @@ class FirestoreSocialRepository(
     }
 
     override suspend fun sendFriendRequest(targetId: String): Boolean {
-        return try {
-            val data = hashMapOf("targetId" to targetId)
-            functions.getHttpsCallable("sendFriendRequest").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("targetId" to targetId)
+        functions.getHttpsCallable("sendFriendRequest").call(data).await()
+        return true
     }
 
     override suspend fun acceptFriendRequest(senderId: String): Boolean {
-        return try {
-            val data = hashMapOf("senderId" to senderId)
-            functions.getHttpsCallable("acceptFriendRequest").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("senderId" to senderId)
+        functions.getHttpsCallable("acceptFriendRequest").call(data).await()
+        return true
     }
 
     override suspend fun declineFriendRequest(senderId: String): Boolean {
-        return try {
-            val data = hashMapOf("senderId" to senderId)
-            functions.getHttpsCallable("declineFriendRequest").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("senderId" to senderId)
+        functions.getHttpsCallable("declineFriendRequest").call(data).await()
+        return true
     }
 
     override suspend fun removeFriend(friendId: String): Boolean {
-        return try {
-            val data = hashMapOf("friendId" to friendId)
-            functions.getHttpsCallable("removeFriend").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("friendId" to friendId)
+        functions.getHttpsCallable("removeFriend").call(data).await()
+        return true
     }
 
     override suspend fun blockPlayer(targetId: String): Boolean {
-        return try {
-            val data = hashMapOf("targetId" to targetId)
-            functions.getHttpsCallable("blockPlayer").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("targetId" to targetId)
+        functions.getHttpsCallable("blockPlayer").call(data).await()
+        return true
     }
 
     override suspend fun unblockPlayer(targetId: String): Boolean {
-        return try {
-            val data = hashMapOf("targetId" to targetId)
-            functions.getHttpsCallable("unblockPlayer").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("targetId" to targetId)
+        functions.getHttpsCallable("unblockPlayer").call(data).await()
+        return true
     }
 
     override fun getBlockedPlayers(userId: String): Flow<List<String>> = callbackFlow {

@@ -13,6 +13,7 @@ interface GameRepository {
     fun getCharacter(userId: String): Flow<Character?>
     suspend fun createCharacter(userId: String, name: String, gender: Gender, race: Race): Boolean
     suspend fun train(userId: String, statType: StatType): Boolean
+    suspend fun finishTraining(): Boolean
     suspend fun completeMission(userId: String, missionId: String): Boolean
     fun getAvailableMissions(): Flow<List<Mission>>
     suspend fun startTravel(userId: String, destination: String): Boolean
@@ -26,15 +27,21 @@ interface GameRepository {
     suspend fun sellItem(itemId: String): Boolean
     suspend fun useItem(itemId: String): Boolean
     suspend fun joinFaction(userId: String, faction: Faction): Boolean
+    suspend fun heartbeat(): Boolean
+    suspend fun explicitLogout(): Boolean
     suspend fun startHealing(): Boolean
+    suspend fun finishHealing(): Boolean
     suspend fun instantHeal(): Boolean
     fun getPlayersAtLocation(location: String): Flow<List<Character>>
-    fun getTopPlayers(limit: Int): Flow<List<Character>>
+    fun getTopPlayers(limit: Int, faction: Faction? = null): Flow<List<Character>>
     fun getPlayerProfile(playerId: String): Flow<Character?>
     fun getLocations(): Flow<List<LocationDef>>
     fun getEnemyDefs(): Flow<List<EnemyDef>>
     fun getMissionDefs(): Flow<List<Mission>>
     fun getMailMessages(userId: String): Flow<List<MailMessage>>
+    suspend fun markMailAsRead(mailId: String): Boolean
+    suspend fun deleteMail(mailId: String): Boolean
+    suspend fun claimMailRewards(mailId: String): Boolean
     fun getMarketItems(): Flow<List<Item>>
 }
 
@@ -57,12 +64,6 @@ class FirestoreGameRepository(
             if (snapshot?.exists() == true) {
                 val character = snapshot.toObject<Character>()
                 if (character != null) {
-                    // Server-authoritative travel finish check
-                    val travel = character.travelState
-                    if (travel != null && travel.arrivalTime <= System.currentTimeMillis()) {
-                        // Notify server to finalize travel
-                        functions.getHttpsCallable("finishTravel").call()
-                    }
                     trySend(character)
                 } else {
                     trySend(null)
@@ -87,6 +88,11 @@ class FirestoreGameRepository(
     override suspend fun train(userId: String, statType: StatType): Boolean {
         val data = hashMapOf("statType" to statType.name)
         functions.getHttpsCallable("train").call(data).await()
+        return true
+    }
+
+    override suspend fun finishTraining(): Boolean {
+        functions.getHttpsCallable("finishTraining").call().await()
         return true
     }
 
@@ -176,8 +182,23 @@ class FirestoreGameRepository(
         return true
     }
 
+    override suspend fun heartbeat(): Boolean {
+        functions.getHttpsCallable("heartbeat").call().await()
+        return true
+    }
+
+    override suspend fun explicitLogout(): Boolean {
+        functions.getHttpsCallable("explicitLogout").call().await()
+        return true
+    }
+
     override suspend fun startHealing(): Boolean {
         functions.getHttpsCallable("startHealing").call().await()
+        return true
+    }
+
+    override suspend fun finishHealing(): Boolean {
+        functions.getHttpsCallable("finishHealing").call().await()
         return true
     }
 
@@ -198,11 +219,23 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun getTopPlayers(limit: Int): Flow<List<Character>> = callbackFlow {
-        val subscription = db.collection("players")
-            .orderBy("level", Query.Direction.DESCENDING)
-            .orderBy("xp", Query.Direction.DESCENDING)
-            .limit(limit.toLong())
+    override fun getTopPlayers(limit: Int, faction: Faction?): Flow<List<Character>> = callbackFlow {
+        var query: com.google.firebase.firestore.Query = db.collection("players")
+        
+        if (faction != null) {
+            query = query.whereEqualTo("faction", faction.name)
+            if (faction == Faction.Pirate) {
+                query = query.orderBy("bounty", Query.Direction.DESCENDING)
+            } else {
+                query = query.orderBy("level", Query.Direction.DESCENDING)
+                             .orderBy("xp", Query.Direction.DESCENDING)
+            }
+        } else {
+            query = query.orderBy("level", Query.Direction.DESCENDING)
+                         .orderBy("xp", Query.Direction.DESCENDING)
+        }
+
+        val subscription = query.limit(limit.toLong())
             .addSnapshotListener { snapshot, _ ->
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<Character>() })
@@ -251,13 +284,28 @@ class FirestoreGameRepository(
 
     override fun getMailMessages(userId: String): Flow<List<MailMessage>> = callbackFlow {
         val subscription = db.collection("players").document(userId).collection("mail")
-            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, _ ->
                 snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<MailMessage>() })
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<MailMessage>()?.copy(id = doc.id) })
                 }
             }
         awaitClose { subscription.remove() }
+    }
+
+    override suspend fun markMailAsRead(mailId: String): Boolean {
+        functions.getHttpsCallable("markMailAsRead").call(hashMapOf("mailId" to mailId)).await()
+        return true
+    }
+
+    override suspend fun deleteMail(mailId: String): Boolean {
+        functions.getHttpsCallable("deleteMail").call(hashMapOf("mailId" to mailId)).await()
+        return true
+    }
+
+    override suspend fun claimMailRewards(mailId: String): Boolean {
+        functions.getHttpsCallable("claimMailRewards").call(hashMapOf("mailId" to mailId)).await()
+        return true
     }
 
     override fun getMarketItems(): Flow<List<Item>> = callbackFlow {
@@ -292,22 +340,27 @@ class MockGameRepository : GameRepository {
         _character.update { char ->
             char?.let {
                 if (it.energy >= 10) {
-                    val updatedStats = when (statType) {
-                        StatType.Strength -> it.stats.copy(strength = it.stats.strength + 1)
-                        StatType.Endurance -> it.stats.copy(endurance = it.stats.endurance + 1)
-                        StatType.Agility -> it.stats.copy(agility = it.stats.agility + 1)
-                        StatType.Perception -> it.stats.copy(perception = it.stats.perception + 1)
-                        StatType.Willpower -> it.stats.copy(willpower = it.stats.willpower + 1)
-                        StatType.Luck -> it.stats.copy(luck = it.stats.luck + 1)
-                        StatType.Swordsmanship -> it.stats.copy(swordsmanship = it.stats.swordsmanship + 1)
-                        StatType.Brawling -> it.stats.copy(brawling = it.stats.brawling + 1)
-                        StatType.Gunslinging -> it.stats.copy(gunslinging = it.stats.gunslinging + 1)
-                        StatType.Spear -> it.stats.copy(spear = it.stats.spear + 1)
-                        StatType.MartialArts -> it.stats.copy(martialArts = it.stats.martialArts + 1)
-                        StatType.DualBlades -> it.stats.copy(dualBlades = it.stats.dualBlades + 1)
+                    val updatedChar = when (statType) {
+                        StatType.Strength -> it.copy(stats = it.stats.copy(strength = it.stats.strength + 1))
+                        StatType.Endurance -> it.copy(stats = it.stats.copy(endurance = it.stats.endurance + 1))
+                        StatType.Agility -> it.copy(stats = it.stats.copy(agility = it.stats.agility + 1))
+                        StatType.Perception -> it.copy(stats = it.stats.copy(perception = it.stats.perception + 1))
+                        StatType.Willpower -> it.copy(stats = it.stats.copy(willpower = it.stats.willpower + 1))
+                        StatType.Luck -> it.copy(stats = it.stats.copy(luck = it.stats.luck + 1))
+                        StatType.Swordsmanship -> it.copy(stats = it.stats.copy(swordsmanship = it.stats.swordsmanship + 1))
+                        StatType.Brawling -> it.copy(stats = it.stats.copy(brawling = it.stats.brawling + 1))
+                        StatType.Gunslinging -> it.copy(stats = it.stats.copy(gunslinging = it.stats.gunslinging + 1))
+                        StatType.Spear -> it.copy(stats = it.stats.copy(spear = it.stats.spear + 1))
+                        StatType.MartialArts -> it.copy(stats = it.stats.copy(martialArts = it.stats.martialArts + 1))
+                        StatType.Sniper -> it.copy(stats = it.stats.copy(sniper = it.stats.sniper + 1))
+                        StatType.MysticArts -> it.copy(stats = it.stats.copy(mysticArts = it.stats.mysticArts + 1))
+                        StatType.Cooking -> it.copy(professionStats = it.professionStats.copy(cooking = it.professionStats.cooking + 1))
+                        StatType.Navigating -> it.copy(professionStats = it.professionStats.copy(navigating = it.professionStats.navigating + 1))
+                        StatType.TreasureHunting -> it.copy(professionStats = it.professionStats.copy(treasureHunting = it.professionStats.treasureHunting + 1))
+                        StatType.Blacksmith -> it.copy(professionStats = it.professionStats.copy(blacksmith = it.professionStats.blacksmith + 1))
+                        StatType.Fishing -> it.copy(professionStats = it.professionStats.copy(fishing = it.professionStats.fishing + 1))
                     }
-                    it.copy(
-                        stats = updatedStats,
+                    updatedChar.copy(
                         energy = it.energy - 10,
                         xp = it.xp + 5
                     ).checkLevelUp()
@@ -379,11 +432,15 @@ class MockGameRepository : GameRepository {
         return true
     }
     override suspend fun joinFaction(userId: String, faction: Faction): Boolean = true
+    override suspend fun heartbeat(): Boolean = true
+    override suspend fun explicitLogout(): Boolean = true
     override suspend fun startHealing(): Boolean = true
+    override suspend fun finishHealing(): Boolean = true
+    override suspend fun finishTraining(): Boolean = true
     override suspend fun instantHeal(): Boolean = true
 
     override fun getPlayersAtLocation(location: String): Flow<List<Character>> = flowOf(emptyList())
-    override fun getTopPlayers(limit: Int): Flow<List<Character>> = flowOf(emptyList())
+    override fun getTopPlayers(limit: Int, faction: Faction?): Flow<List<Character>> = flowOf(emptyList())
 
     override fun getPlayerProfile(playerId: String): Flow<Character?> = flowOf(
         Character(
@@ -398,9 +455,65 @@ class MockGameRepository : GameRepository {
         )
     )
 
-    override fun getLocations(): Flow<List<LocationDef>> = flowOf(emptyList())
+    override fun getLocations(): Flow<List<LocationDef>> = flowOf(
+        listOf(
+            LocationDef(
+                id = "fogi_tail",
+                name = "Fogi Tail Island",
+                region = "East Blue",
+                description = "A peaceful starting island with a small village.",
+                actions = listOf(
+                    ActionDef(ActionType.Docks, "Docks", "⚓"),
+                    ActionDef(ActionType.Tavern, "Tavern", "🍺"),
+                    ActionDef(ActionType.Kitchen, "Kitchen", "🍳"),
+                    ActionDef(ActionType.Training, "Training", "🥋")
+                ),
+                x = 0, y = 0
+            ),
+            LocationDef(
+                id = "ironcrest",
+                name = "Ironcrest Isle",
+                region = "East Blue",
+                description = "A rocky island known for its rich iron mines and shipyards.",
+                actions = listOf(
+                    ActionDef(ActionType.Docks, "Docks", "⚓"),
+                    ActionDef(ActionType.Shipyard, "Shipyard", "🔨"),
+                    ActionDef(ActionType.Forge, "Forge", "🔥"),
+                    ActionDef(ActionType.Market, "Market", "💰")
+                ),
+                x = 200, y = -100
+            ),
+            LocationDef(
+                id = "amber_reach",
+                name = "Amber Reach",
+                region = "East Blue",
+                description = "A dense forest island with ancient ruins hidden within.",
+                actions = listOf(
+                    ActionDef(ActionType.Docks, "Docks", "⚓"),
+                    ActionDef(ActionType.Expedition, "Expedition", "🗺️"),
+                    ActionDef(ActionType.Work, "Work", "⚓")
+                ),
+                x = -150, y = 300
+            ),
+            LocationDef(
+                id = "starry_peak",
+                name = "Starry Peak",
+                region = "East Blue",
+                description = "A high mountain peak with a clear view of the stars.",
+                actions = listOf(
+                    ActionDef(ActionType.Docks, "Docks", "⚓"),
+                    ActionDef(ActionType.Observatory, "Observatory", "🔭"),
+                    ActionDef(ActionType.Training, "Training", "🥋")
+                ),
+                x = 400, y = 400
+            )
+        )
+    )
     override fun getEnemyDefs(): Flow<List<EnemyDef>> = flowOf(emptyList())
     override fun getMissionDefs(): Flow<List<Mission>> = flowOf(emptyList())
     override fun getMailMessages(userId: String): Flow<List<MailMessage>> = flowOf(emptyList())
+    override suspend fun markMailAsRead(mailId: String): Boolean = true
+    override suspend fun deleteMail(mailId: String): Boolean = true
+    override suspend fun claimMailRewards(mailId: String): Boolean = true
     override fun getMarketItems(): Flow<List<Item>> = flowOf(emptyList())
 }

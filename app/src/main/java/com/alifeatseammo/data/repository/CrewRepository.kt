@@ -37,65 +37,41 @@ class FirestoreCrewRepository(
     }
 
     override suspend fun createCrew(name: String, description: String): Boolean {
-        return try {
-            val data = hashMapOf(
-                "name" to name,
-                "description" to description
-            )
-            functions.getHttpsCallable("createCrew").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf(
+            "name" to name,
+            "description" to description
+        )
+        functions.getHttpsCallable("createCrew").call(data).await()
+        return true
     }
 
     override suspend fun joinCrew(crewId: String): Boolean {
-        return try {
-            val data = hashMapOf("crewId" to crewId)
-            functions.getHttpsCallable("joinCrew").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("crewId" to crewId)
+        functions.getHttpsCallable("joinCrew").call(data).await()
+        return true
     }
 
     override suspend fun leaveCrew(): Boolean {
-        return try {
-            functions.getHttpsCallable("leaveCrew").call().await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        functions.getHttpsCallable("leaveCrew").call().await()
+        return true
     }
 
     override suspend fun inviteToCrew(targetId: String): Boolean {
-        return try {
-            val data = hashMapOf("targetId" to targetId)
-            functions.getHttpsCallable("inviteToCrew").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("targetId" to targetId)
+        functions.getHttpsCallable("inviteToCrew").call(data).await()
+        return true
     }
 
     override suspend fun respondToInvite(crewId: String, accept: Boolean): Boolean {
-        return try {
-            val data = hashMapOf("crewId" to crewId, "accept" to accept)
-            functions.getHttpsCallable("respondToInvite").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("crewId" to crewId, "accept" to accept)
+        functions.getHttpsCallable("respondToInvite").call(data).await()
+        return true
     }
 
     override suspend fun promoteMember(targetId: String, rank: String): Boolean {
-        return try {
-            val data = hashMapOf("targetId" to targetId, "rank" to rank)
-            functions.getHttpsCallable("promoteMember").call(data).await()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        val data = hashMapOf("targetId" to targetId, "rank" to rank)
+        functions.getHttpsCallable("promoteMember").call(data).await()
+        return true
     }
 
     override fun getInvitesForUser(userId: String): Flow<List<CrewInvite>> = callbackFlow {

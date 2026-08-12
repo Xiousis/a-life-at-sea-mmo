@@ -33,6 +33,7 @@ fun DashboardScreen(
     playersNearby: List<Character>,
     playerCount: Int,
     missionCount: Int,
+    mailCount: Int,
     onActionClick: (ActionType) -> Unit,
     onPlayerClick: (Character) -> Unit,
     onMissionsClick: () -> Unit,
@@ -62,7 +63,7 @@ fun DashboardScreen(
                 fontWeight = FontWeight.Bold
             )
             Row {
-                BadgedBox(badge = { Badge { Text("2") } }) {
+                BadgedBox(badge = { if (mailCount > 0) Badge { Text("$mailCount") } }) {
                     IconButton(onClick = onMailClick) {
                         Text("✉", fontSize = 20.sp)
                     }
@@ -97,6 +98,13 @@ fun DashboardScreen(
                     text = "💰 ${character.gold} Gold",
                     style = MaterialTheme.typography.bodyMedium
                 )
+                if (character.infamy > 0) {
+                    Text(
+                        text = "⚖ Infamy: ${character.infamy}/100",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -113,9 +121,9 @@ fun DashboardScreen(
 
         // Faction Recruitment
         if (character.faction == Faction.Neutral && location != null) {
-            val recruitment = when (location.name) {
-                "Navy Outpost" -> Faction.Navy
-                "Pirate\u0027s Den" -> Faction.Pirate
+            val recruitment = when {
+                location.name.startsWith("Navy Outpost") -> Faction.Navy
+                location.name == "Pirate\u0027s Den" -> Faction.Pirate
                 else -> null
             }
 

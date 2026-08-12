@@ -63,8 +63,8 @@ fun MapScreen(
                                 val canvasHeight = size.height
                                 
                                 locations.forEach { loc ->
-                                    val x = (loc.x + 200) * (canvasWidth / 400f)
-                                    val y = (loc.y + 200) * (canvasHeight / 400f)
+                                    val x = (loc.x + 500) * (canvasWidth / 1000f)
+                                    val y = (loc.y + 500) * (canvasHeight / 1000f)
                                     val locOffset = Offset(x, y)
                                     
                                     if ((offset - locOffset).getDistance() < 40f) {
@@ -86,8 +86,8 @@ fun MapScreen(
 
                     // Draw Locations
                     locations.forEach { loc ->
-                        val x = (loc.x + 200) * (size.width / 400f)
-                        val y = (loc.y + 200) * (size.height / 400f)
+                        val x = (loc.x + 500) * (size.width / 1000f)
+                        val y = (loc.y + 500) * (size.height / 1000f)
                         
                         val isCurrent = loc.name == character.currentLocation
                         
