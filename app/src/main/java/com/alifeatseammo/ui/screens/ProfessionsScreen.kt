@@ -9,14 +9,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.StatType
-import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,11 +23,6 @@ fun ProfessionsScreen(
     onTrainClick: (StatType) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
-    }
-
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(character.trainingState) {
         while (character.trainingState != null) {
@@ -138,6 +130,7 @@ private fun getProfessionValue(character: Character, type: StatType): Int {
         StatType.TreasureHunting -> character.professionStats.treasureHunting
         StatType.Blacksmith -> character.professionStats.blacksmith
         StatType.Fishing -> character.professionStats.fishing
+        StatType.Medical -> character.professionStats.medical
         else -> 0
     }
 }

@@ -44,6 +44,16 @@ class CombatViewModel @Inject constructor(
         }
     }
 
+    fun startMonsterHunt() {
+        viewModelScope.launch {
+            try {
+                gameRepository.startMonsterHunt()
+            } catch (e: Exception) {
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
     fun clearErrorMessage() {
         _errorMessage.value = null
     }

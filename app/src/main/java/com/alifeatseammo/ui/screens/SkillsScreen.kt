@@ -80,6 +80,7 @@ fun SkillsScreen(
                         AttributeRow("Treasure Hunting", character.professionStats.treasureHunting)
                         AttributeRow("Blacksmith", character.professionStats.blacksmith)
                         AttributeRow("Fishing", character.professionStats.fishing)
+                        AttributeRow("Medical", character.professionStats.medical)
                     }
                 }
             }

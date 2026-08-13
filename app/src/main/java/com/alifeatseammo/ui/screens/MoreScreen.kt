@@ -21,7 +21,6 @@ fun MoreScreen(
         MoreMenuItem("Character", "👤"),
         MoreMenuItem("Inventory", "📦"),
         MoreMenuItem("Skills", "📜"),
-        MoreMenuItem("Professions", "⚓"),
         MoreMenuItem("Leaderboard", "🏆"),
         MoreMenuItem("Chat", "💬"),
         MoreMenuItem("Mail", "✉"),

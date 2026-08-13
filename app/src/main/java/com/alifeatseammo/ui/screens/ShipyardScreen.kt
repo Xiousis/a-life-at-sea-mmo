@@ -7,15 +7,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Ship
-import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,11 +21,6 @@ fun ShipyardScreen(
     onBuyShip: (Ship) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(

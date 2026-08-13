@@ -14,11 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
-import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.StatType
-import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,11 +24,6 @@ fun TrainingScreen(
     onTrainClick: (StatType) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
-    }
-
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(character.trainingState) {
         while (character.trainingState != null) {
@@ -47,7 +39,7 @@ fun TrainingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Combat Training") },
+                title = { Text("Training & Professions") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -133,15 +125,30 @@ fun TrainingScreen(
                     StatType.Willpower to "Energy recovery and resistance.",
                     StatType.Luck to "Loot find and critical chance."
                 )
-                else -> listOf(
-                    StatType.Swordsmanship to "Mastery of the blade.",
-                    StatType.Brawling to "Unarmed combat skills.",
-                    StatType.Gunslinging to "Pistols and revolvers.",
-                    StatType.Spear to "Polearms and spears.",
-                    StatType.MartialArts to "Advanced fighting techniques.",
-                    StatType.Sniper to "Long-range precision.",
-                    StatType.MysticArts to "Coming soon..."
-                )
+                else -> {
+                    val combatSkills = mutableListOf<Pair<StatType, String>>()
+                    val loc = character.currentLocation
+                    
+                    val townsWithDojo = setOf(
+                        "Fogi Tail Island",
+                        "Ironcrest Isle",
+                        "Tortuga Bay",
+                        "Navy Outpost Aqua",
+                        "Navy Outpost Terra",
+                        "Navy Outpost Ignis"
+                    )
+
+                    if (townsWithDojo.contains(loc)) {
+                        combatSkills.add(StatType.Swordsmanship to "Mastery of the blade.")
+                        combatSkills.add(StatType.Brawling to "Unarmed combat skills.")
+                        combatSkills.add(StatType.Gunslinging to "Pistols and revolvers.")
+                        combatSkills.add(StatType.Spear to "Polearms and spears.")
+                        combatSkills.add(StatType.MartialArts to "Advanced fighting techniques.")
+                        combatSkills.add(StatType.Sniper to "Long-range precision.")
+                    }
+                    
+                    combatSkills
+                }
             }
 
             LazyColumn(
@@ -212,5 +219,6 @@ fun getStatValue(character: Character, type: StatType): Int {
         StatType.TreasureHunting -> character.professionStats.treasureHunting
         StatType.Blacksmith -> character.professionStats.blacksmith
         StatType.Fishing -> character.professionStats.fishing
+        StatType.Medical -> character.professionStats.medical
     }
 }

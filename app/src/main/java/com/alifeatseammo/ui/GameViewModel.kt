@@ -233,6 +233,26 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun purchaseMedicalLicense() {
+        viewModelScope.launch {
+            try {
+                gameRepository.purchaseMedicalLicense()
+            } catch (e: Exception) {
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
+    fun healPlayer(targetPlayerId: String) {
+        viewModelScope.launch {
+            try {
+                gameRepository.healPlayer(targetPlayerId)
+            } catch (e: Exception) {
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
     fun finishTravel() {
         viewModelScope.launch {
             try {

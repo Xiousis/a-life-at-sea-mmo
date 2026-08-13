@@ -32,7 +32,8 @@ const STAT_MAPPING: Record<string, string> = {
     "Navigating": "navigating",
     "TreasureHunting": "treasureHunting",
     "Blacksmith": "blacksmith",
-    "Fishing": "fishing"
+    "Fishing": "fishing",
+    "Medical": "medical"
 };
 
 const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = {
@@ -48,6 +49,9 @@ const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = 
     "Crystal Cove": { x: 120, y: 80, region: "Grand Line" },
     "Volcano Peak": { x: 200, y: 150, region: "Grand Line" },
     "Whispering Woods": { x: -150, y: 180, region: "Grand Line" },
+    "Serpent\u0027s Maw": { x: 500, y: 500, region: "Grand Line" },
+    "Kraken\u0027s Rest": { x: -400, y: -400, region: "South Blue" },
+    "Shadow Fen": { x: -300, y: -100, region: "East Blue" },
 };
 
 function calculateTravelTime(from: string, to: string, speedMultiplier: number = 1.0): number {
@@ -55,13 +59,14 @@ function calculateTravelTime(from: string, to: string, speedMultiplier: number =
     const end = LOCATION_DATA[to] || { x: 0, y: 0, region: "Unknown" };
 
     const dist = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
-    let baseTime = dist * 2000; // 1 unit = 2 seconds
+    let baseTime = dist * 300; // 1 unit = 0.3 seconds
 
     if (start.region !== end.region) {
-        baseTime += 60000; // Extra minute for inter-region travel
+        baseTime += 30000; // Extra 30 seconds for inter-region travel
     }
 
-    return Math.max(10000, Math.floor(baseTime / speedMultiplier)); // Min 10 seconds
+    const calculatedTime = Math.floor(baseTime / speedMultiplier);
+    return Math.min(300000, Math.max(10000, calculatedTime)); // Cap at 5 mins, min 10s
 }
 
 // --- Helper Functions ---
@@ -95,10 +100,16 @@ export function calculateCurrentEnergy(character: any): { energy: number, energy
 
 function checkLevelUp(character: any) {
     let { level, xp, stats, maxEnergy, energy, maxHp, hp } = character;
-    let xpNeeded = level * 100;
+    const MAX_LEVEL = 300;
+
+    if (level >= MAX_LEVEL) {
+        return { ...character, level: MAX_LEVEL, xp: 0, leveledUp: false };
+    }
+
+    let xpNeeded = level * level * 100;
 
     let leveledUp = false;
-    while (xp >= xpNeeded) {
+    while (xp >= xpNeeded && level < MAX_LEVEL) {
         level++;
         xp -= xpNeeded;
         maxEnergy += 100;
@@ -113,7 +124,11 @@ function checkLevelUp(character: any) {
         stats.willpower += 1;
         stats.luck += 1;
 
-        xpNeeded = level * 100;
+        if (level < MAX_LEVEL) {
+            xpNeeded = level * level * 100;
+        } else {
+            xp = 0; // Cap XP at level 300
+        }
         leveledUp = true;
     }
 
@@ -294,6 +309,10 @@ export const train = functions.https.onCall(async (data, context) => {
 
         if (character.trainingState) {
              throw new functions.https.HttpsError("failed-precondition", "You are already training.");
+        }
+
+        if (statType === "Medical") {
+            throw new functions.https.HttpsError("failed-precondition", "Medical skill can only be trained by healing patients in an infirmary.");
         }
 
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
@@ -1034,8 +1053,24 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 } else {
                     const goldLost = Math.floor(updatedChar.gold * 0.1);
                     updatedChar.gold -= goldLost;
-                    updatedChar.currentLocation = "Fogi Tail Island";
-                    updatedChar.hp = 0; // Set to 0 HP on defeat
+
+                    // Death Penalty / Respawn Logic
+                    const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(updatedChar.currentLocation));
+                    const location = locationSnap.data();
+                    const hasCamp = location?.actions?.some((a: any) => a.type === "Camp");
+                    const hasInfirmary = location?.actions?.some((a: any) => a.type === "Infirmary");
+
+                    if (hasCamp && !hasInfirmary) {
+                        // Monster Island defeat: stay at location, start 2-min healing timer
+                        updatedChar.hp = 0;
+                        updatedChar.healingState = { endTime: Date.now() + HEALING_DURATION_MS };
+                    } else {
+                        // Normal defeat: respawn at home
+                        updatedChar.currentLocation = "Fogi Tail Island";
+                        updatedChar.hp = 0;
+                        updatedChar.healingState = null;
+                    }
+
                     updatedChar.energy = character.maxEnergy;
                     recordLog(transaction, userId, "CombatLoss", `Defeated by ${enemy.name}`, -goldLost, 0);
                 }
@@ -1266,6 +1301,127 @@ export const instantHeal = functions.https.onCall(async (data, context) => {
     });
 });
 
+export const purchaseMedicalLicense = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+        const character = snapshot.data() as any;
+
+        if (character.hasMedicalLicense) throw new functions.https.HttpsError("already-exists", "You already have a medical license.");
+        if (character.gold < 15000) throw new functions.https.HttpsError("failed-precondition", "Not enough gold (15,000 required).");
+
+        transaction.update(playerRef, {
+            gold: admin.firestore.FieldValue.increment(-15000),
+            hasMedicalLicense: true
+        });
+        recordLog(transaction, userId, "PurchaseMedicalLicense", "Obtained a medical license", -15000, 0);
+        return { success: true };
+    });
+});
+
+export const healPlayer = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    const { targetPlayerId } = data;
+    const userId = context.auth.uid;
+    const healerRef = db.collection("players").doc(userId);
+    const targetRef = db.collection("players").doc(targetPlayerId);
+
+    return db.runTransaction(async (transaction) => {
+        const [healerSnap, targetSnap] = await Promise.all([
+            transaction.get(healerRef),
+            transaction.get(targetRef)
+        ]);
+
+        if (!healerSnap.exists || !targetSnap.exists) throw new functions.https.HttpsError("not-found", "Player not found.");
+        const healer = healerSnap.data() as any;
+        const target = targetSnap.data() as any;
+
+        if (!healer.hasMedicalLicense) throw new functions.https.HttpsError("failed-precondition", "You do not have a medical license.");
+        if (healer.currentLocation !== target.currentLocation) throw new functions.https.HttpsError("failed-precondition", "Target is not at your location.");
+        if (!target.healingState) throw new functions.https.HttpsError("failed-precondition", "Target is not currently resting in the hospital.");
+        if (target.hp >= target.maxHp) throw new functions.https.HttpsError("failed-precondition", "Target is already at full health.");
+
+        const medicalSkill = healer.professionStats?.medical || 0;
+        const healAmount = 10 + (medicalSkill * 2);
+        const newHp = Math.min(target.maxHp, target.hp + healAmount);
+
+        const targetUpdate: any = { hp: newHp };
+        if (newHp >= target.maxHp) {
+            targetUpdate.healingState = null;
+        }
+
+        const healerUpdate: any = {
+            xp: admin.firestore.FieldValue.increment(10),
+            "professionStats.medical": admin.firestore.FieldValue.increment(1)
+        };
+
+        transaction.update(targetRef, targetUpdate);
+        transaction.update(healerRef, healerUpdate);
+
+        recordLog(transaction, userId, "HealPlayer", `Healed ${target.name} for ${healAmount} HP`, 0, 10);
+        return { success: true, healedAmount: healAmount, fullyHealed: newHp >= target.maxHp };
+    });
+});
+
+export const startMonsterHunt = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        character = processHealing(character);
+
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to hunt monsters. Visit a camp.");
+        }
+
+        if (character.travelState || character.combatState || character.trainingState || character.healingState) {
+            throw new functions.https.HttpsError("failed-precondition", "Player is already busy.");
+        }
+
+        const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
+        const location = locationSnap.data();
+        if (location?.isSafe) {
+            throw new functions.https.HttpsError("failed-precondition", "There are no monsters to hunt in safe zones.");
+        }
+
+        const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
+        if (energy < 5) throw new functions.https.HttpsError("failed-precondition", "Not enough energy (5 required).");
+
+        const enemy = generateEnemy(character.level);
+
+        transaction.update(playerRef, {
+            energy: energy - 5,
+            energyUpdatedAt,
+            combatState: {
+                enemy: enemy,
+                playerTurn: true,
+                logs: [`You went out searching and found a ${enemy.name}!`],
+                isFinished: false,
+                playerWon: false,
+                turnCount: 0,
+                playerEffects: [],
+                enemyEffects: [],
+                cooldowns: {}
+            }
+        });
+
+        recordLog(transaction, userId, "StartMonsterHunt", `Hunting a level ${enemy.level} ${enemy.name}`, 0, 0);
+        return { success: true, enemy };
+    });
+});
+
 // --- Existing Functions ---
 
 export const completeMission = functions.https.onCall(async (data, context) => {
@@ -1435,17 +1591,20 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
     const batch = db.batch();
 
     const locations = [
-        { name: "Fogi Tail Island", region: "East Blue", description: "A peaceful starting island with clear blue waters.", isSafe: true, weather: "Sunny", x: 0, y: 0, actions: [{ type: "Training", label: "Dojo", icon: "🥋" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Medical Clinic", icon: "🏥" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: true, weather: "Foggy", x: 50, y: 20, actions: [{ type: "Market", label: "Blacksmith", icon: "⚒" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 10, y: 15, actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Tortuga Bay", region: "South Blue", description: "A bustling pirate haven filled with taverns and mystery.", isSafe: true, weather: "Tropical", x: 10, y: -100, actions: [{ type: "Tavern", label: "The Salty Dog", icon: "🍻" }, { type: "Market", label: "Bazaar", icon: "💰" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Pirate Doctor", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Pirate\u0027s Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 350, y: -350, actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Fogi Tail Island", region: "East Blue", description: "A peaceful starting island with clear blue waters.", isSafe: true, weather: "Sunny", x: 0, y: 0, actions: [{ type: "Training", label: "Dojo", icon: "🥋" }, { type: "Kitchen", label: "Galley", icon: "🍳" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Medical Clinic", icon: "🏥" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: true, weather: "Foggy", x: 50, y: 20, actions: [{ type: "Forge", label: "Grand Forge", icon: "⚒" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 10, y: 15, actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Shadow Fen", region: "East Blue", description: "A murky swamp island filled with dangerous creatures.", isSafe: false, weather: "Overcast", x: -300, y: -100, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Tortuga Bay", region: "South Blue", description: "A bustling pirate haven filled with taverns and mystery.", isSafe: true, weather: "Tropical", x: 10, y: -100, actions: [{ type: "Tavern", label: "The Salty Dog", icon: "🍻" }, { type: "Market", label: "Bazaar", icon: "💰" }, { type: "Expedition", label: "Treasure Hunt", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Pirate Doctor", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Pirate\u0027s Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 350, y: -350, actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Kraken\u0027s Rest", region: "South Blue", description: "A desolate island graveyard of sunken ships and sea monsters.", isSafe: false, weather: "Stormy", x: -400, y: -400, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Navy Outpost Aqua", region: "South Blue", description: "A strictly regulated military base maintaining order.", isSafe: true, weather: "Clear", x: -80, y: -50, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Navy Hospital", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Navy Outpost Terra", region: "Grand Line", description: "A frontier navy post watching over the Grand Line entrance.", isSafe: true, weather: "Windy", x: -300, y: 200, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Navy Outpost Ignis", region: "Grand Line", description: "A strategic outpost near the volcanic islands.", isSafe: true, weather: "Hot", x: 400, y: 300, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Crystal Cove", region: "Grand Line", description: "An island made of glowing crystals and mysterious energy.", isSafe: false, weather: "Shimmering", x: 120, y: 80, actions: [{ type: "BlackMarket", label: "Crystal Trader", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 200, y: 150, actions: [{ type: "Training", label: "Extreme Training", icon: "🔥" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -150, y: 180, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
+        { name: "Crystal Cove", region: "Grand Line", description: "An island made of glowing crystals and mysterious energy.", isSafe: false, weather: "Shimmering", x: 120, y: 80, actions: [{ type: "BlackMarket", label: "Crystal Trader", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 200, y: 150, actions: [{ type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -150, y: 180, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Observatory", label: "Star Gazing", icon: "🔭" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Serpent\u0027s Maw", region: "Grand Line", description: "A terrifying island shaped like a giant serpent\u0027s head.", isSafe: false, weather: "Foggy", x: 500, y: 500, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
     ];
 
     for (const loc of locations) {

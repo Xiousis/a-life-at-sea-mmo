@@ -21,15 +21,10 @@ fun TravelingScreen(
     character: Character,
     onCompleteClick: () -> Unit = {}
 ) {
-    val context = LocalContext.current
     val travelState = character.travelState ?: return
     
     var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val isFinished = currentTime >= travelState.arrivalTime
-
-    LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_traveling_music)
-    }
 
     LaunchedEffect(travelState.arrivalTime) {
         while (true) {

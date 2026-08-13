@@ -1,6 +1,8 @@
 package com.alifeatseammo.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -11,37 +13,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
-import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Character
-import com.alifeatseammo.util.MusicManager
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InfirmaryScreen(
     character: Character,
+    playersAtLocation: List<Character>,
     onStartRest: () -> Unit,
     onInstantHeal: () -> Unit,
+    onPurchaseLicense: () -> Unit,
+    onHealPlayer: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
-    }
-
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
     
-    LaunchedEffect(character.healingState) {
-        while (character.healingState != null) {
-            currentTime = System.currentTimeMillis()
-            delay(1000)
-        }
-    }
-
     val healingEndTime = character.healingState?.endTime ?: 0
     val remainingMs = (healingEndTime - currentTime).coerceAtLeast(0)
     val isHealing = character.healingState != null
+
+    LaunchedEffect(character.healingState) {
+        if (isHealing) {
+            while (true) {
+                currentTime = System.currentTimeMillis()
+                delay(1000)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -59,12 +58,11 @@ fun InfirmaryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = "🏥", fontSize = 64.sp)
-            Spacer(modifier = Modifier.height(24.dp))
+            Text(text = "🏥", fontSize = 48.sp)
+            Spacer(modifier = Modifier.height(16.dp))
             
             Text(
                 text = if (character.hp <= 0) "You are critically injured!" else "Welcome to the infirmary.",
@@ -80,7 +78,7 @@ fun InfirmaryScreen(
                 style = MaterialTheme.typography.bodyLarge
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             if (isHealing) {
                 Text(text = "Resting...", style = MaterialTheme.typography.titleMedium)
@@ -94,36 +92,110 @@ fun InfirmaryScreen(
                     modifier = Modifier.fillMaxWidth().height(8.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Please wait while the doctor treats your wounds.",
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodySmall
-                )
             } else {
-                Button(
-                    onClick = onStartRest,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = character.hp < character.maxHp
-                ) {
-                    Text("FREE REST (2 MINS)")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onStartRest,
+                        modifier = Modifier.weight(1f),
+                        enabled = character.hp < character.maxHp
+                    ) {
+                        Text("REST")
+                    }
+                    
+                    OutlinedButton(
+                        onClick = onInstantHeal,
+                        modifier = Modifier.weight(1f),
+                        enabled = character.hp < character.maxHp && character.gold >= 50
+                    ) {
+                        Text("HEAL (50G)")
+                    }
                 }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                OutlinedButton(
-                    onClick = onInstantHeal,
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 24.dp))
+
+            Text(
+                text = "Medical Profession",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Start
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (!character.hasMedicalLicense) {
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = character.hp < character.maxHp && character.gold >= 50
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
                 ) {
-                    Text("QUICK TREATMENT (50 GOLD)")
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Become a Doctor",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Obtain a medical license to heal other players and earn experience.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = onPurchaseLicense,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = character.gold >= 15000
+                        ) {
+                            Text("BUY LICENSE (15,000 GOLD)")
+                        }
+                    }
                 }
+            } else {
+                Text(
+                    text = "Medical Skill: Level ${character.professionStats.medical}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
                 
-                if (character.gold < 50 && character.hp < character.maxHp) {
-                    Text(
-                        text = "Not enough gold for quick treatment.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Patients in Hospital:",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+
+                val injuredPlayers = playersAtLocation.filter { it.id != character.id && it.healingState != null }
+                
+                if (injuredPlayers.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No patients currently waiting.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(injuredPlayers.size) { index ->
+                            val p = injuredPlayers[index]
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = p.name, fontWeight = FontWeight.Bold)
+                                        Text(text = "HP: ${p.hp}/${p.maxHp}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Button(onClick = { onHealPlayer(p.id) }) {
+                                        Text("HEAL")
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

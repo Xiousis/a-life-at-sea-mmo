@@ -19,10 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
-import com.alifeatseammo.data.model.ActionType
-import com.alifeatseammo.data.model.Character
-import com.alifeatseammo.data.model.Faction
-import com.alifeatseammo.data.model.LocationDef
+import com.alifeatseammo.data.model.*
 import com.alifeatseammo.R
 import com.alifeatseammo.util.MusicManager
 
@@ -40,11 +37,6 @@ fun DashboardScreen(
     onMailClick: () -> Unit,
     onJoinFaction: (Faction) -> Unit
 ) {
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -112,8 +104,12 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 StatusBar("Energy", character.getCurrentEnergy(), character.maxEnergy, Color(0xFF64B5F6))
                 Spacer(modifier = Modifier.height(8.dp))
-                val xpNeeded = character.level * 100
-                StatusBar("XP", character.xp, xpNeeded, Color(0xFF81C784))
+                if (character.level < 300) {
+                    val xpNeeded = character.getXpNeeded()
+                    StatusBar("XP", character.xp, xpNeeded, Color(0xFF81C784))
+                } else {
+                    StatusBar("XP", 1, 1, Color(0xFF81C784), labelOverride = "MAX")
+                }
             }
         }
 
@@ -143,10 +139,11 @@ fun DashboardScreen(
                         )
                         Text(
                             text = if (faction == Faction.Pirate) 
-                                "Leave your civilian life behind and embrace freedom." 
-                                else "Protect these waters and maintain order.",
+                                "• Build Bounty\n• Form a Crew\n• Raid islands\n• Attack Marines\n• Become a Yonko-like sea emperor" 
+                                else "• Gain Rank\n• Hunt wanted Pirates\n• Join Marine divisions\n• Capture criminals\n• Become Fleet Admiral",
                             style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Start,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(onClick = { onJoinFaction(faction) }) {
@@ -295,7 +292,7 @@ fun DashboardScreen(
 }
 
 @Composable
-fun StatusBar(label: String, current: Int, max: Int, color: Color) {
+fun StatusBar(label: String, current: Int, max: Int, color: Color, labelOverride: String? = null) {
     val progress = (current.toFloat() / max.toFloat()).coerceIn(0f, 1f)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -319,7 +316,7 @@ fun StatusBar(label: String, current: Int, max: Int, color: Color) {
         }
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "$current/$max",
+            text = labelOverride ?: "$current/$max",
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.width(60.dp),
             textAlign = TextAlign.End

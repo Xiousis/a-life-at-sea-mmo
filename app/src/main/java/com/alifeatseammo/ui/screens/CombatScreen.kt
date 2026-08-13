@@ -16,21 +16,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
-import com.alifeatseammo.R
 import com.alifeatseammo.data.model.*
-import com.alifeatseammo.util.MusicManager
 
 @Composable
 fun CombatScreen(
     character: Character,
     onActionClick: (CombatAction, String?, String?) -> Unit
 ) {
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
-    }
-
     val combatState = character.combatState ?: return
     val enemy = combatState.enemy
     val listState = rememberLazyListState()

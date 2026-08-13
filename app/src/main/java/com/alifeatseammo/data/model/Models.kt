@@ -32,6 +32,7 @@ data class Character(
     val blocked: List<String> = emptyList(),
     val learnedTechniques: List<String> = emptyList(),
     val professionStats: ProfessionStats = ProfessionStats(),
+    val hasMedicalLicense: Boolean = false,
     val healingState: HealingState? = null,
     val trainingState: TrainingState? = null,
     val ship: Ship = Ship()
@@ -63,6 +64,7 @@ data class CharacterPrivate(
     val blocked: List<String> = emptyList(),
     val learnedTechniques: List<String> = emptyList(),
     val professionStats: ProfessionStats = ProfessionStats(),
+    val hasMedicalLicense: Boolean = false,
     val healingState: HealingState? = null,
     val trainingState: TrainingState? = null,
     val ship: Ship = Ship()
@@ -139,13 +141,14 @@ data class ProfessionStats(
     val navigating: Int = 0,
     val treasureHunting: Int = 0,
     val blacksmith: Int = 0,
-    val fishing: Int = 0
+    val fishing: Int = 0,
+    val medical: Int = 0
 )
 
 enum class StatType {
     Strength, Endurance, Agility, Perception, Willpower, Luck,
     Swordsmanship, Brawling, Gunslinging, Spear, MartialArts, Sniper, MysticArts,
-    Cooking, Navigating, TreasureHunting, Blacksmith, Fishing
+    Cooking, Navigating, TreasureHunting, Blacksmith, Fishing, Medical
 }
 
 data class Mission(
@@ -256,7 +259,42 @@ data class MailMessage(
 
 enum class ActionType {
     Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Cave, Fishing, Infirmary, Work,
-    Kitchen, Forge, Observatory, Expedition
+    Kitchen, Forge, Observatory, Expedition, Grind
 }
 
-fun Character.checkLevelUp(): Character = this // Handled server-side now
+fun Character.getXpNeeded(): Int {
+    return (level * level * 100).coerceAtLeast(100)
+}
+
+fun Character.checkLevelUp(): Character {
+    val maxLevel = 300
+    if (level >= maxLevel) return this.copy(xp = 0)
+
+    var currentLevel = level
+    var currentXp = xp
+    var currentMaxHp = maxHp
+    var currentMaxEnergy = maxEnergy
+
+    var xpNeeded = currentLevel * currentLevel * 100
+    while (currentXp >= xpNeeded && currentLevel < maxLevel) {
+        currentXp -= xpNeeded
+        currentLevel++
+        currentMaxHp += 100
+        currentMaxEnergy += 100
+        
+        if (currentLevel < maxLevel) {
+            xpNeeded = currentLevel * currentLevel * 100
+        } else {
+            currentXp = 0
+        }
+    }
+
+    return this.copy(
+        level = currentLevel,
+        xp = currentXp,
+        maxHp = currentMaxHp,
+        hp = if (currentLevel > level) currentMaxHp else hp,
+        maxEnergy = currentMaxEnergy,
+        energy = if (currentLevel > level) currentMaxEnergy else energy
+    )
+}

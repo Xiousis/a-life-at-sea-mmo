@@ -8,12 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
-import com.alifeatseammo.R
 import com.alifeatseammo.data.model.Gender
 import com.alifeatseammo.data.model.Race
 import com.alifeatseammo.data.repository.AuthResult
-import com.alifeatseammo.util.MusicManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,11 +20,6 @@ fun CharacterCreationScreen(
     onClearError: () -> Unit,
     onLogout: () -> Unit
 ) {
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
-    }
-
     var name by remember { mutableStateOf("") }
     var selectedGender by remember { mutableStateOf(Gender.Male) }
     var selectedRace by remember { mutableStateOf(Race.Human) }

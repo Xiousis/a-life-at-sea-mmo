@@ -65,6 +65,8 @@ fun AppNavigation(
                         ActionType.Market -> navController.navigate(Screen.Market.route)
                         ActionType.Tavern -> navController.navigate(Screen.Tavern.route)
                         ActionType.Infirmary -> navController.navigate(Screen.Infirmary.route)
+                        ActionType.Camp -> navController.navigate(Screen.Camp.route)
+                        ActionType.Grind -> combatViewModel.startMonsterHunt()
                         ActionType.Shipyard -> navController.navigate(Screen.Shipyard.route)
                         ActionType.Work -> navController.navigate(Screen.Professions.createRoute("all"))
                         ActionType.Kitchen -> navController.navigate(Screen.Professions.createRoute("Cooking"))
@@ -222,7 +224,6 @@ fun AppNavigation(
                         "Character" -> navController.navigate(Screen.Character.createRoute(currentChar.id))
                         "Inventory" -> navController.navigate(Screen.Inventory.route)
                         "Skills" -> navController.navigate(Screen.Skills.route)
-                        "Professions" -> navController.navigate(Screen.Professions.createRoute("all"))
                         "Leaderboard" -> navController.navigate(Screen.Leaderboard.route)
                         "Chat" -> navController.navigate(Screen.Chat.route)
                         "Mail" -> navController.navigate(Screen.Mail.route)
@@ -298,7 +299,19 @@ fun AppNavigation(
             )
         }
         composable(Screen.Infirmary.route) {
+            val playersNearby by viewModel.playersAtLocation.collectAsState()
             InfirmaryScreen(
+                character = currentChar,
+                playersAtLocation = playersNearby,
+                onStartRest = { viewModel.startHealing() },
+                onInstantHeal = { viewModel.instantHeal() },
+                onPurchaseLicense = { viewModel.purchaseMedicalLicense() },
+                onHealPlayer = { viewModel.healPlayer(it) },
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.Camp.route) {
+            CampScreen(
                 character = currentChar,
                 onStartRest = { viewModel.startHealing() },
                 onInstantHeal = { viewModel.instantHeal() },

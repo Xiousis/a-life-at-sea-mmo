@@ -33,7 +33,7 @@ android {
         debug {
             firebaseAppDistribution {
                 artifactType = "APK"
-                releaseNotes = "New features and bug fixes for A Life at Sea MMO!"
+                releaseNotes = "Added Medical Skill! Players can now obtain a medical license for 15,000 gold and heal other players in the infirmary to level up."
                 testers = "oscali11@gmail.com"
             }
         }

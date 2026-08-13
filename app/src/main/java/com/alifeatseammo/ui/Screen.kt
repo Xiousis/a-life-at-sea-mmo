@@ -30,6 +30,7 @@ sealed class Screen(val route: String) {
     object Mail : Screen("mail")
     object UpgradeAccount : Screen("upgrade_account")
     object Infirmary : Screen("infirmary")
+    object Camp : Screen("camp")
     object Traveling : Screen("traveling")
     object Shipyard : Screen("shipyard")
     object Fishing : Screen("fishing")
