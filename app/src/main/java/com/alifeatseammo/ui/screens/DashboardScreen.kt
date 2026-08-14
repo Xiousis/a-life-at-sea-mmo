@@ -76,8 +76,16 @@ fun DashboardScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold
                 )
+                if (character.title.isNotEmpty()) {
+                    Text(
+                        text = "« ${character.title} »",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
-                    text = "Lv. ${character.level} • ${character.race} • ${character.faction}",
+                    text = "${character.rank} • Lv. ${character.level} • ${character.race} • ${character.faction}",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(

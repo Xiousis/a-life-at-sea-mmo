@@ -148,15 +148,25 @@ fun CombatScreen(
                     if (character.learnedTechniques.isEmpty()) {
                         Text("No techniques learned.")
                     } else {
-                        character.learnedTechniques.forEach { techId ->
-                            Button(
-                                onClick = {
-                                    onActionClick(CombatAction.Technique, techId, null)
-                                    showTechniques = false
-                                },
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                            ) {
-                                Text(techId.replaceFirstChar { it.uppercase() })
+                        val restrictedTypes = character.mythicArt?.restrictedSkillTypes ?: emptyList()
+                        val availableTechniques = character.learnedTechniques.filter { techId ->
+                            val techType = TechniqueRegistry.getTypeFor(techId)
+                            techType == null || techType !in restrictedTypes
+                        }
+                        
+                        if (availableTechniques.isEmpty()) {
+                            Text("All your techniques are restricted by your Mythic Art!", color = MaterialTheme.colorScheme.error)
+                        } else {
+                            availableTechniques.forEach { techId ->
+                                Button(
+                                    onClick = {
+                                        onActionClick(CombatAction.Technique, techId, null)
+                                        showTechniques = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                ) {
+                                    Text(techId.replaceFirstChar { it.uppercase() })
+                                }
                             }
                         }
                     }
@@ -196,6 +206,68 @@ fun CombatScreen(
                 TextButton(onClick = { showItems = false }) { Text("Cancel") }
             }
         )
+    }
+
+    if (combatState.isFinished && combatState.playerWon) {
+        AlertDialog(
+            onDismissRequest = { }, // Force clicking the button
+            title = { 
+                Text(
+                    "VICTORY", 
+                    style = MaterialTheme.typography.headlineSmall, 
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF4CAF50),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                ) 
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("You have defeated ${enemy.name}!", textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        RewardItem("XP", "+${combatState.xpEarned}", Color(0xFF2196F3))
+                        RewardItem("Gold", "+${combatState.goldEarned}", Color(0xFFFFC107))
+                    }
+
+                    if (combatState.loot.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text("Loot Dropped:", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        combatState.loot.forEach { item ->
+                            Text(
+                                text = "• ${item.name} (${item.type})",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = when(item.rarity) {
+                                    Rarity.Common -> Color.LightGray
+                                    Rarity.Uncommon -> Color(0xFF4CAF50)
+                                    Rarity.Rare -> Color(0xFF2196F3)
+                                    Rarity.Epic -> Color(0xFF9C27B0)
+                                    Rarity.Legendary -> Color(0xFFFF9800)
+                                }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onActionClick(CombatAction.Flee, null, null) }, // Using Flee as "Finish/Exit" combat
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Claim & Continue")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun RewardItem(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, style = MaterialTheme.typography.labelSmall)
+        Text(text = value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color)
     }
 }
 

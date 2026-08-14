@@ -1,0 +1,340 @@
+package com.alifeatseammo.ui.screens
+
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.alifeatseammo.data.model.Character
+import com.alifeatseammo.data.model.MythicArt
+import com.alifeatseammo.data.model.ElementType
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MythicArtScreen(
+    character: Character,
+    onRollClick: () -> Unit,
+    onAdminGrantTestItems: () -> Unit,
+    onBackClick: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Ancient Altar") },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Island of World Secrets",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "The altar whispers of ancient powers...",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.secondary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // Current Mythic Art Display
+            CurrentMythicArtCard(character.mythicArt)
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Roll Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val adminNames = listOf("sedna", "von")
+                    if (adminNames.contains(character.name.lowercase())) {
+                        Button(
+                            onClick = onAdminGrantTestItems,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                        ) {
+                            Text("ADMIN: GRANT TEST ARTIFACTS")
+                        }
+                    }
+
+                    val freeRolls = character.freeMythicRolls
+                    val canAfford = freeRolls > 0 || character.gold >= 1000000
+                    
+                    if (freeRolls > 0) {
+                        Text(
+                            text = "Free Rolls Remaining: $freeRolls",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF4CAF50)
+                        )
+                    } else {
+                        Text(
+                            text = "Roll Cost: 1,000,000 Gold",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = onRollClick,
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        enabled = canAfford,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (freeRolls > 0) "USE FREE ROLL" else "ROLL FOR 1M GOLD",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                    
+                    if (character.inventory.size >= 20) {
+                        Text(
+                            text = "Inventory is full! Free up space first.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CurrentMythicArtCard(mythicArt: MythicArt?) {
+    val tierColor = when (mythicArt?.tier) {
+        "Z" -> Color(0xFF00FFFF)   // Cyan / Divine
+        "SSS" -> Color(0xFFFFD700) // Gold
+        "SS" -> Color(0xFFE5E4E2)  // Platinum
+        "S" -> Color(0xFFC0C0C0)   // Silver
+        "A" -> Color(0xFFFF4500)   // OrangeRed
+        "B" -> Color(0xFF9370DB)   // Purple
+        "C" -> Color(0xFF1E90FF)   // DodgerBlue
+        "D" -> Color(0xFF4CAF50)   // Green
+        "E" -> Color(0xFF8B4513)   // Brown/Bronze
+        "F" -> Color.Gray
+        else -> Color.Gray
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(tierColor.copy(alpha = 0.2f), Color.Transparent)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .border(2.dp, tierColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (mythicArt != null) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "[ ${mythicArt.tier} ]",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Black,
+                    color = tierColor
+                )
+                Text(
+                    text = mythicArt.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = mythicArt.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                if (mythicArt.element != null) {
+                    val elementColor = when (mythicArt.element) {
+                        ElementType.Fire -> Color(0xFFFF4500)
+                        ElementType.Water -> Color(0xFF1E90FF)
+                        ElementType.Earth -> Color(0xFF8B4513)
+                        ElementType.Air -> Color(0xFF87CEEB)
+                        ElementType.Lightning -> Color(0xFFFFD700)
+                        ElementType.Ice -> Color(0xFFAFEEEE)
+                        ElementType.Light -> Color(0xFFFFFACD)
+                        ElementType.Dark -> Color(0xFF4B0082)
+                        ElementType.Void -> Color(0xFF000000)
+                        ElementType.Chaos -> Color(0xFFDC143C)
+                        ElementType.Celestial -> Color(0xFFE6E6FA)
+                        ElementType.Genesis -> Color(0xFF00FF7F)
+                        ElementType.Divine -> Color(0xFFFFDF00)
+                        ElementType.Annihilation -> Color(0xFF800000)
+                        ElementType.Creation -> Color(0xFFF5F5F5)
+                    }
+                    Text(
+                        text = "Element: ${mythicArt.element}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = elementColor
+                    )
+                }
+
+                if (mythicArt.elementalWeaknesses.isNotEmpty()) {
+                    Text(
+                        text = "Elemental Weakness: ${mythicArt.elementalWeaknesses.joinToString(", ")}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (mythicArt.skillMultiplier > 1.0f) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "${mythicArt.multipliedSkill} Buff: +${((mythicArt.skillMultiplier - 1.0f) * 100).toInt()}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50)
+                    )
+                }
+
+                if (mythicArt.hugeBuffValue > 0 && mythicArt.hugeBuffType != null) {
+                    Text(
+                        text = "${mythicArt.hugeBuffType}: +${(mythicArt.hugeBuffValue * 100).toInt()}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50)
+                    )
+                }
+
+                if (mythicArt.debuffPercentage > 0f) {
+                    Text(
+                        text = "Debuff: -${(mythicArt.debuffPercentage * 100).toInt()}%",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (mythicArt.energyRegainMultiplier > 1.0f) {
+                    Text(
+                        text = "Energy Regain: x${mythicArt.energyRegainMultiplier}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2196F3)
+                    )
+                }
+
+                if (mythicArt.travelTimeMultiplier != 1.0f) {
+                    val isBuff = mythicArt.travelTimeMultiplier < 1.0f
+                    val displayValue = if (isBuff) (1.0f / mythicArt.travelTimeMultiplier).toInt() else mythicArt.travelTimeMultiplier
+                    Text(
+                        text = if (isBuff) "Travel Speed: x$displayValue" else "Travel Time: x$displayValue",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isBuff) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (mythicArt.weakAgainst.isNotEmpty()) {
+                    Text(
+                        text = "Weak Against: ${mythicArt.weakAgainst.joinToString(", ")}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (!mythicArt.canLearnNonCombatSkills) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "DEBUFF: NO NON-COMBAT ACTIONS",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (mythicArt.restrictedSkillTypes.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "RESTRICTIONS:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        text = "Disables: ${mythicArt.restrictedSkillTypes.joinToString(", ")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                if (mythicArt.techniques.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Special Techniques:",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = tierColor
+                    )
+                    Text(
+                        text = mythicArt.techniques.joinToString(", "),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "?",
+                    style = MaterialTheme.typography.displayLarge,
+                    color = Color.Gray.copy(alpha = 0.3f)
+                )
+                Text(
+                    text = "No Mythic Art Awakened",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.Gray
+                )
+            }
+        }
+    }
+}

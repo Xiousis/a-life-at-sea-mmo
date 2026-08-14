@@ -48,6 +48,8 @@ interface GameRepository {
     suspend fun purchaseMedicalLicense(): Boolean
     suspend fun healPlayer(targetPlayerId: String): Boolean
     suspend fun startMonsterHunt(): Boolean
+    suspend fun rollMythicArt(): Boolean
+    suspend fun adminGrantTestItems(): Boolean
 }
 
 class FirestoreGameRepository(
@@ -337,6 +339,11 @@ class FirestoreGameRepository(
         return true
     }
 
+    override suspend fun adminGrantTestItems(): Boolean {
+        functions.getHttpsCallable("adminGrantTestItems").call().await()
+        return true
+    }
+
     override suspend fun healPlayer(targetPlayerId: String): Boolean {
         functions.getHttpsCallable("healPlayer").call(hashMapOf("targetPlayerId" to targetPlayerId)).await()
         return true
@@ -344,6 +351,11 @@ class FirestoreGameRepository(
 
     override suspend fun startMonsterHunt(): Boolean {
         functions.getHttpsCallable("startMonsterHunt").call().await()
+        return true
+    }
+
+    override suspend fun rollMythicArt(): Boolean {
+        functions.getHttpsCallable("rollMythicArt").call().await()
         return true
     }
 }

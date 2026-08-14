@@ -21,6 +21,7 @@ sealed class Screen(val route: String) {
     object Crew : Screen("crew")
     object More : Screen("more")
     object Inventory : Screen("inventory")
+    object Stats : Screen("stats")
     object Skills : Screen("skills")
     object Settings : Screen("settings")
     object Help : Screen("help")
@@ -34,4 +35,5 @@ sealed class Screen(val route: String) {
     object Traveling : Screen("traveling")
     object Shipyard : Screen("shipyard")
     object Fishing : Screen("fishing")
+    object MythicArt : Screen("mythic_art")
 }

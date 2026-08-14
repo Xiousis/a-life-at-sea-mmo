@@ -124,7 +124,22 @@ fun InfirmaryScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (!character.hasMedicalLicense) {
+            val isZTier = character.mythicArt?.tier == "Z"
+
+            if (isZTier) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Text(
+                        text = "Your Mythic Art forbids practicing medicine. You are far beyond such mundane acts.",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else if (!character.hasMedicalLicense) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)

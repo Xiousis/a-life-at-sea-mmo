@@ -64,6 +64,10 @@ class MainActivity : ComponentActivity() {
                 val user by viewModel.currentUser.collectAsState()
                 val currentLocation by viewModel.currentLocationInfo.collectAsState()
                 val errorMsg by viewModel.errorMessage.collectAsState()
+                val combatErrorMsg by combatViewModel.errorMessage.collectAsState()
+                val travelErrorMsg by travelViewModel.errorMessage.collectAsState()
+                val socialErrorMsg by socialViewModel.errorMessage.collectAsState()
+                val economyErrorMsg by economyViewModel.errorMessage.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
 
                 val context = androidx.compose.ui.platform.LocalContext.current
@@ -96,10 +100,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                LaunchedEffect(errorMsg) {
-                    errorMsg?.let {
+                LaunchedEffect(errorMsg, combatErrorMsg, travelErrorMsg, socialErrorMsg, economyErrorMsg) {
+                    val message = errorMsg ?: combatErrorMsg ?: travelErrorMsg ?: socialErrorMsg ?: economyErrorMsg
+                    message?.let {
                         snackbarHostState.showSnackbar(it)
                         viewModel.clearErrorMessage()
+                        combatViewModel.clearErrorMessage()
+                        travelViewModel.clearErrorMessage()
+                        socialViewModel.clearErrorMessage()
+                        economyViewModel.clearErrorMessage()
                     }
                 }
 

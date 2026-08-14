@@ -74,6 +74,7 @@ fun AppNavigation(
                         ActionType.Observatory -> navController.navigate(Screen.Professions.createRoute("Navigating"))
                         ActionType.Expedition -> navController.navigate(Screen.Professions.createRoute("TreasureHunting"))
                         ActionType.Fishing -> navController.navigate(Screen.Fishing.route)
+                        ActionType.MythicRoll -> navController.navigate(Screen.MythicArt.route)
                         else -> {}
                     }
                 },
@@ -204,7 +205,6 @@ fun AppNavigation(
                     onBackClick = { navController.popBackStack() },
                     onAttackClick = {
                         combatViewModel.attackPlayer(p)
-                        navController.navigate(Screen.Dashboard.route)
                     },
                     onViewCrewClick = {
                         navController.navigate(Screen.CrewProfile.route)
@@ -223,6 +223,7 @@ fun AppNavigation(
                     when (item.label) {
                         "Character" -> navController.navigate(Screen.Character.createRoute(currentChar.id))
                         "Inventory" -> navController.navigate(Screen.Inventory.route)
+                        "Stats" -> navController.navigate(Screen.Stats.route)
                         "Skills" -> navController.navigate(Screen.Skills.route)
                         "Leaderboard" -> navController.navigate(Screen.Leaderboard.route)
                         "Chat" -> navController.navigate(Screen.Chat.route)
@@ -242,6 +243,12 @@ fun AppNavigation(
                 onUseItem = { economyViewModel.useItem(it) },
                 onCookItem = { economyViewModel.cookFish(it) },
                 onSellItem = { economyViewModel.sellItem(it) },
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.Stats.route) {
+            StatsScreen(
+                character = currentChar,
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -311,10 +318,13 @@ fun AppNavigation(
             )
         }
         composable(Screen.Camp.route) {
+            val playersNearby by viewModel.playersAtLocation.collectAsState()
             CampScreen(
                 character = currentChar,
+                playersAtLocation = playersNearby,
                 onStartRest = { viewModel.startHealing() },
                 onInstantHeal = { viewModel.instantHeal() },
+                onHealPlayer = { viewModel.healPlayer(it) },
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -365,6 +375,14 @@ fun AppNavigation(
             CombatScreen(
                 character = currentChar,
                 onActionClick = { action, techId, itemId -> combatViewModel.combatAction(action, techId, itemId) }
+            )
+        }
+        composable(Screen.MythicArt.route) {
+            MythicArtScreen(
+                character = currentChar,
+                onRollClick = { viewModel.rollMythicArt() },
+                onAdminGrantTestItems = { viewModel.adminGrantTestItems() },
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

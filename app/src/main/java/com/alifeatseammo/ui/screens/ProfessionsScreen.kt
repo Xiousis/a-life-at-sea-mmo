@@ -101,7 +101,8 @@ fun ProfessionsScreen(
                 StatType.Navigating to "Faster travel times.",
                 StatType.TreasureHunting to "Better loot from chests.",
                 StatType.Blacksmith to "Craft and repair gear.",
-                StatType.Fishing to "Catch fish in the open sea."
+                StatType.Fishing to "Catch fish in the open sea.",
+                StatType.Medical to "Heal others and perform surgeries."
             ).filter { 
                 skillFilter == "all" || it.first.name.equals(skillFilter, ignoreCase = true)
             }
@@ -110,12 +111,14 @@ fun ProfessionsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(professions) { (type, desc) ->
+                    val canLearn = character.mythicArt?.canLearnNonCombatSkills ?: true
                     ProfessionRow(
                         label = type.name,
                         value = getProfessionValue(character, type),
                         description = desc,
-                        canAfford = character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining,
-                        onPractice = { onTrainClick(type) }
+                        canAfford = character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining && canLearn,
+                        onPractice = { onTrainClick(type) },
+                        isLockedByMythic = !canLearn
                     )
                 }
             }
@@ -141,7 +144,8 @@ fun ProfessionRow(
     value: Int,
     description: String,
     canAfford: Boolean,
-    onPractice: () -> Unit
+    onPractice: () -> Unit,
+    isLockedByMythic: Boolean = false
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth()
@@ -151,7 +155,18 @@ fun ProfessionRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    if (isLockedByMythic) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "LOCKED",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
                 Text(text = "Level: $value", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             }
@@ -160,7 +175,7 @@ fun ProfessionRow(
                 enabled = canAfford,
                 shape = MaterialTheme.shapes.small
             ) {
-                Text("PRACTICE")
+                Text(if (isLockedByMythic) "DISABLED" else "PRACTICE")
             }
         }
     }

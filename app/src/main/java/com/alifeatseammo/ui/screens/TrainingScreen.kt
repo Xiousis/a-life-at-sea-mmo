@@ -5,17 +5,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.StatType
+import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,11 +26,11 @@ fun TrainingScreen(
     onTrainClick: (StatType) -> Unit,
     onBackClick: () -> Unit
 ) {
-    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(character.trainingState) {
         while (character.trainingState != null) {
             currentTime = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1000)
+            kotlinx.coroutines.delay(1000.milliseconds)
         }
     }
 
@@ -76,7 +78,7 @@ fun TrainingScreen(
                                 style = MaterialTheme.typography.labelSmall
                             )
                             Text(
-                                text = String.format("%02ds", remainingMs / 1000),
+                                text = String.format(Locale.US, "%02ds", remainingMs / 1000),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Black,
                                 color = if (remainingMs > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
@@ -101,7 +103,7 @@ fun TrainingScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            var selectedTab by remember { mutableStateOf(0) }
+            var selectedTab by remember { mutableIntStateOf(0) }
             val tabs = listOf("Attributes", "Combat")
 
             SecondaryTabRow(selectedTabIndex = selectedTab) {
@@ -135,7 +137,8 @@ fun TrainingScreen(
                         "Tortuga Bay",
                         "Navy Outpost Aqua",
                         "Navy Outpost Terra",
-                        "Navy Outpost Ignis"
+                        "Navy Outpost Ignis",
+                        "Island of World Secrets"
                     )
 
                     if (townsWithDojo.contains(loc)) {
@@ -155,12 +158,46 @@ fun TrainingScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(stats) { (type, desc) ->
+                    val mythicArt = character.mythicArt
+                    var buffText = ""
+                    var debuffText = ""
+
+                    if (mythicArt != null) {
+                        // Global Debuff (Attributes only)
+                        val attributes = setOf(StatType.Strength, StatType.Endurance, StatType.Agility, StatType.Perception, StatType.Willpower, StatType.Luck)
+                        if (attributes.contains(type) && mythicArt.debuffPercentage > 0f) {
+                            debuffText = "-${(mythicArt.debuffPercentage * 100).toInt()}%"
+                        }
+
+                        // Specific Skill Buffs
+                        if (mythicArt.multipliedSkill == type && mythicArt.skillMultiplier > 1.0f) {
+                            val percent = ((mythicArt.skillMultiplier - 1.0f) * 100).toInt()
+                            buffText = "+$percent%"
+                        }
+
+                        // Huge Buff
+                        if (mythicArt.hugeBuffType == type && mythicArt.hugeBuffValue > 0f) {
+                            val percent = (mythicArt.hugeBuffValue * 100).toInt()
+                            buffText = if (buffText.isEmpty()) "+$percent%" else "$buffText / +$percent%"
+                        }
+                        
+                        // Restrictions
+                        if (mythicArt.restrictedSkillTypes.contains(type)) {
+                            debuffText = "DISABLED"
+                        }
+                    }
+
                     TrainingRow(
                         label = type.name,
                         value = getStatValue(character, type),
                         description = desc,
-                        canAfford = character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining,
-                        onTrain = { onTrainClick(type) }
+                        buffText = buffText,
+                        debuffText = debuffText,
+                        canAfford = character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining && 
+                                   !character.mythicArt?.restrictedSkillTypes?.contains(type).let { it ?: false } &&
+                                   (type in setOf(StatType.Strength, StatType.Endurance, StatType.Agility, StatType.Perception, StatType.Willpower, StatType.Luck, StatType.Swordsmanship, StatType.Brawling, StatType.Gunslinging, StatType.Spear, StatType.MartialArts, StatType.Sniper, StatType.MysticArts) || (character.mythicArt?.canLearnNonCombatSkills ?: true)),
+                        onTrain = { onTrainClick(type) },
+                        isLockedByMythic = !(character.mythicArt?.canLearnNonCombatSkills ?: true) && type in setOf(StatType.Cooking, StatType.Navigating, StatType.TreasureHunting, StatType.Blacksmith, StatType.Fishing, StatType.Medical)
                     )
                 }
             }
@@ -173,8 +210,11 @@ fun TrainingRow(
     label: String,
     value: Int,
     description: String,
+    buffText: String = "",
+    debuffText: String = "",
     canAfford: Boolean,
-    onTrain: () -> Unit
+    onTrain: () -> Unit,
+    isLockedByMythic: Boolean = false
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth()
@@ -184,7 +224,36 @@ fun TrainingRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    if (isLockedByMythic) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "LOCKED",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (buffText.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = buffText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF4CAF50),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (debuffText.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = debuffText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
                 Text(text = "Current: $value", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             }
@@ -193,7 +262,7 @@ fun TrainingRow(
                 enabled = canAfford,
                 shape = MaterialTheme.shapes.small
             ) {
-                Text("TRAIN")
+                Text(if (debuffText == "DISABLED" || isLockedByMythic) "LOCKED" else "TRAIN")
             }
         }
     }
@@ -221,4 +290,14 @@ fun getStatValue(character: Character, type: StatType): Int {
         StatType.Fishing -> character.professionStats.fishing
         StatType.Medical -> character.professionStats.medical
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TrainingScreenPreview() {
+    TrainingScreen(
+        character = com.alifeatseammo.data.model.Character(name = "Test Pirate"),
+        onTrainClick = {},
+        onBackClick = {}
+    )
 }

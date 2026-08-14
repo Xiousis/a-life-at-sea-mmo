@@ -27,6 +27,32 @@ fun InventoryScreen(
     onSellItem: (Item) -> Unit,
     onBackClick: () -> Unit
 ) {
+    var itemToUseWithWarning by remember { mutableStateOf<Item?>(null) }
+
+    if (itemToUseWithWarning != null) {
+        AlertDialog(
+            onDismissRequest = { itemToUseWithWarning = null },
+            title = { Text("Replace Mythic Art?") },
+            text = { Text("You already have an active Mythic Art. Awakening this artifact will permanently replace your old Mythic Art and its techniques. Are you sure?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        itemToUseWithWarning?.let { onUseItem(it) }
+                        itemToUseWithWarning = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("REPLACE")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToUseWithWarning = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -79,7 +105,13 @@ fun InventoryScreen(
                         InventoryItemCard(
                             item = item,
                             onEquip = { onEquipItem(item) },
-                            onUse = { onUseItem(item) },
+                            onUse = {
+                                if (item.type == ItemType.Artifact && character.mythicArt != null) {
+                                    itemToUseWithWarning = item
+                                } else {
+                                    onUseItem(item)
+                                }
+                            },
                             onCook = { onCookItem(item) },
                             onSell = { onSellItem(item) }
                         )
@@ -182,9 +214,13 @@ fun InventoryItemCard(
                             Text("Equip", fontSize = 12.sp)
                         }
                     }
-                    ItemType.Consumable, ItemType.Food -> {
+                    ItemType.Consumable, ItemType.Food, ItemType.Artifact -> {
                         Button(onClick = onUse, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
-                            Text(if (item.type == ItemType.Food) "Eat" else "Use", fontSize = 12.sp)
+                            Text(when(item.type) {
+                                ItemType.Food -> "Eat"
+                                ItemType.Artifact -> "Awaken"
+                                else -> "Use"
+                            }, fontSize = 12.sp)
                         }
                     }
                     ItemType.Fish -> {

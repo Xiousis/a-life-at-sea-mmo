@@ -20,6 +20,7 @@ fun MoreScreen(
     val menuItems = mutableListOf(
         MoreMenuItem("Character", "👤"),
         MoreMenuItem("Inventory", "📦"),
+        MoreMenuItem("Stats", "📊"),
         MoreMenuItem("Skills", "📜"),
         MoreMenuItem("Leaderboard", "🏆"),
         MoreMenuItem("Chat", "💬"),

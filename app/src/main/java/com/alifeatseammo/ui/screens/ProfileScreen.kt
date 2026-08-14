@@ -1,8 +1,9 @@
 package com.alifeatseammo.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -12,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Crew
+import com.alifeatseammo.data.model.getXpNeeded
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,6 +28,77 @@ fun ProfileScreen(
     onViewCrewClick: () -> Unit = {},
     onAddFriendClick: () -> Unit = {}
 ) {
+    var showMythicArtDetails by remember { mutableStateOf(false) }
+
+    if (showMythicArtDetails && character.mythicArt != null) {
+        val mythicArt = character.mythicArt
+        AlertDialog(
+            onDismissRequest = { showMythicArtDetails = false },
+            title = {
+                Text(
+                    text = "${mythicArt.name} [${mythicArt.tier}]",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = mythicArt.description, style = MaterialTheme.typography.bodyMedium)
+                    
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    
+                    Text(text = "BUFFS:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = Color(0xFF4CAF50))
+                    
+                    if (mythicArt.skillMultiplier > 1.0f) {
+                        Text(text = "• ${mythicArt.multipliedSkill} Buff: +${((mythicArt.skillMultiplier - 1.0f) * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                    }
+                    
+                    if (mythicArt.hugeBuffValue > 0 && mythicArt.hugeBuffType != null) {
+                        Text(text = "• ${mythicArt.hugeBuffType}: +${(mythicArt.hugeBuffValue * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                    }
+                    
+                    if (mythicArt.energyRegainMultiplier > 1.0f) {
+                        Text(text = "• Energy Regain: x${mythicArt.energyRegainMultiplier}", style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    // Stats from bonusStats
+                    val bonusStats = mythicArt.bonusStats
+                    if (bonusStats.strength > 0) Text(text = "• Strength: +${bonusStats.strength}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.endurance > 0) Text(text = "• Endurance: +${bonusStats.endurance}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.agility > 0) Text(text = "• Agility: +${bonusStats.agility}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.perception > 0) Text(text = "• Perception: +${bonusStats.perception}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.willpower > 0) Text(text = "• Willpower: +${bonusStats.willpower}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.luck > 0) Text(text = "• Luck: +${bonusStats.luck}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.mysticArts > 0) Text(text = "• Mystic Arts: +${bonusStats.mysticArts}", style = MaterialTheme.typography.bodySmall)
+
+                    if (mythicArt.debuffPercentage > 0f || mythicArt.restrictedSkillTypes.isNotEmpty()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        Text(text = "DEBUFFS / RESTRICTIONS:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                        
+                        if (mythicArt.debuffPercentage > 0f) {
+                            Text(text = "• Global Power Debuff: -${(mythicArt.debuffPercentage * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                        }
+                        
+                        if (mythicArt.restrictedSkillTypes.isNotEmpty()) {
+                            Text(text = "• Disables Skills: ${mythicArt.restrictedSkillTypes.joinToString(", ")}", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+
+                    if (mythicArt.techniques.isNotEmpty()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        Text(text = "GRANTED TECHNIQUES:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                        Text(text = mythicArt.techniques.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMythicArtDetails = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -57,6 +130,35 @@ fun ProfileScreen(
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
+            
+            // XP Bar
+            val xpNeeded = character.getXpNeeded()
+            val progress = character.xp.toFloat() / xpNeeded.toFloat()
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                Text(
+                    text = "${character.xp} / $xpNeeded XP",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
             Text(
                 text = character.race.name,
                 fontSize = 18.sp,
@@ -75,7 +177,16 @@ fun ProfileScreen(
                     ProfileStatRow("Infamy:", "${character.infamy}/100", color = MaterialTheme.colorScheme.error)
                 }
                 ProfileStatRow("Crew:", crew?.name ?: "None")
-                ProfileStatRow("Title:", character.title)
+                ProfileStatRow("Rank:", character.rank)
+                if (character.title.isNotEmpty()) {
+                    ProfileStatRow("Title:", character.title)
+                }
+                ProfileStatRow(
+                    label = "Mystic Art:",
+                    value = character.mythicArt?.name ?: "None",
+                    color = if (character.mythicArt != null) MaterialTheme.colorScheme.primary else Color.Gray,
+                    modifier = if (character.mythicArt != null) Modifier.clickable { showMythicArtDetails = true } else Modifier
+                )
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
@@ -126,9 +237,9 @@ fun ProfileScreen(
 }
 
 @Composable
-fun ProfileStatRow(label: String, value: String, color: Color = Color.Unspecified) {
+fun ProfileStatRow(label: String, value: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)

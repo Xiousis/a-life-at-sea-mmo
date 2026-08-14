@@ -13,6 +13,141 @@ const TURN_TIMEOUT_MS = 60 * 1000; // 1 minute per turn
 const HEALING_DURATION_MS = 2 * 60 * 1000; // 2 minutes
 const TRAINING_DURATION_MS = 20 * 1000; // 20 seconds
 const TRAINING_GOLD_COST = 50;
+const MYTHIC_ROLL_GOLD_COST = 1000000;
+
+const MYTHIC_ARTS: Record<string, Array<{
+    name: string,
+    description: string,
+    stats: any,
+    skillMultiplier: number,
+    multipliedSkill: string,
+    techniques: string[],
+    hugeBuffType?: string,
+    hugeBuffValue?: number,
+    debuffPercentage?: number,
+    energyRegainMultiplier?: number,
+    weakAgainst?: string[],
+    element?: string,
+    elementalWeaknesses?: string[],
+    travelTimeMultiplier?: number,
+    canLearnNonCombatSkills?: boolean,
+    restrictedSkillTypes?: string[]
+}>> = {
+    "F": [
+        { name: "Novice Strike", description: "A basic strike taught to every beginner.", stats: { strength: 1 }, skillMultiplier: 1.10, multipliedSkill: "Swordsmanship", techniques: ["Horizontal Slash"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Rusty Guard", description: "Using a worn blade to deflect blows.", stats: { endurance: 1 }, skillMultiplier: 1.10, multipliedSkill: "Blacksmith", techniques: ["Sturdy Block"], hugeBuffType: "Endurance", hugeBuffValue: 0.05, weakAgainst: ["Brawling"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Quick Step", description: "A simple movement to reposition.", stats: { agility: 1 }, skillMultiplier: 1.10, multipliedSkill: "Navigating", techniques: ["Dash"], hugeBuffType: "Agility", hugeBuffValue: 0.05, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
+        { name: "Dull Edge", description: "Attacking with a poorly maintained weapon.", stats: { strength: 1, agility: 1 }, skillMultiplier: 1.10, multipliedSkill: "Brawling", techniques: ["Heavy Chop"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Simple Thrust", description: "A straightforward piercing attack.", stats: { perception: 1 }, skillMultiplier: 1.10, multipliedSkill: "Spear", techniques: ["Point Strike"], hugeBuffType: "Perception", hugeBuffValue: 0.05, weakAgainst: ["Swordsmanship"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Steady Breath", description: "Focusing on breathing to maintain stamina.", stats: { willpower: 1 }, skillMultiplier: 1.10, multipliedSkill: "Medical", techniques: ["Calm State"], hugeBuffType: "Willpower", hugeBuffValue: 0.05, weakAgainst: ["Gunslinging"], element: "Light", elementalWeaknesses: ["Dark"] },
+        { name: "Lucky Swipe", description: "An unplanned attack that somehow lands.", stats: { luck: 1 }, skillMultiplier: 1.10, multipliedSkill: "TreasureHunting", techniques: ["Wild Swing"], hugeBuffType: "Luck", hugeBuffValue: 0.05, weakAgainst: ["Spear"], element: "Light", elementalWeaknesses: ["Dark"] },
+        { name: "Basic Flourish", description: "A simple showy move with no real power.", stats: { agility: 1, luck: 1 }, skillMultiplier: 1.10, multipliedSkill: "Cooking", techniques: ["Distraction"], hugeBuffType: "Agility", hugeBuffValue: 0.05, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
+        { name: "Fisherman's Hook", description: "A technique derived from daily chores.", stats: { strength: 1, perception: 1 }, skillMultiplier: 1.10, multipliedSkill: "Fishing", techniques: ["Pull"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], element: "Water", elementalWeaknesses: ["Lightning"] },
+        { name: "Sailor's Balance", description: "Maintaining footing on uneven ground.", stats: { agility: 1, endurance: 1 }, skillMultiplier: 1.10, multipliedSkill: "Navigating", techniques: ["Brace"], hugeBuffType: "Endurance", hugeBuffValue: 0.05, weakAgainst: ["Brawling"], element: "Water", elementalWeaknesses: ["Lightning"] }
+    ],
+    "E": [
+        { name: "Steel Bite", description: "A more focused strike that pierces deeper.", stats: { strength: 4 }, skillMultiplier: 1.30, multipliedSkill: "Gunslinging", techniques: ["Deep Cut"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Vanguard Defense", description: "A defensive stance used by front-line soldiers.", stats: { endurance: 4 }, skillMultiplier: 1.30, multipliedSkill: "MartialArts", techniques: ["Iron Wall"], hugeBuffType: "Endurance", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Fleet Foot", description: "Agile movements that baffle the inexperienced.", stats: { agility: 4 }, skillMultiplier: 1.30, multipliedSkill: "Sniper", techniques: ["Evasion"], hugeBuffType: "Agility", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Air", elementalWeaknesses: ["Ice"] },
+        { name: "Sharpened Senses", description: "Heightened awareness on the battlefield.", stats: { perception: 4 }, skillMultiplier: 1.30, multipliedSkill: "MysticArts", techniques: ["Pre-empt"], hugeBuffType: "Perception", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Lightning", elementalWeaknesses: ["Earth"] },
+        { name: "Stone Heart", description: "Resisting fear and mental pressure.", stats: { willpower: 4 }, skillMultiplier: 1.30, multipliedSkill: "Brawling", techniques: ["Unshakable"], hugeBuffType: "Willpower", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Gambler's Strike", description: "A high-risk, high-reward attack.", stats: { luck: 5 }, skillMultiplier: 1.30, multipliedSkill: "TreasureHunting", techniques: ["Double or Nothing"], hugeBuffType: "Luck", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Chaos", elementalWeaknesses: ["Void"] },
+        { name: "Twin Fang", description: "A rapid two-hit combination.", stats: { strength: 2, agility: 3 }, skillMultiplier: 1.30, multipliedSkill: "Swordsmanship", techniques: ["Double Slash"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Crushing Weight", description: "Leveraging body weight into a strike.", stats: { strength: 5 }, skillMultiplier: 1.30, multipliedSkill: "Brawling", techniques: ["Slam"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Eagle Eye", description: "Spotting weaknesses from a distance.", stats: { perception: 5 }, skillMultiplier: 1.30, multipliedSkill: "Sniper", techniques: ["Precision Hit"], hugeBuffType: "Perception", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Lightning", elementalWeaknesses: ["Earth"] },
+        { name: "Brave Charge", description: "Rushing forward with reckless abandon.", stats: { willpower: 5, strength: 2 }, skillMultiplier: 1.30, multipliedSkill: "MartialArts", techniques: ["Stampede"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Fire", elementalWeaknesses: ["Water"] }
+    ],
+    "D": [
+        { name: "Rippling Blade", description: "A fluid attack that bypasses simple parries.", stats: { swordsmanship: 7, agility: 2 }, skillMultiplier: 1.60, multipliedSkill: "Swordsmanship", techniques: ["Flowing Strike"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Water", elementalWeaknesses: ["Lightning"] },
+        { name: "Mountain's Resolve", description: "Standing firm against a tide of enemies.", stats: { endurance: 8, willpower: 2 }, skillMultiplier: 1.60, multipliedSkill: "Blacksmith", techniques: ["Immovable"], hugeBuffType: "Endurance", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Whirlwind Spin", description: "A spinning attack that hits multiple targets.", stats: { agility: 8, strength: 2 }, skillMultiplier: 1.60, multipliedSkill: "Spear", techniques: ["Cyclone"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
+        { name: "Hunter's Mark", description: "Tracking a target with lethal intent.", stats: { perception: 8, luck: 2 }, skillMultiplier: 1.60, multipliedSkill: "Sniper", techniques: ["Focused Fire"], hugeBuffType: "Sniper", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Lightning", elementalWeaknesses: ["Earth"] },
+        { name: "Iron Fist", description: "Combining martial arts with swordplay.", stats: { martialArts: 7, strength: 3 }, skillMultiplier: 1.60, multipliedSkill: "MartialArts", techniques: ["Grip Smash"], hugeBuffType: "MartialArts", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Silent Step", description: "Moving without a sound to ambush foes.", stats: { agility: 10 }, skillMultiplier: 1.60, multipliedSkill: "TreasureHunting", techniques: ["Shadow Strike"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
+        { name: "Piercing Gale", description: "A thrust that carries the force of a gust.", stats: { strength: 10 }, skillMultiplier: 1.60, multipliedSkill: "Spear", techniques: ["Air Piercer"], hugeBuffType: "Spear", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
+        { name: "Serpent's Coil", description: "A deceptive technique that traps weapons.", stats: { agility: 7, perception: 3 }, skillMultiplier: 1.60, multipliedSkill: "MysticArts", techniques: ["Disarm"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Water", elementalWeaknesses: ["Lightning"] },
+        { name: "Thunderous Clap", description: "An explosive strike that dazes opponents.", stats: { strength: 9, willpower: 3 }, skillMultiplier: 1.60, multipliedSkill: "Brawling", techniques: ["Shockwave"], hugeBuffType: "Strength", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Lightning", elementalWeaknesses: ["Earth"] },
+        { name: "Mirror Image", description: "A feint that leaves an afterimage.", stats: { agility: 9, luck: 4 }, skillMultiplier: 1.60, multipliedSkill: "MysticArts", techniques: ["Flicker"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] }
+    ],
+    "C": [
+        { name: "Azure Flow", description: "Mastering the rhythm of combat.", stats: { swordsmanship: 12, agility: 5 }, skillMultiplier: 2.00, multipliedSkill: "Swordsmanship", techniques: ["Water Slicer"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Water", elementalWeaknesses: ["Lightning"] },
+        { name: "Grizzly Crush", description: "An overwhelming strike with brute force.", stats: { strength: 15, endurance: 5 }, skillMultiplier: 2.00, multipliedSkill: "Brawling", techniques: ["Bone Breaker"], hugeBuffType: "Strength", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Wind Runner", description: "Moving as fast as the breeze.", stats: { agility: 15, luck: 5 }, skillMultiplier: 2.00, multipliedSkill: "Navigating", techniques: ["Breeze Step"], hugeBuffType: "Agility", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Air", elementalWeaknesses: ["Ice"] },
+        { name: "Watcher's Gaze", description: "Seeing through illusions and feints.", stats: { perception: 15, willpower: 5 }, skillMultiplier: 2.00, multipliedSkill: "Sniper", techniques: ["True Vision"], hugeBuffType: "Perception", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Lightning", elementalWeaknesses: ["Earth"] },
+        { name: "Soul Shield", description: "Protecting the mind from dark arts.", stats: { willpower: 15, mysticArts: 5 }, skillMultiplier: 2.00, multipliedSkill: "MysticArts", techniques: ["Purge"], hugeBuffType: "MysticArts", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Light", elementalWeaknesses: ["Dark"] },
+        { name: "Crimson Edge", description: "A blood-soaked blade that thirsts for battle.", stats: { luck: 15, strength: 5 }, skillMultiplier: 2.00, multipliedSkill: "Swordsmanship", techniques: ["Bleed Out"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Dark", elementalWeaknesses: ["Light"] },
+        { name: "Storm Caller", description: "Infusing attacks with static energy.", stats: { mysticArts: 12, agility: 5 }, skillMultiplier: 2.00, multipliedSkill: "MysticArts", techniques: ["Bolt Strike"], hugeBuffType: "MysticArts", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Lightning", elementalWeaknesses: ["Earth"] },
+        { name: "Earth Shaker", description: "Striking the ground to disrupt balance.", stats: { strength: 14, endurance: 6 }, skillMultiplier: 2.00, multipliedSkill: "Blacksmith", techniques: ["Tremor"], hugeBuffType: "Strength", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Desert Mirage", description: "A shimmering technique that hides intent.", stats: { agility: 14, perception: 6 }, skillMultiplier: 2.00, multipliedSkill: "TreasureHunting", techniques: ["Sand Trap"], hugeBuffType: "Agility", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Air", elementalWeaknesses: ["Ice"] },
+        { name: "Phoenix Rise", description: "Recovering from the brink with newfound vigor.", stats: { willpower: 14, luck: 6 }, skillMultiplier: 2.00, multipliedSkill: "Medical", techniques: ["Rebirth"], hugeBuffType: "Willpower", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Fire", elementalWeaknesses: ["Water"] }
+    ],
+    "B": [
+        { name: "Dragon's Breath", description: "Exhaling power through the blade.", stats: { swordsmanship: 40, mysticArts: 20, strength: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Fire Slash", "Heat Haze"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Fire", elementalWeaknesses: ["Water"] },
+        { name: "Titan's Grip", description: "Wielding massive weapons with ease.", stats: { strength: 50, endurance: 20, willpower: 10 }, skillMultiplier: 4.00, multipliedSkill: "Blacksmith", techniques: ["Colossus Strike", "Earth Breaker"], hugeBuffType: "Strength", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Lightning Reflex", description: "Reacting before the thought even forms.", stats: { agility: 50, perception: 20, luck: 10 }, skillMultiplier: 4.00, multipliedSkill: "Gunslinging", techniques: ["Flash Step", "Afterimage"], hugeBuffType: "Agility", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Lightning", elementalWeaknesses: ["Earth"] },
+        { name: "Oracle's Whisper", description: "Hearing the future of the fight.", stats: { perception: 50, willpower: 20, agility: 10 }, skillMultiplier: 4.00, multipliedSkill: "Navigating", techniques: ["Prevision", "Mind Link"], hugeBuffType: "Perception", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Light", elementalWeaknesses: ["Dark"] },
+        { name: "Void Anchor", description: "Grounding oneself in the fabric of reality.", stats: { willpower: 50, endurance: 20, mysticArts: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Nullify", "Gravity Field"], hugeBuffType: "Willpower", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Void", elementalWeaknesses: ["Chaos"] },
+        { name: "Fortune's Favor", description: "Destiny smiles upon your every move.", stats: { luck: 60, agility: 10, perception: 10 }, skillMultiplier: 4.00, multipliedSkill: "TreasureHunting", techniques: ["Destiny Strike", "Jackpot"], hugeBuffType: "Luck", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Celestial", elementalWeaknesses: ["Void"] },
+        { name: "Frost Bite", description: "Freezing the enemy's movements.", stats: { mysticArts: 40, agility: 20, endurance: 10 }, skillMultiplier: 4.00, multipliedSkill: "Cooking", techniques: ["Ice Prison", "Glacial Wall"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Ice", elementalWeaknesses: ["Air"] },
+        { name: "Raging Torrent", description: "A relentless barrage of attacks.", stats: { swordsmanship: 45, strength: 15, agility: 10 }, skillMultiplier: 4.00, multipliedSkill: "Fishing", techniques: ["Flood", "Tidal Wave"], hugeBuffType: "Swordsmanship", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Water", elementalWeaknesses: ["Lightning"] },
+        { name: "Shadow Weaver", description: "Manipulating shadows to bind foes.", stats: { mysticArts: 45, perception: 15, luck: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Dark Bind", "Nightmare"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Dark", elementalWeaknesses: ["Light"] },
+        { name: "Celestial Alignment", description: "Drawing power from the stars.", stats: { willpower: 45, luck: 15, mysticArts: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Starfall", "Sunbeam"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Celestial", elementalWeaknesses: ["Void"] }
+    ],
+    "A": [
+        { name: "Nebula Strike", description: "A cosmic strike that transcends dimensions.", stats: { swordsmanship: 80, mysticArts: 50, strength: 30 }, skillMultiplier: 10.00, multipliedSkill: "MysticArts", techniques: ["Cosmic Tear", "Black Hole", "Nova"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Celestial", elementalWeaknesses: ["Void"] },
+        { name: "Atlas Burden", description: "Holding the weight of the heavens.", stats: { strength: 90, endurance: 50, willpower: 30 }, skillMultiplier: 10.00, multipliedSkill: "Blacksmith", techniques: ["Heavenly Smash", "Sky Cracker", "Final Pillar"], hugeBuffType: "Strength", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Chronos Step", description: "Moving through time for a brief moment.", stats: { agility: 90, perception: 50, luck: 30 }, skillMultiplier: 10.00, multipliedSkill: "Navigating", techniques: ["Time Warp", "Stutter", "Future Echo"], hugeBuffType: "Agility", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Void", elementalWeaknesses: ["Chaos"] },
+        { name: "Spirit Reaper", description: "Striking at the very soul of the opponent.", stats: { mysticArts: 90, willpower: 50, perception: 30 }, skillMultiplier: 10.00, multipliedSkill: "Medical", techniques: ["Soul Rend", "Spirit Bind", "Essence Theft"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Dark", elementalWeaknesses: ["Light"] },
+        { name: "Eternal Bastion", description: "An unbreakable defense that reflects damage.", stats: { endurance: 90, luck: 50, strength: 30 }, skillMultiplier: 10.00, multipliedSkill: "Blacksmith", techniques: ["Mirror Shield", "Fortress", "Aegis"], hugeBuffType: "Endurance", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "King's Authority", description: "Commanding the battlefield with presence.", stats: { willpower: 90, perception: 50, agility: 30 }, skillMultiplier: 10.00, multipliedSkill: "Navigating", techniques: ["Overawe", "Command", "Domination"], hugeBuffType: "Willpower", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Divine", elementalWeaknesses: ["Chaos"] },
+        { name: "Nature's Wrath", description: "Harnessing the power of the natural world.", stats: { mysticArts: 80, strength: 40, endurance: 30 }, skillMultiplier: 10.00, multipliedSkill: "Fishing", techniques: ["Entangle", "Root Spike", "Thorn Hail"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Earth", elementalWeaknesses: ["Air"] },
+        { name: "Silver Lining", description: "Finding victory in the direst situations.", stats: { luck: 100, agility: 40, perception: 30 }, skillMultiplier: 10.00, multipliedSkill: "TreasureHunting", techniques: ["Miracle", "Lucky Break", "Twist of Fate"], hugeBuffType: "Luck", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Celestial", elementalWeaknesses: ["Void"] },
+        { name: "Solar Flare", description: "Blinding enemies with the brilliance of the sun.", stats: { mysticArts: 85, perception: 40, willpower: 30 }, skillMultiplier: 10.00, multipliedSkill: "Cooking", techniques: ["Sunburst", "Blinding Light", "Solar Storm"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Fire", elementalWeaknesses: ["Water"] },
+        { name: "Abyssal Maw", description: "Consuming the light and hope of foes.", stats: { mysticArts: 85, willpower: 40, endurance: 30 }, skillMultiplier: 10.00, multipliedSkill: "MysticArts", techniques: ["Devour", "Void Pull", "Darkness Falls"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Dark", elementalWeaknesses: ["Light"] }
+    ],
+    "S": [
+        { name: "Godspeed", description: "Surpassing the limits of human speed.", stats: { agility: 60, perception: 30 }, skillMultiplier: 25.00, multipliedSkill: "Sniper", techniques: ["Sonic Boom", "Infinite Afterimage", "Flash Step", "Time Warp", "Evasion", "Shadow Strike", "Afterimage", "Stutter", "Future Echo", "Dash"], hugeBuffType: "Agility", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Void", elementalWeaknesses: ["Chaos"] },
+        { name: "World Sunderer", description: "A strike capable of splitting islands.", stats: { strength: 70, swordsmanship: 40 }, skillMultiplier: 25.00, multipliedSkill: "Swordsmanship", techniques: ["Great Divide", "Earth Quake", "Universal Cut", "One Strike", "Alpha Strike", "Colossus Strike", "Earth Breaker", "Sky Cracker", "Final Pillar", "Heavenly Smash"], hugeBuffType: "Strength", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Chaos", elementalWeaknesses: ["Void"] },
+        { name: "Maelstrom of Souls", description: "A vortex of spiritual energy.", stats: { mysticArts: 65, willpower: 45 }, skillMultiplier: 25.00, multipliedSkill: "MysticArts", techniques: ["Soul Suck", "Spirit Explosion", "Soul Rend", "Spirit Bind", "Essence Theft", "Darkness Falls", "Void Pull", "Black Hole", "Nightmare", "Dark Bind"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Void", elementalWeaknesses: ["Chaos"] },
+        { name: "Absolute Zero", description: "Freezing time and space itself.", stats: { mysticArts: 68, endurance: 52 }, skillMultiplier: 25.00, multipliedSkill: "Medical", techniques: ["Frozen Domain", "Shatter", "Glacial Wall", "Ice Prison", "Iron Wall", "Immovable", "Mirror Shield", "Fortress", "Aegis", "Sturdy Block"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Ice", elementalWeaknesses: ["Air"] },
+        { name: "Divine Providence", description: "Guided by the hand of fate.", stats: { luck: 100, willpower: 50 }, skillMultiplier: 25.00, multipliedSkill: "TreasureHunting", techniques: ["Fate's Seal", "Unstoppable Force", "Miracle", "Jackpot", "Lucky Break", "Twist of Fate", "Destiny Strike", "Double or Nothing", "Butterfly Effect", "Entropy"], hugeBuffType: "Luck", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Divine", elementalWeaknesses: ["Chaos"] }
+    ],
+    "SS": [
+        { name: "Chaos Theory", description: "Mastering the unpredictability of existence.", stats: { luck: 150, mysticArts: 100, perception: 50 }, skillMultiplier: 100.00, multipliedSkill: "MysticArts", techniques: ["Entropy", "Butterfly Effect", "Singularity", "Fate's Seal", "Destiny Strike", "Jackpot", "Twist of Fate", "Flicker", "Shadow Strike", "Time Warp"], hugeBuffType: "Luck", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, weakAgainst: ["MartialArts"], element: "Chaos", elementalWeaknesses: ["Void"] },
+        { name: "Elysium's Gate", description: "Opening the doors to a higher plane.", stats: { willpower: 150, endurance: 100, mysticArts: 50 }, skillMultiplier: 100.00, multipliedSkill: "Medical", techniques: ["Ascension", "Holy Rain", "Judgment", "Rebirth", "Purge", "Sunbeam", "Solar Storm", "Blinding Light", "Sunburst", "Miracle"], hugeBuffType: "Willpower", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, weakAgainst: ["MartialArts"], element: "Celestial", elementalWeaknesses: ["Void"] },
+        { name: "Void Reaver", description: "Erasing anything the blade touches.", stats: { swordsmanship: 120, strength: 100, agility: 80 }, skillMultiplier: 100.00, multipliedSkill: "Swordsmanship", techniques: ["Erasure", "Non-Existence", "Dark Matter", "Universal Cut", "One Strike", "Alpha Strike", "End of All", "Finality", "Rewrite", "Delete"], hugeBuffType: "Swordsmanship", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, weakAgainst: ["MartialArts"], element: "Void", elementalWeaknesses: ["Celestial"] },
+        { name: "Genesis", description: "The power of creation at your fingertips.", stats: { strength: 80, endurance: 80, agility: 80, perception: 80, willpower: 80, luck: 80, swordsmanship: 80, brawling: 80, gunslinging: 80, spear: 80, martialArts: 80, sniper: 80, mysticArts: 80 }, skillMultiplier: 100.00, multipliedSkill: "Cooking", techniques: ["Creation", "Renewal", "Alpha Strike", "Horizontal Slash", "Sturdy Block", "Dash", "Heavy Chop", "Point Strike", "Calm State", "Wild Swing"], hugeBuffType: "MysticArts", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, weakAgainst: ["MartialArts"], element: "Genesis", elementalWeaknesses: ["Void"] }
+    ],
+    "SSS": [
+        { name: "Zenith", description: "The absolute pinnacle of martial prowess.", stats: { strength: 300, agility: 300, swordsmanship: 500, perception: 200 }, skillMultiplier: 500.00, multipliedSkill: "Swordsmanship", techniques: ["One Strike", "Universal Cut", "End of All", "Great Divide", "Earth Quake", "Sonic Boom", "Infinite Afterimage", "Alpha Strike", "Flash Step", "Time Warp", "Cosmic Tear", "Black Hole", "Nova", "Final Pillar"], hugeBuffType: "Swordsmanship", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, element: "Divine", elementalWeaknesses: ["Chaos"] },
+        { name: "Omegalyth", description: "The beginning and the end of all things.", stats: { mysticArts: 500, willpower: 400, luck: 300, endurance: 300 }, skillMultiplier: 500.00, multipliedSkill: "MysticArts", techniques: ["Erasure", "Rebirth", "Finality", "Soul Suck", "Spirit Explosion", "Frozen Domain", "Shatter", "Ascension", "Holy Rain", "Judgment", "Cosmic Tear", "Black Hole", "Nova", "Singularity"], hugeBuffType: "MysticArts", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, element: "Void", elementalWeaknesses: ["Creation"] },
+        { name: "The Author's Pen", description: "Rewriting the very laws of reality.", stats: { luck: 999, willpower: 999, perception: 999 }, skillMultiplier: 500.00, multipliedSkill: "TreasureHunting", techniques: ["Rewrite", "Delete", "Absolute Command", "Fate's Seal", "Unstoppable Force", "Miracle", "Singularity", "Entropy", "Butterfly Effect", "Creation", "Renewal", "Alpha Strike", "Non-Existence", "Erasure"], hugeBuffType: "Willpower", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, element: "Creation", elementalWeaknesses: ["Annihilation"] }
+    ],
+    "Z": [
+        {
+            name: "God's Eye of Annihilation",
+            description: "The left eye of the void. A world-shattering power that seeks only to return everything to nothingness. Users can erase matter and souls alike, but are forbidden from mundane acts like cooking, healing, or professions. Travel is 2x slower due to the weight of your existence.",
+            stats: { strength: 1000, endurance: 1000, agility: 1000, perception: 1000, willpower: 1000, luck: 1000, swordsmanship: 1000, brawling: 1000, gunslinging: 1000, spear: 1000, martialArts: 1000, sniper: 1000, mysticArts: 5000 },
+            skillMultiplier: 5000.0, multipliedSkill: "MysticArts",
+            techniques: ["Annihilation: Void Burst", "Annihilation: Reality Erasure", "Annihilation: Soul Grasp", "Annihilation: World's End", "Annihilation: Abyssal Gaze", "Annihilation: Dark Matter Crush", "Annihilation: Entropy Pulse", "Annihilation: Singularity Strike", "Annihilation: Oblivion Wave", "Annihilation: Shadow Reign", "Annihilation: Ruin", "Annihilation: Decay", "Annihilation: Despair", "Annihilation: Chaos Bolt", "Annihilation: Ultimate Zero"],
+            hugeBuffType: "MysticArts", hugeBuffValue: 2500.0, debuffPercentage: 0.0, energyRegainMultiplier: 10.0,
+            travelTimeMultiplier: 2.0, canLearnNonCombatSkills: false,
+            restrictedSkillTypes: ["Cooking", "Navigating", "TreasureHunting", "Blacksmith", "Fishing", "Medical"],
+            element: "Annihilation", elementalWeaknesses: ["Creation"]
+        },
+        {
+            name: "Celestial Eye of Creation",
+            description: "The right eye of the origin. A world-building power that can manifest anything from thin air and manipulate the threads of destiny itself, but mundane acts like cooking, healing, or professions are beneath you. Travel is 2x slower due to the divine presence you carry.",
+            stats: { strength: 1000, endurance: 1000, agility: 1000, perception: 1000, willpower: 1000, luck: 1000, swordsmanship: 1000, brawling: 1000, gunslinging: 1000, spear: 1000, martialArts: 1000, sniper: 1000, mysticArts: 5000 },
+            skillMultiplier: 5000.0, multipliedSkill: "MysticArts",
+            techniques: ["Creation: Genesis Flash", "Creation: Life Weaver", "Creation: Stellar Birth", "Creation: Infinite Bloom", "Creation: Holy Radiance", "Creation: Divine Structure", "Creation: Harmony Strike", "Creation: Eternal Dawn", "Creation: Cosmic Pulse", "Creation: Seraphim's Gaze", "Creation: Restoration", "Creation: Sanctity", "Creation: Purity", "Creation: Luminescence", "Creation: Omega Spark"],
+            hugeBuffType: "MysticArts", hugeBuffValue: 2500.0, debuffPercentage: 0.0, energyRegainMultiplier: 10.0,
+            travelTimeMultiplier: 2.0, canLearnNonCombatSkills: false,
+            restrictedSkillTypes: ["Cooking", "Navigating", "TreasureHunting", "Blacksmith", "Fishing", "Medical"],
+            element: "Creation", elementalWeaknesses: ["Annihilation"]
+        }
+    ]
+};
 
 const STAT_MAPPING: Record<string, string> = {
     "Strength": "strength",
@@ -38,20 +173,21 @@ const STAT_MAPPING: Record<string, string> = {
 
 const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = {
     "Fogi Tail Island": { x: 0, y: 0, region: "East Blue" },
-    "Ironcrest Isle": { x: 50, y: 20, region: "East Blue" },
-    "Amber Reach": { x: -30, y: 40, region: "East Blue" },
-    "Sunken Reef": { x: 10, y: 15, region: "East Blue" },
-    "Tortuga Bay": { x: 10, y: -100, region: "South Blue" },
+    "Ironcrest Isle": { x: 160, y: 40, region: "East Blue" },
+    "Amber Reach": { x: -80, y: 150, region: "East Blue" },
+    "Sunken Reef": { x: 70, y: 90, region: "East Blue" },
+    "Tortuga Bay": { x: 30, y: -210, region: "South Blue" },
     "Pirate\u0027s Den": { x: 350, y: -350, region: "South Blue" },
-    "Navy Outpost Aqua": { x: -80, y: -50, region: "South Blue" },
+    "Navy Outpost Aqua": { x: -160, y: -110, region: "South Blue" },
     "Navy Outpost Terra": { x: -300, y: 200, region: "Grand Line" },
     "Navy Outpost Ignis": { x: 400, y: 300, region: "Grand Line" },
-    "Crystal Cove": { x: 120, y: 80, region: "Grand Line" },
-    "Volcano Peak": { x: 200, y: 150, region: "Grand Line" },
+    "Crystal Cove": { x: 280, y: 120, region: "Grand Line" },
+    "Volcano Peak": { x: 420, y: 240, region: "Grand Line" },
     "Whispering Woods": { x: -150, y: 180, region: "Grand Line" },
     "Serpent\u0027s Maw": { x: 500, y: 500, region: "Grand Line" },
     "Kraken\u0027s Rest": { x: -400, y: -400, region: "South Blue" },
     "Shadow Fen": { x: -300, y: -100, region: "East Blue" },
+    "Island of World Secrets": { x: 4000, y: 4000, region: "Unknown" },
 };
 
 function calculateTravelTime(from: string, to: string, speedMultiplier: number = 1.0): number {
@@ -112,12 +248,16 @@ function checkLevelUp(character: any) {
     while (xp >= xpNeeded && level < MAX_LEVEL) {
         level++;
         xp -= xpNeeded;
-        maxEnergy += 100;
-        energy = maxEnergy;
-        stats.endurance += 1;
-        maxHp += 100;
+
+        maxHp += 20;
         hp = maxHp;
 
+        if (level % 5 === 0) {
+            maxEnergy += 5;
+            energy = maxEnergy;
+        }
+
+        stats.endurance += 1;
         stats.strength += 1;
         stats.agility += 1;
         stats.perception += 1;
@@ -133,6 +273,113 @@ function checkLevelUp(character: any) {
     }
 
     return { ...character, level, xp, stats, maxEnergy, energy, maxHp, hp, leveledUp };
+}
+
+export const rollMythicArt = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = snapshot.data() as any;
+
+        // Location check
+        if (character.currentLocation !== "Island of World Secrets") {
+            throw new functions.https.HttpsError("failed-precondition", "You must be at the Island of World Secrets to roll for Mythic Arts.");
+        }
+
+        // Cost check
+        let freeRolls = character.freeMythicRolls;
+        if (freeRolls === undefined || freeRolls === null) {
+            freeRolls = 3;
+        }
+
+        let goldCost = 0;
+        if (freeRolls <= 0) {
+            goldCost = MYTHIC_ROLL_GOLD_COST;
+            if ((character.gold || 0) < goldCost) {
+                throw new functions.https.HttpsError("failed-precondition", `Not enough gold (1,000,000 required). Current: ${character.gold || 0}`);
+            }
+        }
+
+        // Inventory check
+        const inventory = character.inventory || [];
+        if (inventory.length + 3 > INVENTORY_CAPACITY) {
+            throw new functions.https.HttpsError("failed-precondition", "Inventory does not have enough space for 3 artifacts.");
+        }
+
+        const rolledArtifacts = [];
+        for (let i = 0; i < 3; i++) {
+            const rand = Math.random() * 100;
+            let tier = "F";
+            if (rand < 0.000001) tier = "Z";
+            else if (rand < 0.000101) tier = "SSS";
+            else if (rand < 0.001101) tier = "SS";
+            else if (rand < 0.011101) tier = "S";
+            else if (rand < 0.111101) tier = "A";
+            else if (rand < 1.111101) tier = "B";
+            else if (rand < 6.111101) tier = "C";
+            else if (rand < 26.111101) tier = "D";
+
+            const artifactItem = {
+                id: `mythic_artifact_${tier}_${Date.now()}_${i}`,
+                name: `${tier} Tier Artifact`,
+                description: `A mysterious artifact that contains a random ${tier} tier Mythic Art. Use it to awaken its power.`,
+                type: "Artifact",
+                rarity: getRarityForTier(tier),
+                price: getPriceForTier(tier),
+                mythicTier: tier,
+                levelRequirement: 1
+            };
+            rolledArtifacts.push(artifactItem);
+        }
+
+        const updates: any = {
+            inventory: admin.firestore.FieldValue.arrayUnion(...rolledArtifacts)
+        };
+
+        if (freeRolls > 0) {
+            updates.freeMythicRolls = freeRolls - 1;
+        } else {
+            updates.gold = admin.firestore.FieldValue.increment(-goldCost);
+        }
+
+        transaction.update(playerRef, updates);
+        const rolledTiers = rolledArtifacts.map(a => a.mythicTier).join(", ");
+        recordLog(transaction, userId, "RollMythicArt", `Rolled 3 artifacts: ${rolledTiers}`, -goldCost, 0);
+
+        return { success: true, tiers: rolledTiers };
+    });
+});
+
+function getRarityForTier(tier: string): string {
+    switch (tier) {
+        case "Z": return "Legendary";
+        case "SSS": return "Legendary";
+        case "SS": return "Legendary";
+        case "S": return "Epic";
+        case "A": return "Epic";
+        case "B": return "Rare";
+        case "C": return "Uncommon";
+        default: return "Common";
+    }
+}
+
+function getPriceForTier(tier: string): number {
+    switch (tier) {
+        case "SSS": return 10000000;
+        case "SS": return 5000000;
+        case "S": return 2000000;
+        case "A": return 1000000;
+        case "B": return 500000;
+        case "C": return 100000;
+        case "D": return 50000;
+        default: return 10000;
+    }
 }
 
 function processHealing(character: any): any {
@@ -206,7 +453,11 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
         lastOnline: Date.now(),
         isOnline: true,
         currentLocation: "Fogi Tail Island",
-        title: "Novice Sailor",
+        freeMythicRolls: 3,
+        mythicArt: null,
+        rank: "Novice Sailor",
+        title: "",
+        unlockedTitles: [],
         pvpWins: 0,
         pvpLosses: 0,
         faction: "Neutral",
@@ -265,13 +516,13 @@ export const joinFaction = functions.https.onCall(async (data, context) => {
             if (character.currentLocation !== "Pirate\u0027s Den") {
                 throw new functions.https.HttpsError("failed-precondition", "You must be at the Pirate\u0027s Den to join the Pirates.");
             }
-            transaction.update(playerRef, { faction: "Pirate", title: "Rogue Sailor" });
+            transaction.update(playerRef, { faction: "Pirate", rank: "Rogue Sailor" });
             recordLog(transaction, userId, "JoinFaction", "Became a Pirate", 0, 0);
         } else if (faction === "Navy") {
             if (character.currentLocation !== "Navy Outpost Aqua") {
                 throw new functions.https.HttpsError("failed-precondition", "You must be at the Navy Outpost Aqua to enlist in the Navy.");
             }
-            transaction.update(playerRef, { faction: "Navy", title: "Navy Recruit" });
+            transaction.update(playerRef, { faction: "Navy", rank: "Navy Recruit" });
             recordLog(transaction, userId, "JoinFaction", "Enlisted in the Navy", 0, 0);
         } else {
             throw new functions.https.HttpsError("invalid-argument", "Invalid faction choice.");
@@ -313,6 +564,12 @@ export const train = functions.https.onCall(async (data, context) => {
 
         if (statType === "Medical") {
             throw new functions.https.HttpsError("failed-precondition", "Medical skill can only be trained by healing patients in an infirmary.");
+        }
+
+        if (character.mythicArt && character.mythicArt.restrictedSkillTypes) {
+            if (character.mythicArt.restrictedSkillTypes.includes(statType)) {
+                throw new functions.https.HttpsError("failed-precondition", `Your Mythic Art restricts training ${statType}.`);
+            }
         }
 
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
@@ -376,7 +633,7 @@ export const finishTraining = functions.https.onCall(async (data, context) => {
         const updatedChar = { ...character, xp: character.xp + 5, stats, professionStats: pStats, trainingState: null };
         const finalChar = checkLevelUp(updatedChar);
 
-        transaction.set(playerRef, finalChar);
+        transaction.update(playerRef, finalChar);
         recordLog(transaction, userId, "TrainFinish", `Finished training ${statType}`, 0, 5);
 
         return { success: true };
@@ -422,7 +679,12 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         }
 
         const speedMultiplier = character.ship?.speedMultiplier || 1.0;
-        const travelDuration = calculateTravelTime(character.currentLocation, destination, speedMultiplier);
+        let travelMultiplier = 1.0;
+        if (character.mythicArt && character.mythicArt.travelTimeMultiplier) {
+            travelMultiplier = character.mythicArt.travelTimeMultiplier;
+        }
+
+        const travelDuration = calculateTravelTime(character.currentLocation, destination, speedMultiplier * (1.0 / travelMultiplier));
         const arrivalTime = Date.now() + travelDuration;
 
         // Potential for random encounter here (Pirates, Monsters)
@@ -601,6 +863,45 @@ function calculateCombatStats(charOrEnemy: any, currentEffects: any[] = []): Com
     let luck = stats.luck || 5;
     let willpower = stats.willpower || 5;
 
+    // Apply Mythic Art bonuses
+    const mythicArt = charOrEnemy.mythicArt;
+    if (mythicArt) {
+        const skillName = mythicArt.multipliedSkill;
+        const skillMultiplier = mythicArt.skillMultiplier || 1.0;
+        const mappedSkill = STAT_MAPPING[skillName];
+        if (mappedSkill && stats[mappedSkill] !== undefined) {
+            stats[mappedSkill] = Math.floor(stats[mappedSkill] * skillMultiplier);
+        }
+
+        const debuff = mythicArt.debuffPercentage || 0;
+        if (debuff > 0) {
+            const globalMultiplier = 1.0 - debuff;
+            strength = Math.floor(strength * globalMultiplier);
+            endurance = Math.floor(endurance * globalMultiplier);
+            agility = Math.floor(agility * globalMultiplier);
+            perception = Math.floor(perception * globalMultiplier);
+            willpower = Math.floor(willpower * globalMultiplier);
+            luck = Math.floor(luck * globalMultiplier);
+        }
+
+        const hugeBuffType = mythicArt.hugeBuffType;
+        const hugeBuffValue = mythicArt.hugeBuffValue || 0;
+        if (hugeBuffType && hugeBuffValue > 0) {
+            const hugeMappedSkill = STAT_MAPPING[hugeBuffType];
+            if (hugeMappedSkill && stats[hugeMappedSkill] !== undefined) {
+                stats[hugeMappedSkill] = Math.floor(stats[hugeMappedSkill] * (1.0 + hugeBuffValue));
+            } else {
+                const baseStatMulti = 1.0 + hugeBuffValue;
+                if (hugeBuffType === "Strength") strength = Math.floor(strength * baseStatMulti);
+                if (hugeBuffType === "Endurance") endurance = Math.floor(endurance * baseStatMulti);
+                if (hugeBuffType === "Agility") agility = Math.floor(agility * baseStatMulti);
+                if (hugeBuffType === "Perception") perception = Math.floor(perception * baseStatMulti);
+                if (hugeBuffType === "Willpower") willpower = Math.floor(willpower * baseStatMulti);
+                if (hugeBuffType === "Luck") luck = Math.floor(luck * baseStatMulti);
+            }
+        }
+    }
+
     // Derived stats
     let defense = Math.floor(endurance * 1.5 + level);
     let accuracy = 80 + agility * 0.5 + perception * 0.5;
@@ -729,12 +1030,45 @@ function processStatusEffects(character: any, effects: any[], logs: string[]): {
     return { character: updatedChar, activeEffects };
 }
 
-function calculateDamage(attackerStats: CombatStats, defenderStats: CombatStats, attackerEffects: any[], defenderEffects: any[], isCrit: boolean): number {
-    let damage = attackerStats.strength * 2 + (attackerStats.swordsmanship || 0) * 1.5;
+function getHighestCombatSkill(charOrEnemy: any): string {
+    const combatSkills = ["Swordsmanship", "Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper", "MysticArts"];
+    let highestSkill = "Brawling";
+    let highestValue = -1;
+
+    const stats = charOrEnemy.stats || {};
+    for (const skill of combatSkills) {
+        const mapped = STAT_MAPPING[skill];
+        const val = stats[mapped] || 0;
+        if (val > highestValue) {
+            highestValue = val;
+            highestSkill = skill;
+        }
+    }
+    return highestSkill;
+}
+
+function calculateDamage(attackerStats: CombatStats, defenderStats: CombatStats, attackerEffects: any[], defenderEffects: any[], isCrit: boolean, attackerCombatType?: string, defenderMythicArt?: any, attackerMythicArt?: any): number {
+    const mappedCombatSkill = attackerCombatType ? STAT_MAPPING[attackerCombatType] : "swordsmanship";
+    const skillVal = (attackerStats as any)[mappedCombatSkill] || 0;
+    let damage = attackerStats.strength * 2 + skillVal * 1.5;
 
     // Apply Weaken effect
     if (attackerEffects.some(e => e.type === "Weaken")) {
         damage *= 0.7;
+    }
+
+    // Weakness Logic (Combat Type)
+    if (defenderMythicArt && defenderMythicArt.weakAgainst && attackerCombatType) {
+        if (defenderMythicArt.weakAgainst.includes(attackerCombatType)) {
+            damage *= 1.5; // 50% more damage if weak against the type
+        }
+    }
+
+    // Elemental Logic
+    if (attackerMythicArt && attackerMythicArt.element && defenderMythicArt && defenderMythicArt.elementalWeaknesses) {
+        if (defenderMythicArt.elementalWeaknesses.includes(attackerMythicArt.element)) {
+            damage *= 1.5; // 50% more damage if elemental advantage
+        }
     }
 
     let defense = defenderStats.defense;
@@ -824,7 +1158,10 @@ export const combatAction = functions.https.onCall(async (data, context) => {
 
                     if (hitRoll < hitChance) {
                         const isCrit = Math.random() * 100 < pStats.critChance;
-                        const damage = calculateDamage(pStats, targetStats, pActiveEffects, targetEffects, isCrit);
+                        const attackerCombatType = getHighestCombatSkill(character);
+                        const defenderMythicArt = combat.isPvP ? opponent.mythicArt : enemy.mythicArt;
+                        const attackerMythicArt = character.mythicArt;
+                        const damage = calculateDamage(pStats, targetStats, pActiveEffects, targetEffects, isCrit, attackerCombatType, defenderMythicArt, attackerMythicArt);
 
                         if (isCrit) logs.push(`CRITICAL! You strike for ${damage} damage!`);
                         else logs.push(`You hit for ${damage} damage.`);
@@ -854,7 +1191,18 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     cooldowns[techniqueId] = tech.cooldown;
                     combat.cooldowns = cooldowns;
 
-                    let techDamage = Math.floor(pStats.strength * tech.power * 2);
+                    const mappedTechSkill = STAT_MAPPING[tech.type] || "strength";
+                    const techSkillVal = (pStats as any)[mappedTechSkill] || pStats.strength;
+                    let techDamage = Math.floor(techSkillVal * tech.power * 2);
+
+                    // Apply weakness to technique damage
+                    const defenderMythicArt = combat.isPvP ? opponent.mythicArt : enemy.mythicArt;
+                    if (defenderMythicArt && defenderMythicArt.weakAgainst && tech.type) {
+                        if (defenderMythicArt.weakAgainst.includes(tech.type)) {
+                            techDamage = Math.floor(techDamage * 1.5);
+                        }
+                    }
+
                     techDamage = Math.max(1, Math.floor(techDamage - targetStats.defense * 0.3));
 
                     if (combat.isPvP) {
@@ -933,7 +1281,10 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                             const eHitRoll = Math.random() * 100;
                             const eHitChance = eStats.accuracy - pStats.dodge;
                             if (eHitRoll < eHitChance) {
-                                let eDamage = calculateDamage(eStats, pStats, eActiveEffects, pActiveEffects, false);
+                                const attackerCombatType = getHighestCombatSkill(enemy);
+                                const defenderMythicArt = character.mythicArt;
+                                const attackerMythicArt = enemy.mythicArt;
+                                let eDamage = calculateDamage(eStats, pStats, eActiveEffects, pActiveEffects, false, attackerCombatType, defenderMythicArt, attackerMythicArt);
                                 if (combat.defending) {
                                     eDamage = Math.floor(eDamage * 0.5);
                                     combat.defending = false;
@@ -1074,7 +1425,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     updatedChar.energy = character.maxEnergy;
                     recordLog(transaction, userId, "CombatLoss", `Defeated by ${enemy.name}`, -goldLost, 0);
                 }
-                transaction.set(playerRef, updatedChar);
+                transaction.update(playerRef, updatedChar);
                 return { success: true, isFinished: true, playerWon, logs };
             }
         } else {
@@ -1189,10 +1540,10 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
                 attacker.infamy = 0;
                 if (attacker.faction === "Navy") {
                     attacker.faction = "Neutral";
-                    attacker.title = "Dishonored Sailor";
+                    attacker.rank = "Dishonored Sailor";
                 } else if (attacker.faction === "Neutral") {
                     attacker.faction = "Pirate";
-                    attacker.title = "Outlaw";
+                    attacker.rank = "Outlaw";
                 }
             }
         }
@@ -1259,11 +1610,11 @@ export const startHealing = functions.https.onCall(async (data, context) => {
         if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
         if (character.healingState) throw new functions.https.HttpsError("failed-precondition", "You are already resting.");
 
-        // Check if current location has an infirmary
+        // Check if current location has an infirmary or a camp
         const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
         const location = locationSnap.data();
-        const hasInfirmary = location?.actions?.some((a: any) => a.type === "Infirmary");
-        if (!hasInfirmary) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary at your current location.");
+        const hasHealingAction = location?.actions?.some((a: any) => a.type === "Infirmary" || a.type === "Camp");
+        if (!hasHealingAction) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary or camp at your current location.");
 
         const endTime = Date.now() + HEALING_DURATION_MS;
         transaction.update(playerRef, { healingState: { endTime } });
@@ -1285,11 +1636,11 @@ export const instantHeal = functions.https.onCall(async (data, context) => {
         if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
         if (character.gold < 50) throw new functions.https.HttpsError("failed-precondition", "Not enough gold for instant treatment.");
 
-        // Check if current location has an infirmary
+        // Check if current location has an infirmary or a camp
         const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
         const location = locationSnap.data();
-        const hasInfirmary = location?.actions?.some((a: any) => a.type === "Infirmary");
-        if (!hasInfirmary) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary at your current location.");
+        const hasHealingAction = location?.actions?.some((a: any) => a.type === "Infirmary" || a.type === "Camp");
+        if (!hasHealingAction) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary or camp at your current location.");
 
         transaction.update(playerRef, {
             hp: character.maxHp,
@@ -1313,6 +1664,10 @@ export const purchaseMedicalLicense = functions.https.onCall(async (data, contex
 
         if (character.hasMedicalLicense) throw new functions.https.HttpsError("already-exists", "You already have a medical license.");
         if (character.gold < 15000) throw new functions.https.HttpsError("failed-precondition", "Not enough gold (15,000 required).");
+
+        if (character.mythicArt && !character.mythicArt.canLearnNonCombatSkills) {
+            throw new functions.https.HttpsError("failed-precondition", "Your Mythic Art forbids practicing medicine.");
+        }
 
         transaction.update(playerRef, {
             gold: admin.firestore.FieldValue.increment(-15000),
@@ -1340,9 +1695,20 @@ export const healPlayer = functions.https.onCall(async (data, context) => {
         const healer = healerSnap.data() as any;
         const target = targetSnap.data() as any;
 
+        if (healer.mythicArt && !healer.mythicArt.canLearnNonCombatSkills) {
+            throw new functions.https.HttpsError("failed-precondition", "Your Mythic Art forbids non-combat actions like healing.");
+        }
+
         if (!healer.hasMedicalLicense) throw new functions.https.HttpsError("failed-precondition", "You do not have a medical license.");
         if (healer.currentLocation !== target.currentLocation) throw new functions.https.HttpsError("failed-precondition", "Target is not at your location.");
-        if (!target.healingState) throw new functions.https.HttpsError("failed-precondition", "Target is not currently resting in the hospital.");
+
+        // Check if current location has an infirmary or a camp
+        const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(healer.currentLocation));
+        const location = locationSnap.data();
+        const hasHealingAction = location?.actions?.some((a: any) => a.type === "Infirmary" || a.type === "Camp");
+        if (!hasHealingAction) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary or camp at your current location.");
+
+        if (!target.healingState) throw new functions.https.HttpsError("failed-precondition", "Target is not currently resting.");
         if (target.hp >= target.maxHp) throw new functions.https.HttpsError("failed-precondition", "Target is already at full health.");
 
         const medicalSkill = healer.professionStats?.medical || 0;
@@ -1485,7 +1851,7 @@ export const completeMission = functions.https.onCall(async (data, context) => {
         };
 
         updatedChar = checkLevelUp(updatedChar);
-        transaction.set(playerRef, updatedChar);
+        transaction.update(playerRef, updatedChar);
         recordLog(transaction, userId, "MissionCompleted", `Completed mission ${mission.title || missionId}`, mission.goldReward, mission.xpReward);
 
         return { success: true, rewards: { gold: mission.goldReward, xp: mission.xpReward } };
@@ -1574,11 +1940,52 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
 
         character = processHealing(character);
 
-        transaction.update(playerRef, {
-            ...character,
+        const updates: any = {
             lastOnline: Date.now(),
-            isOnline: true
-        });
+            isOnline: true,
+            hp: character.hp,
+            healingState: character.healingState
+        };
+
+        // ADMIN GOLD BOOST
+        const admins = ["sedna", "von"];
+        const charNameLower = (character.nameLower || character.name || "").toLowerCase();
+
+        if (admins.includes(charNameLower) && (character.gold || 0) < 900000000) {
+            updates.gold = 900000000;
+        }
+
+        // TEST MYTHICS FOR ADMINS
+        if (admins.includes(charNameLower)) {
+            const hasHighTier = (character.inventory || []).some((i: any) => i.id.startsWith("test_artifact_SSS_"));
+            if (!hasHighTier) {
+                const testItems = [];
+                const tiers = ["S", "S", "SS", "SS", "SSS", "SSS"];
+                for (let i = 0; i < tiers.length; i++) {
+                    const tier = tiers[i];
+                    testItems.push({
+                        id: `test_artifact_${tier}_${Date.now()}_${i}`,
+                        name: `${tier} Tier Artifact (Test)`,
+                        description: `A mysterious artifact that contains a random ${tier} tier Mythic Art. Use it to awaken its power.`,
+                        type: "Artifact",
+                        rarity: getRarityForTier(tier),
+                        price: getPriceForTier(tier),
+                        mythicTier: tier,
+                        levelRequirement: 1
+                    });
+                }
+                updates.inventory = admin.firestore.FieldValue.arrayUnion(...testItems);
+            }
+        }
+
+        // Rank Repair Logic: Ensure faction members have their correct starting rank if it was lost
+        if (character.faction === "Navy" && (character.rank === "Novice Sailor" || !character.rank)) {
+            updates.rank = "Navy Recruit";
+        } else if (character.faction === "Pirate" && (character.rank === "Novice Sailor" || !character.rank)) {
+            updates.rank = "Rogue Sailor";
+        }
+
+        transaction.update(playerRef, updates);
         return { success: true };
     });
 });
@@ -1592,19 +1999,20 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
 
     const locations = [
         { name: "Fogi Tail Island", region: "East Blue", description: "A peaceful starting island with clear blue waters.", isSafe: true, weather: "Sunny", x: 0, y: 0, actions: [{ type: "Training", label: "Dojo", icon: "🥋" }, { type: "Kitchen", label: "Galley", icon: "🍳" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Medical Clinic", icon: "🏥" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: true, weather: "Foggy", x: 50, y: 20, actions: [{ type: "Forge", label: "Grand Forge", icon: "⚒" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 10, y: 15, actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Shadow Fen", region: "East Blue", description: "A murky swamp island filled with dangerous creatures.", isSafe: false, weather: "Overcast", x: -300, y: -100, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Tortuga Bay", region: "South Blue", description: "A bustling pirate haven filled with taverns and mystery.", isSafe: true, weather: "Tropical", x: 10, y: -100, actions: [{ type: "Tavern", label: "The Salty Dog", icon: "🍻" }, { type: "Market", label: "Bazaar", icon: "💰" }, { type: "Expedition", label: "Treasure Hunt", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Pirate Doctor", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Pirate\u0027s Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 350, y: -350, actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Kraken\u0027s Rest", region: "South Blue", description: "A desolate island graveyard of sunken ships and sea monsters.", isSafe: false, weather: "Stormy", x: -400, y: -400, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Navy Outpost Aqua", region: "South Blue", description: "A strictly regulated military base maintaining order.", isSafe: true, weather: "Clear", x: -80, y: -50, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Navy Hospital", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Navy Outpost Terra", region: "Grand Line", description: "A frontier navy post watching over the Grand Line entrance.", isSafe: true, weather: "Windy", x: -300, y: 200, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Navy Outpost Ignis", region: "Grand Line", description: "A strategic outpost near the volcanic islands.", isSafe: true, weather: "Hot", x: 400, y: 300, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Crystal Cove", region: "Grand Line", description: "An island made of glowing crystals and mysterious energy.", isSafe: false, weather: "Shimmering", x: 120, y: 80, actions: [{ type: "BlackMarket", label: "Crystal Trader", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 200, y: 150, actions: [{ type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -150, y: 180, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Observatory", label: "Star Gazing", icon: "🔭" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Serpent\u0027s Maw", region: "Grand Line", description: "A terrifying island shaped like a giant serpent\u0027s head.", isSafe: false, weather: "Foggy", x: 500, y: 500, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
+        { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: false, weather: "Foggy", x: 640, y: 160, actions: [{ type: "Forge", label: "Grand Forge", icon: "⚒" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 280, y: 360, actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Shadow Fen", region: "East Blue", description: "A murky swamp island filled with dangerous creatures.", isSafe: false, weather: "Overcast", x: -1200, y: -400, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Tortuga Bay", region: "South Blue", description: "A bustling pirate haven filled with taverns and mystery.", isSafe: false, weather: "Tropical", x: 120, y: -840, actions: [{ type: "Tavern", label: "The Salty Dog", icon: "🍻" }, { type: "Market", label: "Bazaar", icon: "💰" }, { type: "Expedition", label: "Treasure Hunt", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Pirate Doctor", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Pirate's Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 1400, y: -1400, actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Kraken's Rest", region: "South Blue", description: "A desolate island graveyard of sunken ships and sea monsters.", isSafe: false, weather: "Stormy", x: -1600, y: -1600, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Navy Outpost Aqua", region: "South Blue", description: "A strictly regulated military base maintaining order.", isSafe: false, weather: "Clear", x: -640, y: -440, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Navy Hospital", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Navy Outpost Terra", region: "Grand Line", description: "A frontier navy post watching over the Grand Line entrance.", isSafe: false, weather: "Windy", x: -1200, y: 800, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Navy Outpost Ignis", region: "Grand Line", description: "A strategic outpost near the volcanic islands.", isSafe: false, weather: "Hot", x: 1600, y: 1200, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Crystal Cove", region: "Grand Line", description: "An island made of glowing crystals and mysterious energy.", isSafe: false, weather: "Shimmering", x: 1120, y: 480, actions: [{ type: "BlackMarket", label: "Crystal Trader", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 1680, y: 960, actions: [{ type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -600, y: 720, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Observatory", label: "Star Gazing", icon: "🔭" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Serpent's Maw", region: "Grand Line", description: "A terrifying island shaped like a giant serpent's head.", isSafe: false, weather: "Foggy", x: 2000, y: 2000, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Island of World Secrets", region: "Unknown", description: "A mystical island shrouded in secrets. Here, you can roll for Mythic Arts.", isSafe: true, weather: "Celestial", x: 4000, y: 4000, actions: [{ type: "MythicRoll", label: "Ancient Altar", icon: "✨" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
     ];
 
     for (const loc of locations) {
@@ -1629,7 +2037,17 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         { id: "sea_shell", name: "Sea Shell", description: "A pretty shell from the ocean floor.", type: "Miscellaneous", rarity: "Common", price: 10 },
         { id: "rusty_cutlass", name: "Rusty Cutlass", description: "An old, worn-out sword.", type: "Weapon", rarity: "Common", price: 50, levelRequirement: 1, statBonus: { strength: 2 } },
         { id: "old_boots", name: "Old Boots", description: "Waterlogged but still wearable.", type: "Armor", rarity: "Common", price: 40, levelRequirement: 1, statBonus: { endurance: 2 } },
-        { id: "pearl", name: "Pearl", description: "A rare and valuable gem from a Giant Squid.", type: "Miscellaneous", rarity: "Rare", price: 200 }
+        { id: "pearl", name: "Pearl", description: "A rare and valuable gem from a Giant Squid.", type: "Miscellaneous", rarity: "Rare", price: 200 },
+        // Artifacts
+        { id: "artifact_f", name: "Shattered Slate (F)", description: "A common artifact containing a faint whisper of power.", type: "Artifact", rarity: "Common", price: 1000, mythicTier: "F" },
+        { id: "artifact_e", name: "Rusty Relic (E)", description: "A simple relic that holds basic knowledge.", type: "Artifact", rarity: "Common", price: 5000, mythicTier: "E" },
+        { id: "artifact_d", name: "Ancient Shard (D)", description: "A shard from a bygone era, pulsating with energy.", type: "Artifact", rarity: "Uncommon", price: 20000, mythicTier: "D" },
+        { id: "artifact_c", name: "Glowing Core (C)", description: "A core of energy that contains specialized techniques.", type: "Artifact", rarity: "Uncommon", price: 100000, mythicTier: "C" },
+        { id: "artifact_b", name: "Jade Idol (B)", description: "A beautifully crafted idol that resonates with your spirit.", type: "Artifact", rarity: "Rare", price: 500000, mythicTier: "B" },
+        { id: "artifact_a", name: "Dragon Scale (A)", description: "A scale from a legendary dragon, containing immense power.", type: "Artifact", rarity: "Rare", price: 2000000, mythicTier: "A" },
+        { id: "artifact_s", name: "Phoenix Feather (S)", description: "A feather that never stops burning with mythical energy.", type: "Artifact", rarity: "Epic", price: 10000000, mythicTier: "S" },
+        { id: "artifact_ss", name: "God's Tear (SS)", description: "A crystalline tear said to fall from the heavens.", type: "Artifact", rarity: "Epic", price: 50000000, mythicTier: "SS" },
+        { id: "artifact_sss", name: "Void Essence (SSS)", description: "The pure essence of the void. The pinnacle of power.", type: "Artifact", rarity: "Legendary", price: 250000000, mythicTier: "SSS" }
     ];
 
     for (const item of items) {
@@ -1662,7 +2080,7 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
     }
 
     await batch.commit();
-    return { success: true, count: locations.length + enemies.length + items.length + lootTables.length };
+    return { success: true, message: `SUCCESS_V4: 15 islands seeded. Safety zones updated.` };
 });
 
 export const sendMessage = functions.https.onCall(async (data, context) => {
@@ -1692,8 +2110,6 @@ export const sendMessage = functions.https.onCall(async (data, context) => {
     return { success: true };
 });
 
-// --- Admin Tools ---
-
 export async function checkAdmin(context: functions.https.CallableContext) {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
@@ -1703,7 +2119,8 @@ export async function checkAdmin(context: functions.https.CallableContext) {
     // Fallback: Hardcoded check for "Sedna" as the primary admin
     const userId = context.auth.uid;
     const playerSnap = await db.collection("players").doc(userId).get();
-    if (playerSnap.exists && (playerSnap.data() as any).nameLower === "sedna") {
+    const adminNames = ["sedna", "von"];
+    if (playerSnap.exists && adminNames.includes((playerSnap.data() as any).nameLower)) {
         // Grant admin claim permanently for this user
         await admin.auth().setCustomUserClaims(userId, { admin: true });
         return;
@@ -1748,6 +2165,32 @@ export const adminSendAnnouncement = functions.https.onCall(async (data, context
     return { success: true };
 });
 
+export const adminSendSystemMail = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    await checkAdmin(context);
+
+    const { targetName, subject, body, rewards } = data;
+
+    const targetSnap = await db.collection("players").where("nameLower", "==", targetName.toLowerCase()).get();
+    if (targetSnap.empty) throw new functions.https.HttpsError("not-found", "Target player not found.");
+
+    const targetId = targetSnap.docs[0].id;
+    const mailRef = db.collection("players").doc(targetId).collection("mail").doc();
+
+    await mailRef.set({
+        id: mailRef.id,
+        senderName: "System",
+        subject: subject || "System Update",
+        body: body || "The latest updates have been applied to your account.",
+        timestamp: Date.now(),
+        isRead: false,
+        claimed: false,
+        rewards: rewards || null
+    });
+
+    return { success: true };
+});
+
 export const adminMutePlayer = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
     await checkAdmin(context);
@@ -1773,6 +2216,53 @@ export const adminBanPlayer = functions.https.onCall(async (data, context) => {
         banReason: reason
     });
     return { success: true };
+});
+
+export const adminGrantTestItems = functions.https.onCall(async (data, context) => {
+    console.log("adminGrantTestItems called by:", context.auth?.uid);
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    await checkAdmin(context);
+    console.log("Admin check passed for:", context.auth.uid);
+
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) {
+            console.log("Character not found for UID:", userId);
+            throw new functions.https.HttpsError("not-found", "Character not found.");
+        }
+
+        const character = snapshot.data() as any;
+        console.log("Found character:", character.name);
+        const currentInventory = character.inventory || [];
+
+        const testItems = [];
+        const tiers = ["S", "S", "SS", "SS", "SSS", "SSS"];
+        for (let i = 0; i < tiers.length; i++) {
+            const tier = tiers[i];
+            testItems.push({
+                id: `test_artifact_${tier}_${Date.now()}_${i}`,
+                name: `${tier} Tier Artifact (Test)`,
+                description: `A mysterious artifact that contains a random ${tier} tier Mythic Art. Use it to awaken its power.`,
+                type: "Artifact",
+                rarity: getRarityForTier(tier),
+                price: getPriceForTier(tier),
+                mythicTier: tier,
+                levelRequirement: 1
+            });
+        }
+
+        console.log("Granting 6 artifacts to:", character.name);
+        transaction.update(playerRef, {
+            inventory: [...currentInventory, ...testItems],
+            gold: 900000000
+        });
+
+        return { success: true };
+    });
 });
 
 // --- Social Functions ---
@@ -2060,6 +2550,77 @@ export const useItem = functions.https.onCall(async (data, context) => {
         if (itemIndex === -1) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
 
         const item = inventory[itemIndex];
+
+        if (item.type === "Artifact") {
+            const tier = item.mythicTier;
+            const arts = MYTHIC_ARTS[tier];
+            if (!arts || arts.length === 0) throw new functions.https.HttpsError("not-found", "Mythic data not found.");
+
+            const mythic = arts[Math.floor(Math.random() * arts.length)];
+
+            const oldArt = character.mythicArt;
+            const stats = character.stats || {};
+            const learnedTechniques = character.learnedTechniques || [];
+
+            // Revert old stats if exists
+            if (oldArt && oldArt.bonusStats) {
+                for (const [stat, value] of Object.entries(oldArt.bonusStats)) {
+                    if (stats[stat] !== undefined) stats[stat] -= (value as number);
+                }
+            }
+
+            // Apply new stats
+            for (const [stat, value] of Object.entries(mythic.stats)) {
+                if (stats[stat] !== undefined) stats[stat] += (value as number);
+            }
+
+            // Remove old techniques from previous Mythic Art if they exist
+            let newTechniques = [...learnedTechniques];
+            if (character.mythicArt && character.mythicArt.techniques) {
+                const oldTechs = character.mythicArt.techniques;
+                newTechniques = newTechniques.filter((tech: string) => !oldTechs.includes(tech));
+            }
+
+            // Add new techniques
+            if (mythic.techniques) {
+                for (const tech of mythic.techniques) {
+                    if (!newTechniques.includes(tech)) {
+                        newTechniques.push(tech);
+                    }
+                }
+            }
+
+            const newMythicArt = {
+                name: mythic.name,
+                tier: tier,
+                description: mythic.description,
+                bonusStats: mythic.stats,
+                skillMultiplier: mythic.skillMultiplier || 1.0,
+                multipliedSkill: mythic.multipliedSkill || "Swordsmanship",
+                techniques: mythic.techniques || [],
+                hugeBuffType: mythic.hugeBuffType || null,
+                hugeBuffValue: mythic.hugeBuffValue || 0,
+                debuffPercentage: mythic.debuffPercentage || 0,
+                energyRegainMultiplier: mythic.energyRegainMultiplier || 1.0,
+                weakAgainst: mythic.weakAgainst || [],
+                travelTimeMultiplier: mythic.travelTimeMultiplier || 1.0,
+                canLearnNonCombatSkills: mythic.canLearnNonCombatSkills !== undefined ? mythic.canLearnNonCombatSkills : true,
+                restrictedSkillTypes: mythic.restrictedSkillTypes || []
+            };
+
+            inventory.splice(itemIndex, 1);
+
+            transaction.update(playerRef, {
+                mythicArt: newMythicArt,
+                stats,
+                learnedTechniques: newTechniques,
+                inventory
+            });
+
+            recordLog(transaction, userId, "UseArtifact", `Used ${item.name} and gained ${mythic.name}`, 0, 0);
+            return { success: true, gainedArt: mythic.name };
+        }
+
         if (item.type !== "Consumable") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
 
         let playerHp = character.hp;

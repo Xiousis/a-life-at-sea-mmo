@@ -63,6 +63,11 @@ class FishingViewModel @Inject constructor(
             val userId = authRepository.currentUser.value?.uid ?: return@launch
             val character = gameRepository.getCharacter(userId).firstOrNull() ?: return@launch
             
+            if (character.mythicArt?.tier == "Z") {
+                _errorMessage.value = "Your Mythic Art is too powerful for such a mundane activity as fishing."
+                return@launch
+            }
+
             val hasRod = character.inventory.any { it.id.startsWith("rod_") || it.type == ItemType.Tool && it.name.contains("Rod", ignoreCase = true) }
             
             if (!hasRod) {

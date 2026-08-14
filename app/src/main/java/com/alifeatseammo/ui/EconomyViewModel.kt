@@ -71,6 +71,11 @@ class EconomyViewModel @Inject constructor(
     }
 
     fun cookFish(item: Item) {
+        val char = character.value ?: return
+        if (char.mythicArt?.tier == "Z") {
+            _errorMessage.value = "A God's Eye user does not cook. They create or annihilate."
+            return
+        }
         viewModelScope.launch {
             try {
                 gameRepository.cookFish(item.id)

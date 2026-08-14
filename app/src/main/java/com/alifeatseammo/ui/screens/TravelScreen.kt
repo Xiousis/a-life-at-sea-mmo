@@ -35,6 +35,7 @@ fun TravelScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
             Text("Current Location: ${character.currentLocation}", style = MaterialTheme.typography.titleMedium)
+            Text("Islands Found: ${locations.size}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
             
             if (character.travelState != null) {
                 TravelTimer(character.travelState)

@@ -10,16 +10,14 @@ plugins {
 
 android {
     namespace = "com.alifeatseammo"
-    compileSdk {
-        version = release(37)
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.alifeatseammo"
         minSdk = 24
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -33,7 +31,7 @@ android {
         debug {
             firebaseAppDistribution {
                 artifactType = "APK"
-                releaseNotes = "Added Medical Skill! Players can now obtain a medical license for 15,000 gold and heal other players in the infirmary to level up."
+                releaseNotes = "Added S, SS, and SSS artifact grant for admins. Fixed artifact distribution logic in heartbeat."
                 testers = "oscali11@gmail.com"
             }
         }

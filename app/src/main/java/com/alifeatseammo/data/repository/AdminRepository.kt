@@ -1,7 +1,6 @@
 package com.alifeatseammo.data.repository
 
 import com.alifeatseammo.data.model.*
-import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.toObject
 import com.google.firebase.functions.FirebaseFunctions
@@ -18,7 +17,7 @@ interface AdminRepository {
     suspend fun teleportPlayer(userId: String, location: String): Boolean
     suspend fun adjustGold(userId: String, amount: Int, reason: String): Boolean
     suspend fun sendGlobalAnnouncement(message: String): Boolean
-    suspend fun seedWorld(): Boolean
+    suspend fun seedWorld(): String
 }
 
 class FirestoreAdminRepository(
@@ -54,67 +53,38 @@ class FirestoreAdminRepository(
     }
 
     override suspend fun mutePlayer(userId: String, reason: String, durationHours: Int): Boolean {
-        return try {
-            val data = hashMapOf("userId" to userId, "reason" to reason, "durationHours" to durationHours)
-            functions.getHttpsCallable("adminMutePlayer").call(data).await()
-            true
-        } catch (e: Exception) {
-            Log.e("AdminRepository", "Error muting player $userId", e)
-            false
-        }
+        val data = hashMapOf("userId" to userId, "reason" to reason, "durationHours" to durationHours)
+        functions.getHttpsCallable("adminMutePlayer").call(data).await()
+        return true
     }
 
     override suspend fun banPlayer(userId: String, reason: String): Boolean {
-        return try {
-            val data = hashMapOf("userId" to userId, "reason" to reason)
-            functions.getHttpsCallable("adminBanPlayer").call(data).await()
-            true
-        } catch (e: Exception) {
-            Log.e("AdminRepository", "Error banning player $userId", e)
-            false
-        }
+        val data = hashMapOf("userId" to userId, "reason" to reason)
+        functions.getHttpsCallable("adminBanPlayer").call(data).await()
+        return true
     }
 
     override suspend fun teleportPlayer(userId: String, location: String): Boolean {
-        return try {
-            val data = hashMapOf("userId" to userId, "location" to location)
-            functions.getHttpsCallable("adminTeleportPlayer").call(data).await()
-            true
-        } catch (e: Exception) {
-            Log.e("AdminRepository", "Error teleporting player $userId to $location", e)
-            false
-        }
+        val data = hashMapOf("userId" to userId, "location" to location)
+        functions.getHttpsCallable("adminTeleportPlayer").call(data).await()
+        return true
     }
 
     override suspend fun adjustGold(userId: String, amount: Int, reason: String): Boolean {
-        return try {
-            val data = hashMapOf("userId" to userId, "amount" to amount, "reason" to reason)
-            functions.getHttpsCallable("adminAdjustGold").call(data).await()
-            true
-        } catch (e: Exception) {
-            Log.e("AdminRepository", "Error adjusting gold for player $userId", e)
-            false
-        }
+        val data = hashMapOf("userId" to userId, "amount" to amount, "reason" to reason)
+        functions.getHttpsCallable("adminAdjustGold").call(data).await()
+        return true
     }
 
     override suspend fun sendGlobalAnnouncement(message: String): Boolean {
-        return try {
-            val data = hashMapOf("message" to message)
-            functions.getHttpsCallable("adminSendAnnouncement").call(data).await()
-            true
-        } catch (e: Exception) {
-            Log.e("AdminRepository", "Error sending announcement", e)
-            false
-        }
+        val data = hashMapOf("message" to message)
+        functions.getHttpsCallable("adminSendAnnouncement").call(data).await()
+        return true
     }
 
-    override suspend fun seedWorld(): Boolean {
-        return try {
-            functions.getHttpsCallable("seedWorld").call().await()
-            true
-        } catch (e: Exception) {
-            Log.e("AdminRepository", "Error seeding world", e)
-            false
-        }
+    override suspend fun seedWorld(): String {
+        val result = functions.getHttpsCallable("seedWorld").call().await()
+        val data = result.data as? Map<*, *>
+        return data?.get("message")?.toString() ?: "No message received"
     }
 }

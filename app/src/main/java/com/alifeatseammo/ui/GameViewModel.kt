@@ -85,7 +85,13 @@ class GameViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     val isAdmin: StateFlow<Boolean> = character
-        .map { it?.name?.equals("Sedna", ignoreCase = true) == true }
+        .map { char ->
+            val name = char?.name?.lowercase()?.trim() ?: ""
+            val adminNames = listOf("sedna", "von")
+            val isMatch = adminNames.contains(name)
+            Log.d("GameViewModel", "Admin check for name '$name': $isMatch")
+            isMatch
+        }
         .stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     private fun startHeartbeat() {
@@ -213,6 +219,20 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun adminGrantTestItems() {
+        viewModelScope.launch {
+            try {
+                gameRepository.adminGrantTestItems()
+            } catch (e: com.google.firebase.functions.FirebaseFunctionsException) {
+                Log.e("GameViewModel", "Functions error: ${e.code}", e)
+                _errorMessage.value = "Grant Error: ${e.code} (${e.message})"
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Grant failed", e)
+                _errorMessage.value = "Failed to grant test items: ${e.message}"
+            }
+        }
+    }
+
     fun startHealing() {
         viewModelScope.launch {
             try {
@@ -283,13 +303,33 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun startMonsterHunt() {
+        viewModelScope.launch {
+            try {
+                gameRepository.startMonsterHunt()
+            } catch (e: Exception) {
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
+    fun rollMythicArt() {
+        viewModelScope.launch {
+            try {
+                gameRepository.rollMythicArt()
+            } catch (e: Exception) {
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
     fun seedWorld() {
         viewModelScope.launch {
             try {
-                adminRepository.seedWorld()
-                _errorMessage.value = "World seeded successfully!"
+                val message = adminRepository.seedWorld()
+                _errorMessage.value = message
             } catch (e: Exception) {
-                _errorMessage.value = e.message
+                _errorMessage.value = "Error: ${e.localizedMessage ?: "Unknown error"}"
             }
         }
     }

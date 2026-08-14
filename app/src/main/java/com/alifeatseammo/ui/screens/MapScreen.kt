@@ -26,6 +26,21 @@ fun MapScreen(
 ) {
     var selectedLocation by remember { mutableStateOf<LocationDef?>(null) }
 
+    // Dynamic scaling based on location bounds
+    val minX = locations.minOfOrNull { it.x }?.toFloat() ?: -500f
+    val maxX = locations.maxOfOrNull { it.x }?.toFloat() ?: 500f
+    val minY = locations.minOfOrNull { it.y }?.toFloat() ?: -500f
+    val maxY = locations.maxOfOrNull { it.y }?.toFloat() ?: 500f
+
+    val padding = 150f
+    val mapMinX = Math.min(minX - padding, -500f)
+    val mapMaxX = Math.max(maxX + padding, 500f)
+    val mapMinY = Math.min(minY - padding, -500f)
+    val mapMaxY = Math.max(maxY + padding, 500f)
+
+    val mapWidth = mapMaxX - mapMinX
+    val mapHeight = mapMaxY - mapMinY
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -39,6 +54,21 @@ fun MapScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            val currentLocationInfo = locations.find { it.name == character.currentLocation }
+            currentLocationInfo?.let { loc ->
+                Text(
+                    text = "Current: ${loc.name} (${loc.x}, ${loc.y})",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+            Text(
+                text = "Total Islands: ${locations.size}",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Gray
+            )
+
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -48,15 +78,14 @@ fun MapScreen(
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(Unit) {
+                        .pointerInput(locations, mapMinX, mapMaxX, mapMinY, mapMaxY) {
                             detectTapGestures { offset ->
-                                // Simple hit detection
                                 val canvasWidth = size.width
                                 val canvasHeight = size.height
                                 
                                 locations.forEach { loc ->
-                                    val x = (loc.x + 500) * (canvasWidth / 1000f)
-                                    val y = (loc.y + 500) * (canvasHeight / 1000f)
+                                    val x = (loc.x - mapMinX) * (canvasWidth / mapWidth)
+                                    val y = (loc.y - mapMinY) * (canvasHeight / mapHeight)
                                     val locOffset = Offset(x, y)
                                     
                                     if ((offset - locOffset).getDistance() < 40f) {
@@ -70,16 +99,18 @@ fun MapScreen(
                     drawRect(color = Color(0xFFB3E5FC))
 
                     // Draw Grid
-                    val step = size.width / 10
-                    for (i in 0..10) {
-                        drawLine(Color.White.copy(alpha = 0.3f), Offset(i * step, 0f), Offset(i * step, size.height))
-                        drawLine(Color.White.copy(alpha = 0.3f), Offset(0f, i * step), Offset(size.width, i * step))
+                    val gridSteps = 10
+                    val stepW = size.width / gridSteps
+                    val stepH = size.height / gridSteps
+                    for (i in 0..gridSteps) {
+                        drawLine(Color.White.copy(alpha = 0.3f), Offset(i * stepW, 0f), Offset(i * stepW, size.height))
+                        drawLine(Color.White.copy(alpha = 0.3f), Offset(0f, i * stepH), Offset(size.width, i * stepH))
                     }
 
                     // Draw Locations
                     locations.forEach { loc ->
-                        val x = (loc.x + 500) * (size.width / 1000f)
-                        val y = (loc.y + 500) * (size.height / 1000f)
+                        val x = (loc.x - mapMinX) * (size.width / mapWidth)
+                        val y = (loc.y - mapMinY) * (size.height / mapHeight)
                         
                         val isCurrent = loc.name == character.currentLocation
                         

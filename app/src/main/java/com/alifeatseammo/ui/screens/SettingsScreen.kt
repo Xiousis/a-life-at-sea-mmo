@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.ui.AuthViewModel
 import com.alifeatseammo.ui.GameViewModel
@@ -37,7 +38,32 @@ fun SettingsScreen(
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Settings Screen")
+            val character by viewModel.character.collectAsState()
             val isAdmin by viewModel.isAdmin.collectAsState()
+            
+            character?.let { char ->
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Debug Info", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text("Location: ${char.currentLocation}")
+                        val currentLocInfo by viewModel.currentLocationInfo.collectAsState()
+                        currentLocInfo?.let { loc ->
+                            Text("Coords: (${loc.x}, ${loc.y})")
+                        } ?: Text("Coords: Unknown")
+                        
+                        val allLocs by viewModel.locations.collectAsState()
+                        Text("Total Islands: ${allLocs.size}")
+                        if (allLocs.isNotEmpty()) {
+                            Text("Last Island: ${allLocs.last().name}")
+                        }
+                    }
+                }
+            }
+
             if (isAdmin) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(

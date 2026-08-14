@@ -1,6 +1,8 @@
 package com.alifeatseammo.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -8,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
@@ -17,8 +20,10 @@ import kotlinx.coroutines.delay
 @Composable
 fun CampScreen(
     character: Character,
+    playersAtLocation: List<Character>,
     onStartRest: () -> Unit,
     onInstantHeal: () -> Unit,
+    onHealPlayer: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -112,22 +117,84 @@ fun CampScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            if (character.hasMedicalLicense) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 24.dp))
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "Medical Profession",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Medical Skill: Level ${character.professionStats.medical}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Injured Travelers at Camp:",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+
+                val injuredPlayers = playersAtLocation.filter { it.id != character.id && it.healingState != null }
+                
+                if (injuredPlayers.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                        Text("No one currently needs help.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(injuredPlayers.size) { index ->
+                            val p = injuredPlayers[index]
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = p.name, fontWeight = FontWeight.Bold)
+                                        Text(text = "HP: ${p.hp}/${p.maxHp}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Button(onClick = { onHealPlayer(p.id) }) {
+                                        Text("HEAL")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Text(text = "ℹ️", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        text = "Resting at a camp is essential in dangerous islands where no hospitals are available.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "ℹ️", fontSize = 24.sp)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = "Resting at a camp is essential in dangerous islands where no hospitals are available.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
         }
