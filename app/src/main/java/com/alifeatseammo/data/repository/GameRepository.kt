@@ -11,22 +11,22 @@ import kotlinx.coroutines.tasks.await
 
 interface GameRepository {
     fun getCharacter(userId: String): Flow<Character?>
-    suspend fun createCharacter(userId: String, name: String, gender: Gender, race: Race): Boolean
-    suspend fun train(userId: String, statType: StatType): Boolean
+    suspend fun createCharacter(name: String, gender: Gender, race: Race): Boolean
+    suspend fun train(statType: StatType): Boolean
     suspend fun finishTraining(): Boolean
-    suspend fun completeMission(userId: String, missionId: String): Boolean
+    suspend fun completeMission(missionId: String): Boolean
     fun getAvailableMissions(): Flow<List<Mission>>
-    suspend fun startTravel(userId: String, destination: String): Boolean
+    suspend fun startTravel(destination: String): Boolean
     suspend fun finishTravel(): Boolean
-    suspend fun combatAction(userId: String, action: CombatAction, techniqueId: String? = null, itemId: String? = null): Boolean
-    suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean
+    suspend fun combatAction(action: CombatAction, techniqueId: String? = null, itemId: String? = null): Boolean
+    suspend fun attackPlayer(defenderId: String): Boolean
     suspend fun equipItem(itemId: String, slot: String): Boolean
     suspend fun unequipItem(slot: String): Boolean
     suspend fun purchaseItem(itemId: String, shopId: String): Boolean
     suspend fun purchaseShip(shipId: String): Boolean
     suspend fun sellItem(itemId: String): Boolean
     suspend fun useItem(itemId: String): Boolean
-    suspend fun joinFaction(userId: String, faction: Faction): Boolean
+    suspend fun joinFaction(faction: Faction): Boolean
     suspend fun heartbeat(): Boolean
     suspend fun explicitLogout(): Boolean
     suspend fun startHealing(): Boolean
@@ -80,7 +80,7 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override suspend fun createCharacter(userId: String, name: String, gender: Gender, race: Race): Boolean {
+    override suspend fun createCharacter(name: String, gender: Gender, race: Race): Boolean {
         val data = hashMapOf(
             "name" to name,
             "gender" to gender.name,
@@ -90,7 +90,7 @@ class FirestoreGameRepository(
         return true
     }
 
-    override suspend fun train(userId: String, statType: StatType): Boolean {
+    override suspend fun train(statType: StatType): Boolean {
         val data = hashMapOf("statType" to statType.name)
         functions.getHttpsCallable("train").call(data).await()
         return true
@@ -101,7 +101,7 @@ class FirestoreGameRepository(
         return true
     }
 
-    override suspend fun completeMission(userId: String, missionId: String): Boolean {
+    override suspend fun completeMission(missionId: String): Boolean {
         val data = hashMapOf("missionId" to missionId)
         functions.getHttpsCallable("completeMission").call(data).await()
         return true
@@ -110,7 +110,11 @@ class FirestoreGameRepository(
     override fun getAvailableMissions(): Flow<List<Mission>> = callbackFlow {
         val subscription = db.collection("gameData").document("world").collection("missions")
             .orderBy("difficulty")
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching available missions", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<Mission>() })
                 }
@@ -118,7 +122,7 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override suspend fun startTravel(userId: String, destination: String): Boolean {
+    override suspend fun startTravel(destination: String): Boolean {
         val data = hashMapOf("destination" to destination)
         functions.getHttpsCallable("startTravel").call(data).await()
         return true
@@ -129,7 +133,7 @@ class FirestoreGameRepository(
         return true
     }
 
-    override suspend fun combatAction(userId: String, action: CombatAction, techniqueId: String?, itemId: String?): Boolean {
+    override suspend fun combatAction(action: CombatAction, techniqueId: String?, itemId: String?): Boolean {
         val data = hashMapOf(
             "action" to action.name,
             "techniqueId" to techniqueId,
@@ -139,7 +143,7 @@ class FirestoreGameRepository(
         return true
     }
 
-    override suspend fun attackPlayer(attackerId: String, defenderId: String): Boolean {
+    override suspend fun attackPlayer(defenderId: String): Boolean {
         val data = hashMapOf("defenderId" to defenderId)
         functions.getHttpsCallable("attackPlayer").call(data).await()
         return true
@@ -181,7 +185,7 @@ class FirestoreGameRepository(
         return true
     }
 
-    override suspend fun joinFaction(userId: String, faction: Faction): Boolean {
+    override suspend fun joinFaction(faction: Faction): Boolean {
         val data = hashMapOf("faction" to faction.name)
         functions.getHttpsCallable("joinFaction").call(data).await()
         return true
@@ -216,7 +220,11 @@ class FirestoreGameRepository(
         val subscription = db.collection("players")
             .whereEqualTo("currentLocation", location)
             .limit(10)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching players at location: $location", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<Character>() })
                 }
@@ -241,7 +249,11 @@ class FirestoreGameRepository(
         }
 
         val subscription = query.limit(limit.toLong())
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching top players (faction=$faction)", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<Character>() })
                 }
@@ -251,7 +263,11 @@ class FirestoreGameRepository(
 
     override fun getPlayerProfile(playerId: String): Flow<Character?> = callbackFlow {
         val subscription = db.collection("players").document(playerId)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching player profile: $playerId", error)
+                    return@addSnapshotListener
+                }
                 trySend(snapshot?.toObject<Character>())
             }
         awaitClose { subscription.remove() }
@@ -259,7 +275,11 @@ class FirestoreGameRepository(
 
     override fun getLocations(): Flow<List<LocationDef>> = callbackFlow {
         val subscription = db.collection("gameData").document("world").collection("locations")
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching locations", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<LocationDef>() })
                 }
@@ -269,7 +289,11 @@ class FirestoreGameRepository(
 
     override fun getEnemyDefs(): Flow<List<EnemyDef>> = callbackFlow {
         val subscription = db.collection("gameData").document("world").collection("enemies")
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching enemy defs", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<EnemyDef>() })
                 }
@@ -279,7 +303,11 @@ class FirestoreGameRepository(
 
     override fun getMissionDefs(): Flow<List<Mission>> = callbackFlow {
         val subscription = db.collection("gameData").document("world").collection("missions")
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching mission defs", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<Mission>() })
                 }
@@ -290,7 +318,11 @@ class FirestoreGameRepository(
     override fun getMailMessages(userId: String): Flow<List<MailMessage>> = callbackFlow {
         val subscription = db.collection("players").document(userId).collection("mail")
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching mail for $userId", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<MailMessage>()?.copy(id = doc.id) })
                 }
@@ -316,7 +348,11 @@ class FirestoreGameRepository(
     override fun getMarketItems(): Flow<List<Item>> = callbackFlow {
         val subscription = db.collection("gameData").document("items").collection("all")
             .limit(20)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching market items", error)
+                    return@addSnapshotListener
+                }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<Item>() })
                 }

@@ -28,7 +28,11 @@ class FirestoreCrewRepository(
 
     override fun getCrew(crewId: String): Flow<Crew?> = callbackFlow {
         val subscription = db.collection("crews").document(crewId)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("CrewRepository", "Error fetching crew: $crewId", error)
+                    return@addSnapshotListener
+                }
                 if (snapshot != null) {
                     trySend(snapshot.toObject(Crew::class.java))
                 }
@@ -78,7 +82,11 @@ class FirestoreCrewRepository(
         val subscription = db.collection("crewInvites")
             .whereEqualTo("targetId", userId)
             .whereEqualTo("status", "pending")
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("CrewRepository", "Error fetching invites for: $userId", error)
+                    return@addSnapshotListener
+                }
                 if (snapshot != null) {
                     trySend(snapshot.documents.mapNotNull { it.toObject<CrewInvite>() })
                 }

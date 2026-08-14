@@ -21,6 +21,7 @@ fun TravelingScreen(
     character: Character,
     onCompleteClick: () -> Unit = {}
 ) {
+    val locale = Locale.US
     val travelState = character.travelState ?: return
     
     var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -70,7 +71,7 @@ fun TravelingScreen(
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = String.format(Locale.getDefault(), "Arrival in %02d:%02d", remainingSec / 60, remainingSec % 60),
+            text = String.format(locale, "Arrival in %02d:%02d", remainingSec / 60, remainingSec % 60),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Medium
         )

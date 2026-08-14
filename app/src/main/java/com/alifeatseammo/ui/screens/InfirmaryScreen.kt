@@ -27,7 +27,7 @@ fun InfirmaryScreen(
     onHealPlayer: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
-    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     
     val healingEndTime = character.healingState?.endTime ?: 0
     val remainingMs = (healingEndTime - currentTime).coerceAtLeast(0)
@@ -83,7 +83,7 @@ fun InfirmaryScreen(
             if (isHealing) {
                 Text(text = "Resting...", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = String.format("%02d:%02d", (remainingMs / 60000), (remainingMs % 60000) / 1000),
+                    text = String.format(java.util.Locale.US, "%02d:%02d", (remainingMs / 60000), (remainingMs % 60000) / 1000),
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Black
                 )

@@ -23,7 +23,7 @@ fun ProfessionsScreen(
     onTrainClick: (StatType) -> Unit,
     onBackClick: () -> Unit
 ) {
-    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(character.trainingState) {
         while (character.trainingState != null) {
             currentTime = System.currentTimeMillis()
@@ -71,7 +71,7 @@ fun ProfessionsScreen(
                         Column(horizontalAlignment = Alignment.End) {
                             Text("Working...", style = MaterialTheme.typography.labelSmall)
                             Text(
-                                text = String.format("%02ds", remainingMs / 1000),
+                                text = String.format(java.util.Locale.US, "%02ds", remainingMs / 1000),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.primary

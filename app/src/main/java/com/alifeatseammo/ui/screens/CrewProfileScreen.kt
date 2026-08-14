@@ -17,6 +17,7 @@ fun CrewProfileScreen(
     onBackClick: () -> Unit,
     onJoinClick: (String) -> Unit
 ) {
+    val locale = Locale.US
     Scaffold(
         topBar = {
             TopAppBar(
@@ -58,7 +59,7 @@ fun CrewProfileScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(text = "Total Bounty:", fontWeight = FontWeight.Bold)
-                                Text(text = String.format(Locale.getDefault(), "%,d B", crew.totalBounty), color = MaterialTheme.colorScheme.error)
+                                Text(text = String.format(locale, "%,d B", crew.totalBounty), color = MaterialTheme.colorScheme.error)
                             }
                         }
                     }

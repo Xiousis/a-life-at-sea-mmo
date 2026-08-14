@@ -13,13 +13,14 @@ service cloud.firestore {
       // Game logic fields are SERVER-ONLY.
       allow update: if request.auth != null && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['title', 'avatarUrl', 'settings', 'isOnline', 'lastOnline']);
+            .hasOnly(['title', 'avatarUrl', 'settings']);
 
       allow delete: if false;
 
       // Private data sub-collection
       match /private/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false;
       }
     }
 
@@ -31,11 +32,8 @@ service cloud.firestore {
         get(/databases/$(database)/documents/players/$(request.auth.uid)).data.crewId == resource.data.channelId
       );
 
-      // Clients can send messages if they belong to the channel
-      allow create: if request.auth != null && (
-        request.resource.data.channelId == 'global' ||
-        get(/databases/$(database)/documents/players/$(request.auth.uid)).data.crewId == request.resource.data.channelId
-      ) && request.resource.data.message.size() <= 200; // Basic length limit
+      // Chat messages must be created via Cloud Function to prevent impersonation
+      allow create: if false;
 
       allow update, delete: if false;
     }

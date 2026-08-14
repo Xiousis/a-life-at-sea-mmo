@@ -27,6 +27,7 @@ fun MailScreen(
     onMarkAsRead: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
+    val locale = Locale.US
     Scaffold(
         topBar = {
             TopAppBar(
@@ -46,7 +47,7 @@ fun MailScreen(
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
                 items(messages) { message ->
-                    MailItem(message, onClaimRewards, onDeleteMail, onMarkAsRead)
+                    MailItem(message, onClaimRewards, onDeleteMail, onMarkAsRead, locale)
                 }
             }
         }
@@ -58,7 +59,8 @@ fun MailItem(
     message: MailMessage,
     onClaimRewards: (String) -> Unit,
     onDeleteMail: (String) -> Unit,
-    onMarkAsRead: (String) -> Unit
+    onMarkAsRead: (String) -> Unit,
+    locale: Locale
 ) {
     Card(
         modifier = Modifier
@@ -81,7 +83,7 @@ fun MailItem(
                     fontWeight = if (!message.isRead) FontWeight.Bold else FontWeight.Normal
                 )
                 Text(
-                    text = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(message.timestamp)),
+                    text = SimpleDateFormat("MMM dd, HH:mm", locale).format(Date(message.timestamp)),
                     style = MaterialTheme.typography.bodySmall
                 )
             }

@@ -187,10 +187,9 @@ class GameViewModel @Inject constructor(
     }
 
     fun train(statType: StatType) {
-        val userId = currentUser.value?.uid ?: return
         viewModelScope.launch {
             try {
-                gameRepository.train(userId, statType)
+                gameRepository.train(statType)
             } catch (e: Exception) {
                 _errorMessage.value = e.message
             }
@@ -198,9 +197,8 @@ class GameViewModel @Inject constructor(
     }
 
     suspend fun completeMission(mission: Mission): Boolean {
-        val userId = currentUser.value?.uid ?: return false
         return try {
-            gameRepository.completeMission(userId, mission.id)
+            gameRepository.completeMission(mission.id)
             true
         } catch (e: Exception) {
             _errorMessage.value = e.message
@@ -209,10 +207,9 @@ class GameViewModel @Inject constructor(
     }
 
     fun joinFaction(faction: Faction) {
-        val userId = currentUser.value?.uid ?: return
         viewModelScope.launch {
             try {
-                gameRepository.joinFaction(userId, faction)
+                gameRepository.joinFaction(faction)
             } catch (e: Exception) {
                 _errorMessage.value = e.message
             }

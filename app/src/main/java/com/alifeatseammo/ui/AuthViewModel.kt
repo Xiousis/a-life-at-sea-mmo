@@ -79,11 +79,10 @@ class AuthViewModel @Inject constructor(
     }
 
     fun createCharacter(name: String, gender: Gender, race: Race) {
-        val userId = currentUser.value?.uid ?: return
         viewModelScope.launch {
             _createCharacterResult.value = AuthResult.Loading
             try {
-                gameRepository.createCharacter(userId, name, gender, race)
+                gameRepository.createCharacter(name, gender, race)
                 delay(2000)
                 _createCharacterResult.value = null
             } catch (e: Exception) {

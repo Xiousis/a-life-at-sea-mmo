@@ -416,7 +416,7 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("invalid-argument", "Name contains invalid characters.");
     }
 
-    const reservedNames = ["admin", "system", "moderator", "game-master", "gm"];
+    const reservedNames = ["admin", "system", "moderator", "game-master", "gm", "sedna", "von"];
     if (reservedNames.includes(trimmedName.toLowerCase())) {
         throw new functions.https.HttpsError("invalid-argument", "This name is reserved.");
     }

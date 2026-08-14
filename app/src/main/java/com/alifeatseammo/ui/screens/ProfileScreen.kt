@@ -28,6 +28,7 @@ fun ProfileScreen(
     onViewCrewClick: () -> Unit = {},
     onAddFriendClick: () -> Unit = {}
 ) {
+    val locale = Locale.US
     var showMythicArtDetails by remember { mutableStateOf(false) }
 
     if (showMythicArtDetails && character.mythicArt != null) {
@@ -171,7 +172,7 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                ProfileStatRow("Bounty:", String.format(Locale.getDefault(), "%,d", character.bounty), color = MaterialTheme.colorScheme.error)
+                ProfileStatRow("Bounty:", String.format(locale, "%,d", character.bounty), color = MaterialTheme.colorScheme.error)
                 ProfileStatRow("Faction:", character.faction.name)
                 if (character.infamy > 0) {
                     ProfileStatRow("Infamy:", "${character.infamy}/100", color = MaterialTheme.colorScheme.error)

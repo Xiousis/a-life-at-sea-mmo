@@ -31,7 +31,11 @@ class FirestoreAdminRepository(
             .whereGreaterThanOrEqualTo("name", query)
             .whereLessThanOrEqualTo("name", query + "\uf8ff")
             .limit(20)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("AdminRepository", "Error searching players for: $query", error)
+                    return@addSnapshotListener
+                }
                 if (snapshot != null) {
                     trySend(snapshot.documents.mapNotNull { it.toObject<Character>() })
                 }
@@ -44,7 +48,11 @@ class FirestoreAdminRepository(
             .whereEqualTo("userId", userId)
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(50)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("AdminRepository", "Error fetching logs for: $userId", error)
+                    return@addSnapshotListener
+                }
                 if (snapshot != null) {
                     trySend(snapshot.documents.mapNotNull { it.toObject<TransactionLog>() })
                 }

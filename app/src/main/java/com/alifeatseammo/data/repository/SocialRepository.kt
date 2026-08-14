@@ -28,7 +28,11 @@ class FirestoreSocialRepository(
 
     override fun getFriends(userId: String): Flow<List<Character>> = callbackFlow {
         val subscription = db.collection("players").document(userId)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("SocialRepository", "Error fetching friends for: $userId", error)
+                    return@addSnapshotListener
+                }
                 val friendIds = snapshot?.toObject<Character>()?.friends ?: emptyList()
                 if (friendIds.isEmpty()) {
                     trySend(emptyList())
@@ -36,6 +40,8 @@ class FirestoreSocialRepository(
                     // Fetch characters for these IDs
                     db.collection("players").whereIn("id", friendIds).get().addOnSuccessListener { querySnapshot ->
                         trySend(querySnapshot.documents.mapNotNull { it.toObject<Character>() })
+                    }.addOnFailureListener { e ->
+                        android.util.Log.e("SocialRepository", "Error fetching friend details", e)
                     }
                 }
             }
@@ -46,7 +52,11 @@ class FirestoreSocialRepository(
         val subscription = db.collection("friendRequests")
             .whereEqualTo("receiverId", userId)
             .whereEqualTo("status", "pending")
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("SocialRepository", "Error fetching pending requests for: $userId", error)
+                    return@addSnapshotListener
+                }
                 if (snapshot != null) {
                     val senderIds = snapshot.documents.mapNotNull { it.getString("senderId") }
                     if (senderIds.isEmpty()) {
@@ -54,6 +64,8 @@ class FirestoreSocialRepository(
                     } else {
                         db.collection("players").whereIn("id", senderIds).get().addOnSuccessListener { querySnapshot ->
                             trySend(querySnapshot.documents.mapNotNull { it.toObject<Character>() })
+                        }.addOnFailureListener { e ->
+                            android.util.Log.e("SocialRepository", "Error fetching sender details", e)
                         }
                     }
                 }
@@ -99,7 +111,11 @@ class FirestoreSocialRepository(
 
     override fun getBlockedPlayers(userId: String): Flow<List<String>> = callbackFlow {
         val subscription = db.collection("players").document(userId)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("SocialRepository", "Error fetching blocked players for: $userId", error)
+                    return@addSnapshotListener
+                }
                 trySend(snapshot?.toObject<Character>()?.blocked ?: emptyList())
             }
         awaitClose { subscription.remove() }
