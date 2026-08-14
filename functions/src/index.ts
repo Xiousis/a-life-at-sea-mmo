@@ -285,7 +285,13 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        character = processHealing(character);
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to roll for Mythic Arts. Visit an infirmary.");
+        }
 
         // Location check
         if (character.currentLocation !== "Island of World Secrets") {
@@ -339,6 +345,8 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
         }
 
         const updates: any = {
+            hp: character.hp,
+            healingState: character.healingState,
             inventory: admin.firestore.FieldValue.arrayUnion(...rolledArtifacts)
         };
 
@@ -401,12 +409,6 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
     const { name, gender, race } = data;
     const userId = context.auth.uid;
 
-    // Validate if character already exists for this user
-    const playerDoc = await db.collection("players").doc(userId).get();
-    if (playerDoc.exists) {
-        throw new functions.https.HttpsError("already-exists", "You already have a character.");
-    }
-
     // Name Validation
     const trimmedName = (name || "").trim();
     if (trimmedName.length < 3 || trimmedName.length > 16) {
@@ -421,79 +423,93 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("invalid-argument", "This name is reserved.");
     }
 
-    // Case-insensitive uniqueness check
-    const nameLower = trimmedName.toLowerCase();
-    const nameQuery = await db.collection("players").where("nameLower", "==", nameLower).get();
-    if (!nameQuery.empty) {
-        throw new functions.https.HttpsError("already-exists", "Character name is already taken.");
-    }
-
     // Race/Gender Validation
     const allowedRaces = ["Human", "Abyssal", "Beastkin", "Celestian", "Automaton"];
     const allowedGenders = ["Male", "Female", "Other"];
     if (!allowedRaces.includes(race)) throw new functions.https.HttpsError("invalid-argument", "Invalid race.");
     if (!allowedGenders.includes(gender)) throw new functions.https.HttpsError("invalid-argument", "Invalid gender.");
 
-    const character = {
-        id: userId,
-        name: trimmedName,
-        nameLower: nameLower,
-        gender: gender,
-        race: race,
-        level: 1,
-        xp: 0,
-        gold: 100,
-        bounty: 0,
-        infamy: 0,
-        hp: 100,
-        maxHp: 100,
-        energy: 100,
-        maxEnergy: 100,
-        energyUpdatedAt: Date.now(),
-        lastOnline: Date.now(),
-        isOnline: true,
-        currentLocation: "Fogi Tail Island",
-        freeMythicRolls: 3,
-        mythicArt: null,
-        rank: "Novice Sailor",
-        title: "",
-        unlockedTitles: [],
-        pvpWins: 0,
-        pvpLosses: 0,
-        faction: "Neutral",
-        stats: {
-            strength: 5,
-            endurance: 5,
-            agility: 5,
-            perception: 5,
-            willpower: 5,
-            luck: 5,
-            swordsmanship: 0,
-            brawling: 0,
-            gunslinging: 0,
-            spear: 0,
-            martialArts: 0,
-            sniper: 0,
-            mysticArts: 0
-        },
-        professionStats: {
-            cooking: 0,
-            navigating: 0,
-            treasureHunting: 0,
-            blacksmith: 0,
-            fishing: 0
-        },
-        inventory: [],
-        equipment: {},
-        travelState: null,
-        combatState: null,
-        learnedTechniques: ["bash"],
-        healingState: null,
-        ship: { id: "row_boat", name: "Row Boat", price: 0, speedMultiplier: 1.0 }
-    };
+    const nameLower = trimmedName.toLowerCase();
+    const playerRef = db.collection("players").doc(userId);
+    const nameRef = db.collection("characterNames").doc(nameLower);
 
-    await db.collection("players").doc(userId).set(character);
-    return { success: true };
+    return db.runTransaction(async (transaction) => {
+        const [playerSnap, nameSnap] = await Promise.all([
+            transaction.get(playerRef),
+            transaction.get(nameRef)
+        ]);
+
+        if (playerSnap.exists) {
+            throw new functions.https.HttpsError("already-exists", "You already have a character.");
+        }
+
+        if (nameSnap.exists) {
+            throw new functions.https.HttpsError("already-exists", "Character name is already taken.");
+        }
+
+        const character = {
+            id: userId,
+            name: trimmedName,
+            nameLower: nameLower,
+            gender: gender,
+            race: race,
+            level: 1,
+            xp: 0,
+            gold: 100,
+            bounty: 0,
+            infamy: 0,
+            hp: 100,
+            maxHp: 100,
+            energy: 100,
+            maxEnergy: 100,
+            energyUpdatedAt: Date.now(),
+            lastOnline: Date.now(),
+            isOnline: true,
+            currentLocation: "Fogi Tail Island",
+            freeMythicRolls: 3,
+            mythicArt: null,
+            rank: "Novice Sailor",
+            title: "",
+            unlockedTitles: [],
+            pvpWins: 0,
+            pvpLosses: 0,
+            faction: "Neutral",
+            stats: {
+                strength: 5,
+                endurance: 5,
+                agility: 5,
+                perception: 5,
+                willpower: 5,
+                luck: 5,
+                swordsmanship: 0,
+                brawling: 0,
+                gunslinging: 0,
+                spear: 0,
+                martialArts: 0,
+                sniper: 0,
+                mysticArts: 0
+            },
+            professionStats: {
+                cooking: 0,
+                navigating: 0,
+                treasureHunting: 0,
+                blacksmith: 0,
+                fishing: 0,
+                medical: 0
+            },
+            inventory: [],
+            equipment: {},
+            travelState: null,
+            combatState: null,
+            learnedTechniques: ["bash"],
+            healingState: null,
+            ship: { id: "row_boat", name: "Row Boat", price: 0, speedMultiplier: 1.0 }
+        };
+
+        transaction.set(nameRef, { userId });
+        transaction.set(playerRef, character);
+        return { success: true };
+    });
 });
 
 export const joinFaction = functions.https.onCall(async (data, context) => {
@@ -580,6 +596,8 @@ export const train = functions.https.onCall(async (data, context) => {
         const endTime = Date.now() + TRAINING_DURATION_MS;
 
         transaction.update(playerRef, {
+            hp: character.hp,
+            healingState: character.healingState,
             energy: energy - 10,
             energyUpdatedAt,
             gold: admin.firestore.FieldValue.increment(-TRAINING_GOLD_COST),
@@ -692,6 +710,8 @@ export const startTravel = functions.https.onCall(async (data, context) => {
             const enemy = generateEnemy(character.level);
 
             transaction.update(playerRef, {
+                hp: character.hp,
+                healingState: character.healingState,
                 combatState: {
                     enemy: enemy,
                     playerTurn: true,
@@ -708,6 +728,8 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         }
 
         transaction.update(playerRef, {
+            hp: character.hp,
+            healingState: character.healingState,
             travelState: { destination, arrivalTime, startTime: Date.now() }
         });
         return { success: true, arrivalTime, travelDuration };
@@ -1491,6 +1513,8 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
         }
 
         const defender = defenderSnap.data() as any;
+        const defenderWithHealing = processHealing(defender);
+        const defenderFinal = defenderWithHealing;
 
         if (userId === defenderId) throw new functions.https.HttpsError("invalid-argument", "You cannot attack yourself.");
 
@@ -1589,8 +1613,16 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
         };
 
         transaction.update(attackerRef, attacker); // Apply processHealing, infamy and faction changes
-        transaction.update(attackerRef, { combatState: attackerCombat });
-        transaction.update(defenderRef, { combatState: defenderCombat });
+        transaction.update(attackerRef, {
+            hp: attacker.hp,
+            healingState: attacker.healingState,
+            combatState: attackerCombat
+        });
+        transaction.update(defenderRef, {
+            hp: defenderFinal.hp,
+            healingState: defenderFinal.healingState,
+            combatState: defenderCombat
+        });
 
         return { success: true };
     });
@@ -1692,8 +1724,15 @@ export const healPlayer = functions.https.onCall(async (data, context) => {
         ]);
 
         if (!healerSnap.exists || !targetSnap.exists) throw new functions.https.HttpsError("not-found", "Player not found.");
-        const healer = healerSnap.data() as any;
-        const target = targetSnap.data() as any;
+        let healer = healerSnap.data() as any;
+        let target = targetSnap.data() as any;
+
+        healer = processHealing(healer);
+        target = processHealing(target);
+
+        if (healer.hp <= 0) throw new functions.https.HttpsError("failed-precondition", "You are too injured to heal others.");
+
+        if (userId === targetPlayerId) throw new functions.https.HttpsError("invalid-argument", "You cannot heal yourself for Medical skill XP. Use resting or items.");
 
         if (healer.mythicArt && !healer.mythicArt.canLearnNonCombatSkills) {
             throw new functions.https.HttpsError("failed-precondition", "Your Mythic Art forbids non-combat actions like healing.");
@@ -1721,6 +1760,8 @@ export const healPlayer = functions.https.onCall(async (data, context) => {
         }
 
         const healerUpdate: any = {
+            hp: healer.hp,
+            healingState: healer.healingState,
             xp: admin.firestore.FieldValue.increment(10),
             "professionStats.medical": admin.firestore.FieldValue.increment(1)
         };
@@ -1768,6 +1809,8 @@ export const startMonsterHunt = functions.https.onCall(async (data, context) => 
         const enemy = generateEnemy(character.level);
 
         transaction.update(playerRef, {
+            hp: character.hp,
+            healingState: character.healingState,
             energy: energy - 5,
             energyUpdatedAt,
             combatState: {
@@ -2256,6 +2299,9 @@ export const adminGrantTestItems = functions.https.onCall(async (data, context) 
         }
 
         console.log("Granting 6 artifacts to:", character.name);
+        if (currentInventory.length + testItems.length > INVENTORY_CAPACITY) {
+            throw new functions.https.HttpsError("failed-precondition", "Inventory full.");
+        }
         transaction.update(playerRef, {
             inventory: [...currentInventory, ...testItems],
             gold: 900000000
@@ -2398,12 +2444,22 @@ export const equipItem = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        character = processHealing(character);
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to change equipment.");
+        }
+
+        const allowedSlots = ["Weapon", "Armor", "Accessory", "Helmet", "Boots", "Gloves"];
+        if (!allowedSlots.includes(slot)) throw new functions.https.HttpsError("invalid-argument", "Invalid equipment slot.");
+
         const inventory = character.inventory || [];
         const item = inventory.find((i: any) => i.id === itemId);
 
         if (!item) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
-        if (item.type !== slot) throw new functions.https.HttpsError("invalid-argument", `Item cannot be equipped in ${slot} slot.`);
+        if (item.type !== slot) throw new functions.https.HttpsError("invalid-argument", `Item type ${item.type} does not match slot ${slot}.`);
 
         // Level Requirement Check
         if (character.level < (item.levelRequirement || 1)) {
@@ -2413,7 +2469,11 @@ export const equipItem = functions.https.onCall(async (data, context) => {
         const equipment = character.equipment || {};
         equipment[slot] = item;
 
-        transaction.update(playerRef, { equipment });
+        transaction.update(playerRef, {
+            hp: character.hp,
+            healingState: character.healingState,
+            equipment
+        });
         return { success: true };
     });
 });
@@ -2429,11 +2489,22 @@ export const unequipItem = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        character = processHealing(character);
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to change equipment.");
+        }
+
         const equipment = character.equipment || {};
         delete equipment[slot];
 
-        transaction.update(playerRef, { equipment });
+        transaction.update(playerRef, {
+            hp: character.hp,
+            healingState: character.healingState,
+            equipment
+        });
         return { success: true };
     });
 });
@@ -2504,7 +2575,13 @@ export const sellItem = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        character = processHealing(character);
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to sell items.");
+        }
 
         // Protection: Check if item is equipped
         const isEquipped = Object.values(character.equipment || {}).some((i: any) => i && i.id === itemId);
@@ -2524,6 +2601,8 @@ export const sellItem = functions.https.onCall(async (data, context) => {
 
         transaction.update(playerRef, {
             gold: admin.firestore.FieldValue.increment(sellPrice),
+            hp: character.hp,
+            healingState: character.healingState,
             inventory
         });
 
@@ -2543,7 +2622,14 @@ export const useItem = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        character = processHealing(character);
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to use items.");
+        }
+
         const inventory = character.inventory || [];
         const itemIndex = inventory.findIndex((i: any) => i.id === itemId);
 
@@ -2611,6 +2697,8 @@ export const useItem = functions.https.onCall(async (data, context) => {
             inventory.splice(itemIndex, 1);
 
             transaction.update(playerRef, {
+                hp: character.hp,
+                healingState: character.healingState,
                 mythicArt: newMythicArt,
                 stats,
                 learnedTechniques: newTechniques,
@@ -2631,6 +2719,7 @@ export const useItem = functions.https.onCall(async (data, context) => {
 
         transaction.update(playerRef, {
             hp: playerHp,
+            healingState: character.healingState,
             inventory
         });
 
@@ -2680,21 +2769,44 @@ export const inviteToCrew = functions.https.onCall(async (data, context) => {
     const { targetId } = data;
     const senderId = context.auth.uid;
 
-    const senderSnap = await db.collection("players").doc(senderId).get();
-    const sender = senderSnap.data() as any;
-    if (!sender.crewId) throw new functions.https.HttpsError("failed-precondition", "You are not in a crew.");
+    if (senderId === targetId) throw new functions.https.HttpsError("invalid-argument", "You cannot invite yourself to your own crew.");
 
-    const inviteRef = db.collection("crewInvites").doc(`${sender.crewId}_${targetId}`);
-    await inviteRef.set({
-        crewId: sender.crewId,
-        crewName: (await db.collection("crews").doc(sender.crewId).get()).data()?.name,
-        senderId,
-        targetId,
-        status: "pending",
-        timestamp: Date.now()
+    const senderRef = db.collection("players").doc(senderId);
+    const targetRef = db.collection("players").doc(targetId);
+
+    return db.runTransaction(async (transaction) => {
+        const [senderSnap, targetSnap] = await Promise.all([
+            transaction.get(senderRef),
+            transaction.get(targetRef)
+        ]);
+
+        if (!senderSnap.exists || !targetSnap.exists) throw new functions.https.HttpsError("not-found", "Player not found.");
+        const sender = senderSnap.data() as any;
+        const target = targetSnap.data() as any;
+
+        if (!sender.crewId) throw new functions.https.HttpsError("failed-precondition", "You are not in a crew.");
+        if (target.crewId) throw new functions.https.HttpsError("failed-precondition", "Target is already in a crew.");
+
+        const crewRef = db.collection("crews").doc(sender.crewId);
+        const crewSnap = await transaction.get(crewRef);
+        const crew = crewSnap.data() as any;
+
+        if (crew.captainId !== senderId && (!crew.roles || crew.roles[senderId] !== "Officer")) {
+            throw new functions.https.HttpsError("permission-denied", "You do not have permission to invite players.");
+        }
+
+        const inviteRef = db.collection("crewInvites").doc(`${sender.crewId}_${targetId}`);
+        transaction.set(inviteRef, {
+            crewId: sender.crewId,
+            crewName: crew.name,
+            senderId,
+            targetId,
+            status: "pending",
+            timestamp: Date.now()
+        });
+
+        return { success: true };
     });
-
-    return { success: true };
 });
 
 export const respondToInvite = functions.https.onCall(async (data, context) => {
@@ -2721,6 +2833,10 @@ export const respondToInvite = functions.https.onCall(async (data, context) => {
             transaction.get(playerRef),
             transaction.get(crewRef)
         ]);
+
+        if (!crewSnap.exists) {
+            throw new functions.https.HttpsError("not-found", "Crew no longer exists.");
+        }
 
         const character = playerSnap.data() as any;
         const crew = crewSnap.data() as any;
@@ -2817,5 +2933,116 @@ export const promoteMember = functions.https.onCall(async (data, context) => {
         transaction.update(crewRef, { roles });
 
         return { success: true };
+    });
+});
+
+export const catchFish = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        character = processHealing(character);
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to fish.");
+        }
+
+        const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
+        if (energy < 5) throw new functions.https.HttpsError("failed-precondition", "Not enough energy (5 required).");
+
+        const inventory = character.inventory || [];
+        if (inventory.length >= INVENTORY_CAPACITY) {
+            throw new functions.https.HttpsError("failed-precondition", "Inventory is full.");
+        }
+
+        const fishTypes = [
+            { name: "Salmon", type: "Fish", price: 50, healAmount: 10 },
+            { name: "Tuna", type: "Fish", price: 100, healAmount: 15 },
+            { name: "Mackerel", type: "Fish", price: 30, healAmount: 5 }
+        ];
+        const caught = fishTypes[Math.floor(Math.random() * fishTypes.length)];
+        const fishItem = {
+            ...caught,
+            id: `fish_${caught.name.toLowerCase()}_${Date.now()}`,
+            rarity: "Common"
+        };
+
+        const updates: any = {
+            energy: energy - 5,
+            energyUpdatedAt: energyUpdatedAt,
+            inventory: admin.firestore.FieldValue.arrayUnion(fishItem),
+            hp: character.hp,
+            healingState: character.healingState,
+            "professionStats.fishing": admin.firestore.FieldValue.increment(1),
+            xp: admin.firestore.FieldValue.increment(5)
+        };
+
+        transaction.update(playerRef, updates);
+        recordLog(transaction, userId, "CatchFish", `Caught a ${caught.name}`, 0, 5);
+
+        return { success: true, fish: caught.name };
+    });
+});
+
+export const cookFish = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { itemId } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        character = processHealing(character);
+        if (character.hp <= 0) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too injured to cook.");
+        }
+
+        const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
+        if (energy < 2) throw new functions.https.HttpsError("failed-precondition", "Not enough energy (2 required).");
+
+        const inventory = character.inventory || [];
+        const fishIndex = inventory.findIndex((i: any) => i.id === itemId && i.type === "Fish");
+        if (fishIndex === -1) throw new functions.https.HttpsError("not-found", "Fish not found in inventory.");
+
+        const fish = inventory[fishIndex];
+        const cookedItem = {
+            id: `cooked_${fish.id}`,
+            name: `Cooked ${fish.name}`,
+            type: "Consumable",
+            healAmount: (fish.healAmount || 10) * 2,
+            price: fish.price * 1.5,
+            rarity: "Common"
+        };
+
+        inventory.splice(fishIndex, 1);
+        inventory.push(cookedItem);
+
+        const updates: any = {
+            energy: energy - 2,
+            energyUpdatedAt: energyUpdatedAt,
+            inventory: inventory,
+            hp: character.hp,
+            healingState: character.healingState,
+            "professionStats.cooking": admin.firestore.FieldValue.increment(1),
+            xp: admin.firestore.FieldValue.increment(10)
+        };
+
+        transaction.update(playerRef, updates);
+        recordLog(transaction, userId, "CookFish", `Cooked ${fish.name}`, 0, 10);
+
+        return { success: true, cookedItem: cookedItem.name };
     });
 });

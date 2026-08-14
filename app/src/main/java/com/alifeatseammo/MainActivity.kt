@@ -71,33 +71,37 @@ class MainActivity : ComponentActivity() {
                 val snackbarHostState = remember { SnackbarHostState() }
 
                 val context = androidx.compose.ui.platform.LocalContext.current
-                LaunchedEffect(user, characterState, currentLocation) {
+                val targetTrackResId = remember(user, characterState, currentLocation) {
                     if (user == null) {
-                        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+                        R.raw.life_at_sea_menu_sound
                     } else {
                         when (val state = characterState) {
                             is CharacterState.Loaded -> {
                                 val char = state.character
                                 when {
                                     char.travelState != null -> {
-                                        MusicManager.play(context, R.raw.life_at_sea_traveling_music)
+                                        R.raw.life_at_sea_traveling_music
                                     }
                                     currentLocation?.name?.startsWith("Navy Outpost", ignoreCase = true) == true -> {
-                                        MusicManager.play(context, R.raw.navy_outpost_music)
+                                        R.raw.navy_outpost_music
                                     }
                                     currentLocation?.name?.equals("Pirate's Den", ignoreCase = true) == true -> {
-                                        MusicManager.play(context, R.raw.pirate_den_music)
+                                        R.raw.pirate_den_music
                                     }
                                     else -> {
-                                        MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+                                        R.raw.life_at_sea_menu_sound
                                     }
                                 }
                             }
                             else -> {
-                                MusicManager.play(context, R.raw.life_at_sea_menu_sound)
+                                R.raw.life_at_sea_menu_sound
                             }
                         }
                     }
+                }
+
+                LaunchedEffect(targetTrackResId) {
+                    MusicManager.play(context, targetTrackResId)
                 }
 
                 LaunchedEffect(errorMsg, combatErrorMsg, travelErrorMsg, socialErrorMsg, economyErrorMsg) {
