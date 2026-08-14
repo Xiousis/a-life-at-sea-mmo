@@ -19,6 +19,7 @@ import com.alifeatseammo.data.model.StatType
 @Composable
 fun ProfessionsScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     skillFilter: String = "all",
     onTrainClick: (StatType) -> Unit,
     onBackClick: () -> Unit
@@ -34,6 +35,7 @@ fun ProfessionsScreen(
     val trainingEndTime = character.trainingState?.endTime ?: 0
     val remainingMs = (trainingEndTime - currentTime).coerceAtLeast(0)
     val isTraining = character.trainingState != null
+    val isActionLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
 
     Scaffold(
         topBar = {
@@ -116,7 +118,7 @@ fun ProfessionsScreen(
                         label = type.name,
                         value = getProfessionValue(character, type),
                         description = desc,
-                        canAfford = character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining && canLearn,
+                        canAfford = !isActionLoading && character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining && canLearn,
                         onPractice = { onTrainClick(type) },
                         isLockedByMythic = !canLearn
                     )

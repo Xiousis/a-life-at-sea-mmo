@@ -21,13 +21,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 fun MainScaffold(
     navController: NavHostController,
     currentChar: com.alifeatseammo.data.model.Character,
-    viewModel: GameViewModel,
-    authViewModel: AuthViewModel,
-    combatViewModel: CombatViewModel,
-    travelViewModel: TravelViewModel,
-    socialViewModel: SocialViewModel,
-    economyViewModel: EconomyViewModel,
-    profileViewModel: PlayerProfileViewModel,
     snackbarHostState: SnackbarHostState
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -84,13 +77,6 @@ fun MainScaffold(
         AppNavigation(
             navController = navController,
             currentChar = currentChar,
-            viewModel = viewModel,
-            authViewModel = authViewModel,
-            combatViewModel = combatViewModel,
-            travelViewModel = travelViewModel,
-            socialViewModel = socialViewModel,
-            economyViewModel = economyViewModel,
-            profileViewModel = profileViewModel,
             snackbarHostState = snackbarHostState,
             modifier = Modifier.padding(padding)
         )

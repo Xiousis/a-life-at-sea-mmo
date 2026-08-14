@@ -37,4 +37,8 @@ object RepositoryModule {
     @Provides
     @Singleton
     fun provideAdminRepository(): AdminRepository = FirestoreAdminRepository()
+
+    @Provides
+    @Singleton
+    fun provideAuctionRepository(): AuctionRepository = FirestoreAuctionRepository()
 }

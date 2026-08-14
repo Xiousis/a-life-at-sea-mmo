@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
@@ -17,10 +18,12 @@ import kotlinx.coroutines.delay
 @Composable
 fun TravelScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     locations: List<LocationDef>,
     onTravelClick: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
+    val isTraveling = actionState is com.alifeatseammo.ui.UIActionState.Loading
     Scaffold(
         topBar = {
             TopAppBar(
@@ -43,11 +46,20 @@ fun TravelScreen(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(locations.filter { it.name != character.currentLocation }) { location ->
                         OutlinedCard(
-                            onClick = { onTravelClick(location.name) },
-                            modifier = Modifier.fillMaxWidth()
+                            onClick = { if (!isTraveling) onTravelClick(location.name) },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isTraveling
                         ) {
                             ListItem(
-                                headlineContent = { Text(location.name) },
+                                headlineContent = { 
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(location.name)
+                                        if (isTraveling) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        }
+                                    }
+                                },
                                 supportingContent = { Text("Region: ${location.region}") }
                             )
                         }

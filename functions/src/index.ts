@@ -8,7 +8,7 @@ const db = admin.firestore();
 // --- Constants & Config ---
 const ENERGY_REGEN_RATE_MS = 3 * 60 * 1000; // 1 energy per 3 minutes
 const MAX_ENERGY = 100;
-const INVENTORY_CAPACITY = 20;
+const BASE_INVENTORY_CAPACITY = 20;
 const TURN_TIMEOUT_MS = 60 * 1000; // 1 minute per turn
 const HEALING_DURATION_MS = 2 * 60 * 1000; // 2 minutes
 const TRAINING_DURATION_MS = 20 * 1000; // 20 seconds
@@ -173,20 +173,20 @@ const STAT_MAPPING: Record<string, string> = {
 
 const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = {
     "Fogi Tail Island": { x: 0, y: 0, region: "East Blue" },
-    "Ironcrest Isle": { x: 160, y: 40, region: "East Blue" },
-    "Amber Reach": { x: -80, y: 150, region: "East Blue" },
-    "Sunken Reef": { x: 70, y: 90, region: "East Blue" },
-    "Tortuga Bay": { x: 30, y: -210, region: "South Blue" },
-    "Pirate\u0027s Den": { x: 350, y: -350, region: "South Blue" },
-    "Navy Outpost Aqua": { x: -160, y: -110, region: "South Blue" },
-    "Navy Outpost Terra": { x: -300, y: 200, region: "Grand Line" },
-    "Navy Outpost Ignis": { x: 400, y: 300, region: "Grand Line" },
-    "Crystal Cove": { x: 280, y: 120, region: "Grand Line" },
-    "Volcano Peak": { x: 420, y: 240, region: "Grand Line" },
-    "Whispering Woods": { x: -150, y: 180, region: "Grand Line" },
-    "Serpent\u0027s Maw": { x: 500, y: 500, region: "Grand Line" },
-    "Kraken\u0027s Rest": { x: -400, y: -400, region: "South Blue" },
-    "Shadow Fen": { x: -300, y: -100, region: "East Blue" },
+    "Ironcrest Isle": { x: 640, y: 160, region: "East Blue" },
+    "Amber Reach": { x: -320, y: 600, region: "East Blue" },
+    "Sunken Reef": { x: 280, y: 360, region: "East Blue" },
+    "Tortuga Bay": { x: 120, y: -840, region: "South Blue" },
+    "Pirate\u0027s Den": { x: 1400, y: -1400, region: "South Blue" },
+    "Navy Outpost Aqua": { x: -640, y: -440, region: "South Blue" },
+    "Navy Outpost Terra": { x: -1200, y: 800, region: "Grand Line" },
+    "Navy Outpost Ignis": { x: 1600, y: 1200, region: "Grand Line" },
+    "Crystal Cove": { x: 1120, y: 480, region: "Grand Line" },
+    "Volcano Peak": { x: 1680, y: 960, region: "Grand Line" },
+    "Whispering Woods": { x: -600, y: 720, region: "Grand Line" },
+    "Serpent\u0027s Maw": { x: 2000, y: 2000, region: "Grand Line" },
+    "Kraken\u0027s Rest": { x: -1600, y: -1600, region: "South Blue" },
+    "Shadow Fen": { x: -1200, y: -400, region: "East Blue" },
     "Island of World Secrets": { x: 4000, y: 4000, region: "Unknown" },
 };
 
@@ -218,6 +218,14 @@ function recordLog(transaction: admin.firestore.Transaction, userId: string, act
         xpChange,
         timestamp: Date.now()
     });
+}
+
+function calculateMaxCapacity(character: any): number {
+    let capacity = BASE_INVENTORY_CAPACITY;
+    if (character.equipment && character.equipment.Bag) {
+        capacity += (character.equipment.Bag.storageBonus || 0);
+    }
+    return capacity;
 }
 
 export function calculateCurrentEnergy(character: any): { energy: number, energyUpdatedAt: number } {
@@ -294,6 +302,22 @@ function checkLevelUp(character: any) {
     return { ...character, level, xp, stats, maxEnergy, energy, maxHp, hp, leveledUp };
 }
 
+function getArtifactDetails(tier: string): { name: string, description: string } {
+    const details: Record<string, { name: string, description: string }> = {
+        "F": { name: "Shattered Slate [F]", description: "A common artifact containing a faint whisper of power." },
+        "E": { name: "Bones of Old [E]", description: "A weathered relic that holds basic knowledge from a bygone age." },
+        "D": { name: "Ancient Shard [D]", description: "A shard from a long-lost civilization, pulsating with faint energy." },
+        "C": { name: "Glowing Core [C]", description: "A core of pure energy that contains specialized techniques." },
+        "B": { name: "Jade Idol [B]", description: "A beautifully crafted idol that resonates with your spirit." },
+        "A": { name: "Dragon Scale [A]", description: "A scale from a legendary dragon, containing immense power." },
+        "S": { name: "Phoenix Feather [S]", description: "A feather that never stops burning with mythical energy." },
+        "SS": { name: "Tear of a God [SS]", description: "A crystalline tear said to fall from the heavens." },
+        "SSS": { name: "Void Essence [SSS]", description: "The pure essence of the void. The absolute pinnacle of power." },
+        "Z": { name: "Primordial Spark [Z]", description: "A fragment of the original creation, blindingly and terrifyingly powerful." }
+    };
+    return details[tier] || { name: `${tier} Tier Artifact`, description: `A mysterious ${tier} tier artifact.` };
+}
+
 export const rollMythicArt = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
@@ -330,8 +354,9 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
 
         // Inventory check
         const inventory = character.inventory || [];
+        const maxCapacity = calculateMaxCapacity(character);
 
-        if (inventory.length >= INVENTORY_CAPACITY) {
+        if (inventory.length >= maxCapacity) {
             throw new functions.https.HttpsError(
                 "failed-precondition",
                 "Inventory is full."
@@ -351,11 +376,12 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
         else if (rand < 6.111101) tier = "C";
         else if (rand < 26.111101) tier = "D";
 
+        const artifactDetails = getArtifactDetails(tier);
+
         const artifactItem = {
             id: `mythic_artifact_${tier}_${Date.now()}`,
-            name: `${tier} Tier Artifact`,
-            description:
-                `A mysterious artifact that contains a random ${tier} tier Mythic Art. Use it to awaken its power.`,
+            name: artifactDetails.name,
+            description: artifactDetails.description,
             type: "Artifact",
             rarity: getRarityForTier(tier),
             price: getPriceForTier(tier),
@@ -528,6 +554,7 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
                 medical: 0
             },
             inventory: [],
+            inventoryCapacity: 20,
             equipment: {},
             travelState: null,
             combatState: null,
@@ -557,6 +584,8 @@ export const joinFaction = functions.https.onCall(async (data, context) => {
         assertCanPerformAction(character, "join a faction", { blockBusy: true, blockHealing: true });
 
         if (character.faction !== "Neutral") {
+            throw new functions.https.HttpsError("failed-precondition", "You are already in a faction.");
+        }
 
         if (faction === "Pirate") {
             if (character.currentLocation !== "Pirate\u0027s Den") {
@@ -1415,7 +1444,8 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     updatedChar.xp += enemy.xpReward;
                     if (loot.length > 0) {
                         const currentInv = updatedChar.inventory || [];
-                        const freeSlots = INVENTORY_CAPACITY - currentInv.length;
+                        const maxCapacity = calculateMaxCapacity(updatedChar);
+                        const freeSlots = maxCapacity - currentInv.length;
                         const lootToAdd = loot.slice(0, Math.max(0, freeSlots));
 
                         updatedChar.inventory = [...currentInv, ...lootToAdd];
@@ -2038,6 +2068,24 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
             updates.rank = "Rogue Sailor";
         }
 
+        // Skill Repair Logic: Ensure learnedTechniques only contains baseline skills + current Mythic Art skills
+        const currentTechs = character.learnedTechniques || [];
+        const baseline = ["bash"];
+        let expectedTechs = [...baseline];
+
+        if (character.mythicArt) {
+            const artTechs = character.mythicArt.techniques || [];
+            expectedTechs = [...new Set([...baseline, ...artTechs])];
+        }
+
+        // Check if they match (order independent)
+        const isCorrect = currentTechs.length === expectedTechs.length &&
+                          currentTechs.every((t: string) => expectedTechs.includes(t));
+
+        if (!isCorrect) {
+            updates.learnedTechniques = expectedTechs;
+        }
+
         transaction.update(playerRef, updates);
         return { success: true };
     });
@@ -2053,6 +2101,7 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
     const locations = [
         { name: "Fogi Tail Island", region: "East Blue", description: "A peaceful starting island with clear blue waters.", isSafe: true, weather: "Sunny", x: 0, y: 0, actions: [{ type: "Training", label: "Dojo", icon: "🥋" }, { type: "Kitchen", label: "Galley", icon: "🍳" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Medical Clinic", icon: "🏥" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: false, weather: "Foggy", x: 640, y: 160, actions: [{ type: "Forge", label: "Grand Forge", icon: "⚒" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Amber Reach", region: "East Blue", description: "A trade hub known for its amber deposits.", isSafe: false, weather: "Sunny", x: -320, y: 600, actions: [{ type: "Market", label: "Amber Market", icon: "💰" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 280, y: 360, actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Shadow Fen", region: "East Blue", description: "A murky swamp island filled with dangerous creatures.", isSafe: false, weather: "Overcast", x: -1200, y: -400, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Tortuga Bay", region: "South Blue", description: "A bustling pirate haven filled with taverns and mystery.", isSafe: false, weather: "Tropical", x: 120, y: -840, actions: [{ type: "Tavern", label: "The Salty Dog", icon: "🍻" }, { type: "Market", label: "Bazaar", icon: "💰" }, { type: "Expedition", label: "Treasure Hunt", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Pirate Doctor", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
@@ -2067,6 +2116,15 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         { name: "Serpent's Maw", region: "Grand Line", description: "A terrifying island shaped like a giant serpent's head.", isSafe: false, weather: "Foggy", x: 2000, y: 2000, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Island of World Secrets", region: "Unknown", description: "A mystical island shrouded in secrets. Here, you can roll for Mythic Arts.", isSafe: true, weather: "Celestial", x: 4000, y: 4000, actions: [{ type: "MythicRoll", label: "Ancient Altar", icon: "✨" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
     ];
+
+    // Delete old/invalid locations
+    const validLocationNames = locations.map(l => l.name);
+    const existingLocationsSnap = await db.collection("gameData").doc("world").collection("locations").get();
+    existingLocationsSnap.forEach(doc => {
+        if (!validLocationNames.includes(doc.id)) {
+            batch.delete(doc.ref);
+        }
+    });
 
     for (const loc of locations) {
         const ref = db.collection("gameData").doc("world").collection("locations").doc(loc.name);
@@ -2091,16 +2149,11 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         { id: "rusty_cutlass", name: "Rusty Cutlass", description: "An old, worn-out sword.", type: "Weapon", rarity: "Common", price: 50, levelRequirement: 1, statBonus: { strength: 2 } },
         { id: "old_boots", name: "Old Boots", description: "Waterlogged but still wearable.", type: "Armor", rarity: "Common", price: 40, levelRequirement: 1, statBonus: { endurance: 2 } },
         { id: "pearl", name: "Pearl", description: "A rare and valuable gem from a Giant Squid.", type: "Miscellaneous", rarity: "Rare", price: 200 },
-        // Artifacts
-        { id: "artifact_f", name: "Shattered Slate (F)", description: "A common artifact containing a faint whisper of power.", type: "Artifact", rarity: "Common", price: 1000, mythicTier: "F" },
-        { id: "artifact_e", name: "Rusty Relic (E)", description: "A simple relic that holds basic knowledge.", type: "Artifact", rarity: "Common", price: 5000, mythicTier: "E" },
-        { id: "artifact_d", name: "Ancient Shard (D)", description: "A shard from a bygone era, pulsating with energy.", type: "Artifact", rarity: "Uncommon", price: 20000, mythicTier: "D" },
-        { id: "artifact_c", name: "Glowing Core (C)", description: "A core of energy that contains specialized techniques.", type: "Artifact", rarity: "Uncommon", price: 100000, mythicTier: "C" },
-        { id: "artifact_b", name: "Jade Idol (B)", description: "A beautifully crafted idol that resonates with your spirit.", type: "Artifact", rarity: "Rare", price: 500000, mythicTier: "B" },
-        { id: "artifact_a", name: "Dragon Scale (A)", description: "A scale from a legendary dragon, containing immense power.", type: "Artifact", rarity: "Rare", price: 2000000, mythicTier: "A" },
-        { id: "artifact_s", name: "Phoenix Feather (S)", description: "A feather that never stops burning with mythical energy.", type: "Artifact", rarity: "Epic", price: 10000000, mythicTier: "S" },
-        { id: "artifact_ss", name: "God's Tear (SS)", description: "A crystalline tear said to fall from the heavens.", type: "Artifact", rarity: "Epic", price: 50000000, mythicTier: "SS" },
-        { id: "artifact_sss", name: "Void Essence (SSS)", description: "The pure essence of the void. The pinnacle of power.", type: "Artifact", rarity: "Legendary", price: 250000000, mythicTier: "SSS" }
+        // Bags
+        { id: "bag_small", name: "Small Cotton Bag", description: "A simple bag that adds 5 slots to your inventory.", type: "Bag", rarity: "Common", price: 500, storageBonus: 5 },
+        { id: "bag_medium", name: "Sturdy Leather Satchel", description: "A well-made satchel that adds 10 slots to your inventory.", type: "Bag", rarity: "Uncommon", price: 5000, storageBonus: 10 },
+        { id: "bag_large", name: "Reinforced Sea-Chest Bag", description: "A massive bag for serious collectors. Adds 20 slots.", type: "Bag", rarity: "Rare", price: 50000, storageBonus: 20 },
+        { id: "bag_legendary", name: "Infinite Void Pouch", description: "A pouch that seems to defy the laws of space. Adds 50 slots.", type: "Bag", rarity: "Legendary", price: 1000000, storageBonus: 50 }
     ];
 
     for (const item of items) {
@@ -2309,7 +2362,8 @@ export const adminGrantTestItems = functions.https.onCall(async (data, context) 
         }
 
         console.log("Granting 6 artifacts to:", character.name);
-        if (currentInventory.length + testItems.length > INVENTORY_CAPACITY) {
+        const maxCapacity = calculateMaxCapacity(character);
+        if (currentInventory.length + testItems.length > maxCapacity) {
             throw new functions.https.HttpsError("failed-precondition", "Inventory full.");
         }
         transaction.update(playerRef, {
@@ -2459,7 +2513,7 @@ export const equipItem = functions.https.onCall(async (data, context) => {
 
         assertCanPerformAction(character, "change equipment", { blockBusy: true, blockHealing: true });
 
-        const allowedSlots = ["Weapon", "Armor", "Accessory", "Helmet", "Boots", "Gloves"];
+        const allowedSlots = ["Weapon", "Armor", "Accessory", "Bag", "Helmet", "Boots", "Gloves"];
         if (!allowedSlots.includes(slot)) throw new functions.https.HttpsError("invalid-argument", "Invalid equipment slot.");
 
         const inventory = character.inventory || [];
@@ -2476,11 +2530,17 @@ export const equipItem = functions.https.onCall(async (data, context) => {
         const equipment = character.equipment || {};
         equipment[slot] = item;
 
-        transaction.update(playerRef, {
+        const updates: any = {
             hp: character.hp,
             healingState: character.healingState,
             equipment
-        });
+        };
+
+        if (item.type === "Bag") {
+            updates.inventoryCapacity = calculateMaxCapacity({ ...character, equipment });
+        }
+
+        transaction.update(playerRef, updates);
         return { success: true };
     });
 });
@@ -2502,13 +2562,21 @@ export const unequipItem = functions.https.onCall(async (data, context) => {
         assertCanPerformAction(character, "change equipment", { blockBusy: true, blockHealing: true });
 
         const equipment = character.equipment || {};
+        const unequippedItem = equipment[slot];
         delete equipment[slot];
 
-        transaction.update(playerRef, {
+        const updates: any = {
             hp: character.hp,
             healingState: character.healingState,
             equipment
-        });
+        };
+
+        if (unequippedItem && unequippedItem.type === "Bag") {
+            updates.inventoryCapacity = calculateMaxCapacity({ ...character, equipment });
+        }
+
+        transaction.update(playerRef, updates);
+        return { success: true };
         return { success: true };
     });
 });
@@ -2537,6 +2605,10 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
 
         const item = itemSnap.data() as any;
 
+        if (item.type === "Artifact") {
+            throw new functions.https.HttpsError("failed-precondition", "Artifacts cannot be purchased from the market.");
+        }
+
         // Validate location has a market
         const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
         const location = locationSnap.data();
@@ -2556,7 +2628,8 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
         }
 
         const inventory = character.inventory || [];
-        if (inventory.length >= INVENTORY_CAPACITY) {
+        const maxCapacity = calculateMaxCapacity(character);
+        if (inventory.length >= maxCapacity) {
             throw new functions.https.HttpsError("failed-precondition", "Inventory is full.");
         }
 
@@ -2662,21 +2735,10 @@ export const useItem = functions.https.onCall(async (data, context) => {
                 if (stats[stat] !== undefined) stats[stat] += (value as number);
             }
 
-            // Remove old techniques from previous Mythic Art if they exist
-            let newTechniques = [...learnedTechniques];
-            if (character.mythicArt && character.mythicArt.techniques) {
-                const oldTechs = character.mythicArt.techniques;
-                newTechniques = newTechniques.filter((tech: string) => !oldTechs.includes(tech));
-            }
-
-            // Add new techniques
-            if (mythic.techniques) {
-                for (const tech of mythic.techniques) {
-                    if (!newTechniques.includes(tech)) {
-                        newTechniques.push(tech);
-                    }
-                }
-            }
+            // Reset to baseline skills (bash) + new art techniques
+            // This ensures players don't keep old skills if the logic fails
+            const baselineSkills = ["bash"];
+            const newTechniques = [...new Set([...baselineSkills, ...(mythic.techniques || [])])];
 
             const newMythicArt = {
                 name: mythic.name,
@@ -2727,6 +2789,143 @@ export const useItem = functions.https.onCall(async (data, context) => {
 
         recordLog(transaction, userId, "UseItem", `Used ${item.name}`, 0, 0);
         return { success: true, newHp: playerHp };
+    });
+});
+
+// --- Auction House ---
+
+export const listAuctionItem = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { itemId, price } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    if (!price || price <= 0) throw new functions.https.HttpsError("invalid-argument", "Price must be positive.");
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        const character = snapshot.data() as any;
+        assertCanPerformAction(character, "list items for auction", { blockBusy: true, blockHealing: true });
+
+        const inventory = character.inventory || [];
+        const itemIndex = inventory.findIndex((i: any) => i.id === itemId);
+
+        if (itemIndex === -1) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
+
+        // Check if equipped
+        const isEquipped = Object.values(character.equipment || {}).some((i: any) => i && i.id === itemId);
+        if (isEquipped) throw new functions.https.HttpsError("failed-precondition", "Cannot list equipped items.");
+
+        const item = inventory[itemIndex];
+        inventory.splice(itemIndex, 1);
+
+        const listingRef = db.collection("auctions").doc();
+        const listing = {
+            id: listingRef.id,
+            sellerId: userId,
+            sellerName: character.name,
+            item: item,
+            price: price,
+            timestamp: Date.now()
+        };
+
+        transaction.set(listingRef, listing);
+        transaction.update(playerRef, { inventory });
+
+        recordLog(transaction, userId, "AuctionList", `Listed ${item.name} for ${price} Gold`, 0, 0);
+        return { success: true, listingId: listingRef.id };
+    });
+});
+
+export const buyAuctionItem = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { listingId } = data;
+    const buyerId = context.auth.uid;
+    const buyerRef = db.collection("players").doc(buyerId);
+    const listingRef = db.collection("auctions").doc(listingId);
+
+    return db.runTransaction(async (transaction) => {
+        const [buyerSnap, listingSnap] = await Promise.all([
+            transaction.get(buyerRef),
+            transaction.get(listingRef)
+        ]);
+
+        if (!buyerSnap.exists) throw new functions.https.HttpsError("not-found", "Buyer not found.");
+        if (!listingSnap.exists) throw new functions.https.HttpsError("not-found", "Listing not found.");
+
+        const buyer = buyerSnap.data() as any;
+        const listing = listingSnap.data() as any;
+
+        if (buyerId === listing.sellerId) throw new functions.https.HttpsError("failed-precondition", "You cannot buy your own item.");
+        if (buyer.gold < listing.price) throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
+
+        const inventory = buyer.inventory || [];
+        const maxCapacity = calculateMaxCapacity(buyer);
+        if (inventory.length >= maxCapacity) {
+            throw new functions.https.HttpsError("failed-precondition", "Inventory is full.");
+        }
+
+        // Transfer Item to Buyer
+        inventory.push(listing.item);
+        transaction.update(buyerRef, {
+            gold: admin.firestore.FieldValue.increment(-listing.price),
+            inventory
+        });
+
+        // Send Gold to Seller via Mail
+        const sellerMailRef = db.collection("players").doc(listing.sellerId).collection("mail").doc();
+        transaction.set(sellerMailRef, {
+            id: sellerMailRef.id,
+            senderName: "Auction House",
+            subject: "Item Sold!",
+            body: `Your ${listing.item.name} has been sold for ${listing.price} Gold!`,
+            timestamp: Date.now(),
+            isRead: false,
+            claimed: false,
+            rewards: { gold: listing.price }
+        });
+
+        transaction.delete(listingRef);
+
+        recordLog(transaction, buyerId, "AuctionBuy", `Bought ${listing.item.name} for ${listing.price} Gold`, -listing.price, 0);
+        return { success: true };
+    });
+});
+
+export const cancelAuctionListing = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { listingId } = data;
+    const userId = context.auth.uid;
+    const listingRef = db.collection("auctions").doc(listingId);
+
+    return db.runTransaction(async (transaction) => {
+        const listingSnap = await transaction.get(listingRef);
+        if (!listingSnap.exists) throw new functions.https.HttpsError("not-found", "Listing not found.");
+
+        const listing = listingSnap.data() as any;
+        if (listing.sellerId !== userId) throw new functions.https.HttpsError("permission-denied", "Not your listing.");
+
+        const playerRef = db.collection("players").doc(userId);
+        const playerSnap = await transaction.get(playerRef);
+        const character = playerSnap.data() as any;
+
+        const inventory = character.inventory || [];
+        const maxCapacity = calculateMaxCapacity(character);
+        if (inventory.length >= maxCapacity) {
+             throw new functions.https.HttpsError("failed-precondition", "Inventory is full. Cannot return item.");
+        }
+
+        inventory.push(listing.item);
+        transaction.update(playerRef, { inventory });
+        transaction.delete(listingRef);
+
+        recordLog(transaction, userId, "AuctionCancel", `Canceled listing for ${listing.item.name}`, 0, 0);
+        return { success: true };
     });
 });
 
@@ -2901,7 +3100,8 @@ export const claimMailRewards = functions.https.onCall(async (data, context) => 
 
         if (rewards.items) {
              const inventory = character.inventory || [];
-             if (inventory.length + rewards.items.length > INVENTORY_CAPACITY) {
+             const maxCapacity = calculateMaxCapacity(character);
+             if (inventory.length + rewards.items.length > maxCapacity) {
                   throw new functions.https.HttpsError("resource-exhausted", "Inventory full.");
              }
              updates.inventory = [...inventory, ...rewards.items.map((i: any) => ({ ...i, id: `${i.id}_${Date.now()}_${Math.random()}` }))];
@@ -2957,7 +3157,8 @@ export const catchFish = functions.https.onCall(async (data, context) => {
         if (energy < 5) throw new functions.https.HttpsError("failed-precondition", "Not enough energy (5 required).");
 
         const inventory = character.inventory || [];
-        if (inventory.length >= INVENTORY_CAPACITY) {
+        const maxCapacity = calculateMaxCapacity(character);
+        if (inventory.length >= maxCapacity) {
             throw new functions.https.HttpsError("failed-precondition", "Inventory is full.");
         }
 

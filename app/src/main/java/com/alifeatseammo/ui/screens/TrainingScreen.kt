@@ -23,6 +23,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun TrainingScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     onTrainClick: (StatType) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -37,6 +38,7 @@ fun TrainingScreen(
     val trainingEndTime = character.trainingState?.endTime ?: 0
     val remainingMs = (trainingEndTime - currentTime).coerceAtLeast(0)
     val isTraining = character.trainingState != null
+    val isActionLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
 
     Scaffold(
         topBar = {
@@ -193,7 +195,7 @@ fun TrainingScreen(
                         description = desc,
                         buffText = buffText,
                         debuffText = debuffText,
-                        canAfford = character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining && 
+                        canAfford = !isActionLoading && character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining && 
                                    !character.mythicArt?.restrictedSkillTypes?.contains(type).let { it ?: false } &&
                                    (type in setOf(StatType.Strength, StatType.Endurance, StatType.Agility, StatType.Perception, StatType.Willpower, StatType.Luck, StatType.Swordsmanship, StatType.Brawling, StatType.Gunslinging, StatType.Spear, StatType.MartialArts, StatType.Sniper, StatType.MysticArts) || (character.mythicArt?.canLearnNonCombatSkills ?: true)),
                         onTrain = { onTrainClick(type) },
@@ -297,6 +299,7 @@ fun getStatValue(character: Character, type: StatType): Int {
 fun TrainingScreenPreview() {
     TrainingScreen(
         character = com.alifeatseammo.data.model.Character(name = "Test Pirate"),
+        actionState = com.alifeatseammo.ui.UIActionState.Idle,
         onTrainClick = {},
         onBackClick = {}
     )

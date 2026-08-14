@@ -106,10 +106,51 @@ object ItemDefinitions {
         price = 10
     )
 
+    // Bags
+    val SMALL_BAG = Item(
+        id = "bag_small",
+        name = "Small Cotton Bag",
+        description = "A simple bag that adds 5 slots to your inventory.",
+        type = ItemType.Bag,
+        rarity = Rarity.Common,
+        price = 500,
+        storageBonus = 5
+    )
+
+    val MEDIUM_BAG = Item(
+        id = "bag_medium",
+        name = "Sturdy Leather Satchel",
+        description = "A well-made satchel that adds 10 slots to your inventory.",
+        type = ItemType.Bag,
+        rarity = Rarity.Uncommon,
+        price = 5000,
+        storageBonus = 10
+    )
+
+    val LARGE_BAG = Item(
+        id = "bag_large",
+        name = "Reinforced Sea-Chest Bag",
+        description = "A massive bag for serious collectors. Adds 20 slots.",
+        type = ItemType.Bag,
+        rarity = Rarity.Rare,
+        price = 50000,
+        storageBonus = 20
+    )
+
+    val LEGENDARY_BAG = Item(
+        id = "bag_legendary",
+        name = "Infinite Void Pouch",
+        description = "A pouch that seems to defy the laws of space. Adds 50 slots.",
+        type = ItemType.Bag,
+        rarity = Rarity.Legendary,
+        price = 1000000,
+        storageBonus = 50
+    )
+
     // Artifacts
     val ARTIFACT_F = Item(
         id = "artifact_f",
-        name = "Shattered Slate (F)",
+        name = "Shattered Slate [F]",
         description = "A common artifact containing a faint whisper of power.",
         type = ItemType.Artifact,
         rarity = Rarity.Common,
@@ -119,8 +160,8 @@ object ItemDefinitions {
 
     val ARTIFACT_E = Item(
         id = "artifact_e",
-        name = "Rusty Relic (E)",
-        description = "A simple relic that holds basic knowledge.",
+        name = "Bones of Old [E]",
+        description = "A weathered relic that holds basic knowledge from a bygone age.",
         type = ItemType.Artifact,
         rarity = Rarity.Common,
         price = 5000,
@@ -129,8 +170,8 @@ object ItemDefinitions {
 
     val ARTIFACT_D = Item(
         id = "artifact_d",
-        name = "Ancient Shard (D)",
-        description = "A shard from a bygone era, pulsating with energy.",
+        name = "Ancient Shard [D]",
+        description = "A shard from a long-lost civilization, pulsating with faint energy.",
         type = ItemType.Artifact,
         rarity = Rarity.Uncommon,
         price = 20000,
@@ -139,8 +180,8 @@ object ItemDefinitions {
 
     val ARTIFACT_C = Item(
         id = "artifact_c",
-        name = "Glowing Core (C)",
-        description = "A core of energy that contains specialized techniques.",
+        name = "Glowing Core [C]",
+        description = "A core of pure energy that contains specialized techniques.",
         type = ItemType.Artifact,
         rarity = Rarity.Uncommon,
         price = 100000,
@@ -149,7 +190,7 @@ object ItemDefinitions {
 
     val ARTIFACT_B = Item(
         id = "artifact_b",
-        name = "Jade Idol (B)",
+        name = "Jade Idol [B]",
         description = "A beautifully crafted idol that resonates with your spirit.",
         type = ItemType.Artifact,
         rarity = Rarity.Rare,
@@ -159,7 +200,7 @@ object ItemDefinitions {
 
     val ARTIFACT_A = Item(
         id = "artifact_a",
-        name = "Dragon Scale (A)",
+        name = "Dragon Scale [A]",
         description = "A scale from a legendary dragon, containing immense power.",
         type = ItemType.Artifact,
         rarity = Rarity.Rare,
@@ -169,7 +210,7 @@ object ItemDefinitions {
 
     val ARTIFACT_S = Item(
         id = "artifact_s",
-        name = "Phoenix Feather (S)",
+        name = "Phoenix Feather [S]",
         description = "A feather that never stops burning with mythical energy.",
         type = ItemType.Artifact,
         rarity = Rarity.Epic,
@@ -179,7 +220,7 @@ object ItemDefinitions {
 
     val ARTIFACT_SS = Item(
         id = "artifact_ss",
-        name = "God's Tear (SS)",
+        name = "Tear of a God [SS]",
         description = "A crystalline tear said to fall from the heavens.",
         type = ItemType.Artifact,
         rarity = Rarity.Epic,
@@ -189,11 +230,21 @@ object ItemDefinitions {
 
     val ARTIFACT_SSS = Item(
         id = "artifact_sss",
-        name = "Void Essence (SSS)",
-        description = "The pure essence of the void. The pinnacle of power.",
+        name = "Void Essence [SSS]",
+        description = "The pure essence of the void. The absolute pinnacle of power.",
         type = ItemType.Artifact,
         rarity = Rarity.Legendary,
         price = 250000000,
         mythicTier = "SSS"
+    )
+
+    val ARTIFACT_Z = Item(
+        id = "artifact_z",
+        name = "Primordial Spark [Z]",
+        description = "A fragment of the original creation, blindingly and terrifyingly powerful.",
+        type = ItemType.Artifact,
+        rarity = Rarity.Legendary,
+        price = 1000000000,
+        mythicTier = "Z"
     )
 }

@@ -51,38 +51,82 @@ class GameViewModel @Inject constructor(
 
     val character: StateFlow<Character?> = characterState
         .map { if (it is CharacterState.Loaded) it.character else null }
-        .onEach { char ->
-            val travel = char?.travelState
-            if (travel != null) {
-                scheduleTravelFinish(travel.arrivalTime)
-            } else {
-                travelJob?.cancel()
-                travelJob = null
-            }
+        .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
-            val healing = char?.healingState
-            if (healing != null) {
-                scheduleHealingFinish(healing.endTime)
-            } else {
-                healingJob?.cancel()
-                healingJob = null
-            }
+    private val _actionState = MutableStateFlow<UIActionState>(UIActionState.Idle)
+    val actionState: StateFlow<UIActionState> = _actionState.asStateFlow()
 
-            val training = char?.trainingState
-            if (training != null) {
-                scheduleTrainingFinish(training.endTime)
-            } else {
-                trainingJob?.cancel()
-                trainingJob = null
+    init {
+        // Optimize Travel Timer
+        character
+            .map { it?.travelState?.arrivalTime }
+            .distinctUntilChanged()
+            .onEach { arrivalTime ->
+                if (arrivalTime != null) {
+                    scheduleTravelFinish(arrivalTime)
+                } else {
+                    travelJob?.cancel()
+                    travelJob = null
+                }
             }
+            .launchIn(viewModelScope)
 
-            if (char != null && heartbeatJob == null) {
-                startHeartbeat()
-            } else if (char == null) {
-                stopHeartbeat()
+        // Optimize Healing Timer
+        character
+            .map { it?.healingState?.endTime }
+            .distinctUntilChanged()
+            .onEach { endTime ->
+                if (endTime != null) {
+                    scheduleHealingFinish(endTime)
+                } else {
+                    healingJob?.cancel()
+                    healingJob = null
+                }
+            }
+            .launchIn(viewModelScope)
+
+        // Optimize Training Timer
+        character
+            .map { it?.trainingState?.endTime }
+            .distinctUntilChanged()
+            .onEach { endTime ->
+                if (endTime != null) {
+                    scheduleTrainingFinish(endTime)
+                } else {
+                    trainingJob?.cancel()
+                    trainingJob = null
+                }
+            }
+            .launchIn(viewModelScope)
+
+        // Heartbeat management
+        character
+            .map { it != null }
+            .distinctUntilChanged()
+            .onEach { isActive ->
+                if (isActive) startHeartbeat() else stopHeartbeat()
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun performAction(label: String, block: suspend () -> Unit) {
+        if (_actionState.value is UIActionState.Loading) return
+
+        viewModelScope.launch {
+            _actionState.value = UIActionState.Loading(label)
+            try {
+                block()
+                _actionState.value = UIActionState.Success(label)
+                delay(2000)
+                if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
+                    _actionState.value = UIActionState.Idle
+                }
+            } catch (e: Exception) {
+                _actionState.value = UIActionState.Error(e.message ?: "Action failed")
+                _errorMessage.value = e.message
             }
         }
-        .stateIn(viewModelScope, SharingStarted.Lazily, null)
+    }
 
     val isAdmin: StateFlow<Boolean> = character
         .map { char ->
@@ -187,86 +231,62 @@ class GameViewModel @Inject constructor(
     }
 
     fun train(statType: StatType) {
-        viewModelScope.launch {
-            try {
-                gameRepository.train(statType)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Training ${statType.name}") {
+            gameRepository.train(statType)
         }
     }
 
     suspend fun completeMission(mission: Mission): Boolean {
+        _actionState.value = UIActionState.Loading("Completing Mission")
         return try {
             gameRepository.completeMission(mission.id)
+            _actionState.value = UIActionState.Success("Mission Completed")
             true
         } catch (e: Exception) {
+            _actionState.value = UIActionState.Error(e.message ?: "Mission failed")
             _errorMessage.value = e.message
             false
+        } finally {
+            delay(2000)
+            if (_actionState.value is UIActionState.Success) {
+                _actionState.value = UIActionState.Idle
+            }
         }
     }
 
     fun joinFaction(faction: Faction) {
-        viewModelScope.launch {
-            try {
-                gameRepository.joinFaction(faction)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Joining ${faction.name}") {
+            gameRepository.joinFaction(faction)
         }
     }
 
     fun adminGrantTestItems() {
-        viewModelScope.launch {
-            try {
-                gameRepository.adminGrantTestItems()
-            } catch (e: com.google.firebase.functions.FirebaseFunctionsException) {
-                Log.e("GameViewModel", "Functions error: ${e.code}", e)
-                _errorMessage.value = "Grant Error: ${e.code} (${e.message})"
-            } catch (e: Exception) {
-                Log.e("GameViewModel", "Grant failed", e)
-                _errorMessage.value = "Failed to grant test items: ${e.message}"
-            }
+        performAction("Granting Test Items") {
+            gameRepository.adminGrantTestItems()
         }
     }
 
     fun startHealing() {
-        viewModelScope.launch {
-            try {
-                gameRepository.startHealing()
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Starting Rest") {
+            gameRepository.startHealing()
         }
     }
 
     fun instantHeal() {
-        viewModelScope.launch {
-            try {
-                gameRepository.instantHeal()
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Instant Healing") {
+            gameRepository.instantHeal()
         }
     }
 
     fun purchaseMedicalLicense() {
-        viewModelScope.launch {
-            try {
-                gameRepository.purchaseMedicalLicense()
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Purchasing Medical License") {
+            gameRepository.purchaseMedicalLicense()
         }
     }
 
     fun healPlayer(targetPlayerId: String) {
-        viewModelScope.launch {
-            try {
-                gameRepository.healPlayer(targetPlayerId)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Healing Player") {
+            gameRepository.healPlayer(targetPlayerId)
         }
     }
 
@@ -275,7 +295,7 @@ class GameViewModel @Inject constructor(
             try {
                 gameRepository.finishTravel()
             } catch (e: Exception) {
-                _errorMessage.value = e.message
+                Log.e("GameViewModel", "Failed to finish travel", e)
             }
         }
     }
@@ -285,7 +305,7 @@ class GameViewModel @Inject constructor(
             try {
                 gameRepository.finishHealing()
             } catch (e: Exception) {
-                _errorMessage.value = e.message
+                Log.e("GameViewModel", "Failed to finish healing", e)
             }
         }
     }
@@ -295,28 +315,20 @@ class GameViewModel @Inject constructor(
             try {
                 gameRepository.finishTraining()
             } catch (e: Exception) {
-                _errorMessage.value = e.message
+                Log.e("GameViewModel", "Failed to finish training", e)
             }
         }
     }
 
     fun startMonsterHunt() {
-        viewModelScope.launch {
-            try {
-                gameRepository.startMonsterHunt()
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Starting Monster Hunt") {
+            gameRepository.startMonsterHunt()
         }
     }
 
     fun rollMythicArt() {
-        viewModelScope.launch {
-            try {
-                gameRepository.rollMythicArt()
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Rolling Mythic Art") {
+            gameRepository.rollMythicArt()
         }
     }
 

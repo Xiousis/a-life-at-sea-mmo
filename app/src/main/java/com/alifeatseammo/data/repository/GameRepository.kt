@@ -347,6 +347,7 @@ class FirestoreGameRepository(
 
     override fun getMarketItems(): Flow<List<Item>> = callbackFlow {
         val subscription = db.collection("gameData").document("items").collection("all")
+            .whereNotEqualTo("type", "Artifact")
             .limit(20)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {

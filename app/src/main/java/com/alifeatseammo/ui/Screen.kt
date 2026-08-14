@@ -36,4 +36,5 @@ sealed class Screen(val route: String) {
     object Shipyard : Screen("shipyard")
     object Fishing : Screen("fishing")
     object MythicArt : Screen("mythic_art")
+    object Auction : Screen("auction")
 }

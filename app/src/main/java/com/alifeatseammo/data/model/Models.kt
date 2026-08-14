@@ -25,6 +25,7 @@ data class Character(
     val travelState: TravelState? = null,
     val combatState: CombatState? = null,
     val inventory: List<Item> = emptyList(),
+    val inventoryCapacity: Int = 20,
     val equipment: Map<String, Item?> = emptyMap(),
     val crewId: String? = null,
     val faction: Faction = Faction.Neutral,
@@ -69,6 +70,7 @@ data class CharacterPrivate(
     val travelState: TravelState? = null,
     val combatState: CombatState? = null,
     val inventory: List<Item> = emptyList(),
+    val inventoryCapacity: Int = 20,
     val equipment: Map<String, Item?> = emptyMap(),
     val friends: List<String> = emptyList(),
     val blocked: List<String> = emptyList(),
@@ -257,12 +259,13 @@ data class Item(
     val rarity: Rarity = Rarity.Common,
     val price: Int = 0,
     val statBonus: Stats = Stats(),
+    val storageBonus: Int = 0,
     val levelRequirement: Int = 1,
     val mythicTier: String? = null
 )
 
 enum class ItemType {
-    Weapon, Armor, Accessory, Consumable, Tool, Miscellaneous, Fish, Food, Artifact
+    Weapon, Armor, Accessory, Bag, Consumable, Tool, Miscellaneous, Fish, Food, Artifact
 }
 
 data class Crew(
@@ -274,12 +277,22 @@ data class Crew(
     val roles: Map<String, CrewRole> = emptyMap(),
     val totalBounty: Long = 0,
     val level: Int = 1,
-    val experience: Long = 0
+    val experience: Long = 0,
+    val faction: Faction = Faction.Neutral
 )
 
 enum class CrewRole {
     Captain, Officer, Member
 }
+
+data class AuctionListing(
+    val id: String = "",
+    val sellerId: String = "",
+    val sellerName: String = "",
+    val item: Item = Item(),
+    val price: Int = 0,
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 data class CrewInvite(
     val crewId: String = "",

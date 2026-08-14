@@ -51,6 +51,17 @@ class SocialViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    init {
+        viewModelScope.launch {
+            character.collectLatest { char ->
+                if (char != null && char.faction == Faction.Navy && char.infamy >= 100 && char.crewId != null) {
+                    leaveCrew()
+                    _errorMessage.value = "You have been kicked from the Navy and your crew due to high infamy!"
+                }
+            }
+        }
+    }
+
     fun sendMessage(text: String, channelId: String = "global") {
         val char = character.value ?: return
         viewModelScope.launch {
@@ -63,6 +74,11 @@ class SocialViewModel @Inject constructor(
     }
 
     fun createCrew(name: String, description: String) {
+        val char = character.value ?: return
+        if (char.faction == Faction.Neutral) {
+            _errorMessage.value = "Only Navy or Pirates can create crews."
+            return
+        }
         viewModelScope.launch {
             try {
                 crewRepository.createCrew(name, description)
@@ -73,8 +89,14 @@ class SocialViewModel @Inject constructor(
     }
 
     fun joinCrew(crewId: String) {
+        val char = character.value ?: return
         viewModelScope.launch {
             try {
+                val crew = crewRepository.getCrew(crewId).firstOrNull()
+                if (crew != null && crew.faction != char.faction) {
+                    _errorMessage.value = "You can only join crews of your own faction."
+                    return@launch
+                }
                 crewRepository.joinCrew(crewId)
             } catch (e: Exception) {
                 _errorMessage.value = e.message
@@ -103,8 +125,26 @@ class SocialViewModel @Inject constructor(
     }
 
     fun respondToInvite(crewId: String, accept: Boolean) {
+        if (!accept) {
+            viewModelScope.launch {
+                try {
+                    crewRepository.respondToInvite(crewId, false)
+                } catch (e: Exception) {
+                    _errorMessage.value = e.message
+                }
+            }
+            return
+        }
+
+        val char = character.value ?: return
         viewModelScope.launch {
             try {
+                val crew = crewRepository.getCrew(crewId).firstOrNull()
+                if (crew != null && crew.faction != char.faction) {
+                    _errorMessage.value = "You cannot join a crew of a different faction."
+                    crewRepository.respondToInvite(crewId, false)
+                    return@launch
+                }
                 crewRepository.respondToInvite(crewId, accept)
             } catch (e: Exception) {
                 _errorMessage.value = e.message

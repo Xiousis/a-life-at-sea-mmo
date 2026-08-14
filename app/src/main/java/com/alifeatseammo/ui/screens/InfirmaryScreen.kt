@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun InfirmaryScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     playersAtLocation: List<Character>,
     onStartRest: () -> Unit,
     onInstantHeal: () -> Unit,
@@ -28,6 +29,7 @@ fun InfirmaryScreen(
     onBackClick: () -> Unit
 ) {
     var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val isActionLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
     
     val healingEndTime = character.healingState?.endTime ?: 0
     val remainingMs = (healingEndTime - currentTime).coerceAtLeast(0)
@@ -97,7 +99,7 @@ fun InfirmaryScreen(
                     Button(
                         onClick = onStartRest,
                         modifier = Modifier.weight(1f),
-                        enabled = character.hp < character.maxHp
+                        enabled = !isActionLoading && character.hp < character.maxHp
                     ) {
                         Text("REST")
                     }
@@ -105,7 +107,7 @@ fun InfirmaryScreen(
                     OutlinedButton(
                         onClick = onInstantHeal,
                         modifier = Modifier.weight(1f),
-                        enabled = character.hp < character.maxHp && character.gold >= 50
+                        enabled = !isActionLoading && character.hp < character.maxHp && character.gold >= 50
                     ) {
                         Text("HEAL (50G)")
                     }
@@ -158,7 +160,7 @@ fun InfirmaryScreen(
                         Button(
                             onClick = onPurchaseLicense,
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = character.gold >= 15000
+                            enabled = !isActionLoading && character.gold >= 15000
                         ) {
                             Text("BUY LICENSE (15,000 GOLD)")
                         }
@@ -204,7 +206,10 @@ fun InfirmaryScreen(
                                         Text(text = p.name, fontWeight = FontWeight.Bold)
                                         Text(text = "HP: ${p.hp}/${p.maxHp}", style = MaterialTheme.typography.bodySmall)
                                     }
-                                    Button(onClick = { onHealPlayer(p.id) }) {
+                                    Button(
+                                        onClick = { onHealPlayer(p.id) },
+                                        enabled = !isActionLoading
+                                    ) {
                                         Text("HEAL")
                                     }
                                 }

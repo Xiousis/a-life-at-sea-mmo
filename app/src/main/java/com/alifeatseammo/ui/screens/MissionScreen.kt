@@ -17,10 +17,12 @@ import com.alifeatseammo.data.model.Mission
 @Composable
 fun MissionScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     missions: List<Mission>,
     onMissionClick: (Mission) -> Unit,
     onBackClick: () -> Unit
 ) {
+    val isLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
     val filteredMissions = missions.filter { 
         it.factionRequirement == Faction.Neutral || it.factionRequirement == character.faction 
     }
@@ -48,8 +50,9 @@ fun MissionScreen(
                 val isEnergyOk = character.getCurrentEnergy() >= mission.energyCost
                 val isLocationOk = mission.locationId.isEmpty() || character.currentLocation == mission.locationId
                 
-                val isLocked = !isLevelOk || !isEnergyOk || !isLocationOk
+                val isLocked = !isLevelOk || !isEnergyOk || !isLocationOk || isLoading
                 val lockReason = when {
+                    isLoading -> "Processing..."
                     !isLevelOk -> "Required Level: ${mission.minLevel}"
                     !isEnergyOk -> "Not enough Energy"
                     !isLocationOk -> "Required Location: ${mission.locationId}"

@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun CampScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     playersAtLocation: List<Character>,
     onStartRest: () -> Unit,
     onInstantHeal: () -> Unit,
@@ -27,6 +28,7 @@ fun CampScreen(
     onBackClick: () -> Unit
 ) {
     var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val isActionLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
     
     val healingEndTime = character.healingState?.endTime ?: 0
     val remainingMs = (healingEndTime - currentTime).coerceAtLeast(0)
@@ -102,7 +104,7 @@ fun CampScreen(
                     Button(
                         onClick = onStartRest,
                         modifier = Modifier.weight(1f),
-                        enabled = character.hp < character.maxHp
+                        enabled = !isActionLoading && character.hp < character.maxHp
                     ) {
                         Text("REST")
                     }
@@ -110,7 +112,7 @@ fun CampScreen(
                     OutlinedButton(
                         onClick = onInstantHeal,
                         modifier = Modifier.weight(1f),
-                        enabled = character.hp < character.maxHp && character.gold >= 50
+                        enabled = !isActionLoading && character.hp < character.maxHp && character.gold >= 50
                     ) {
                         Text("USE SUPPLIES (50G)")
                     }
@@ -169,7 +171,10 @@ fun CampScreen(
                                         Text(text = p.name, fontWeight = FontWeight.Bold)
                                         Text(text = "HP: ${p.hp}/${p.maxHp}", style = MaterialTheme.typography.bodySmall)
                                     }
-                                    Button(onClick = { onHealPlayer(p.id) }) {
+                                    Button(
+                                        onClick = { onHealPlayer(p.id) },
+                                        enabled = !isActionLoading
+                                    ) {
                                         Text("HEAL")
                                     }
                                 }

@@ -25,10 +25,14 @@ import com.alifeatseammo.data.model.ElementType
 @Composable
 fun MythicArtScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     onRollClick: () -> Unit,
     onAdminGrantTestItems: () -> Unit,
     onBackClick: () -> Unit
 ) {
+    val isLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
+    val isRolling = actionState is com.alifeatseammo.ui.UIActionState.Loading && actionState.label.contains("Rolling")
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -48,6 +52,7 @@ fun MythicArtScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ... (rest of the text remains same)
             Text(
                 text = "Island of World Secrets",
                 style = MaterialTheme.typography.headlineMedium,
@@ -66,6 +71,23 @@ fun MythicArtScreen(
             // Current Mythic Art Display
             CurrentMythicArtCard(character.mythicArt)
 
+            if (actionState is com.alifeatseammo.ui.UIActionState.Error) {
+                Text(
+                    text = actionState.message,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+            } else if (actionState is com.alifeatseammo.ui.UIActionState.Success) {
+                Text(
+                    text = actionState.label,
+                    color = Color(0xFF4CAF50),
+                    modifier = Modifier.padding(top = 16.dp),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
             Spacer(modifier = Modifier.weight(1f))
 
             // Roll Section
@@ -82,14 +104,15 @@ fun MythicArtScreen(
                         Button(
                             onClick = onAdminGrantTestItems,
                             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            enabled = !isLoading,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
                         ) {
-                            Text("ADMIN: GRANT TEST ARTIFACTS")
+                            Text(if (isLoading && actionState.label.contains("Granting")) "GRANTING..." else "ADMIN: GRANT TEST ARTIFACTS")
                         }
                     }
 
                     val freeRolls = character.freeMythicRolls
-                    val canAfford = freeRolls > 0 || character.gold >= 1000000
+                    val canAfford = (freeRolls > 0 || character.gold >= 1000000) && !isLoading
                     
                     if (freeRolls > 0) {
                         Text(
@@ -111,17 +134,27 @@ fun MythicArtScreen(
                     Button(
                         onClick = onRollClick,
                         modifier = Modifier.fillMaxWidth().height(56.dp),
-                        enabled = canAfford,
+                        enabled = canAfford && character.inventory.size < character.inventoryCapacity,
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(
-                            text = if (freeRolls > 0) "USE FREE ROLL" else "ROLL FOR 1M GOLD",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Black
-                        )
+                        if (isRolling) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("AWAKENING...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                        } else {
+                            Text(
+                                text = if (freeRolls > 0) "USE FREE ROLL" else "ROLL FOR 1M GOLD",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
                     }
                     
-                    if (character.inventory.size >= 20) {
+                    if (character.inventory.size >= character.inventoryCapacity) {
                         Text(
                             text = "Inventory is full! Free up space first.",
                             color = MaterialTheme.colorScheme.error,

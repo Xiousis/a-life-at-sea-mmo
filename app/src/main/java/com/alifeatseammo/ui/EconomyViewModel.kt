@@ -19,6 +19,28 @@ class EconomyViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _actionState = MutableStateFlow<UIActionState>(UIActionState.Idle)
+    val actionState: StateFlow<UIActionState> = _actionState.asStateFlow()
+
+    private fun performAction(label: String, block: suspend () -> Unit) {
+        if (_actionState.value is UIActionState.Loading) return
+
+        viewModelScope.launch {
+            _actionState.value = UIActionState.Loading(label)
+            try {
+                block()
+                _actionState.value = UIActionState.Success(label)
+                kotlinx.coroutines.delay(2000)
+                if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
+                    _actionState.value = UIActionState.Idle
+                }
+            } catch (e: Exception) {
+                _actionState.value = UIActionState.Error(e.message ?: "Action failed")
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
     private val currentUser = authRepository.currentUser
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -41,32 +63,20 @@ class EconomyViewModel @Inject constructor(
     fun equipItem(item: Item) {
         val char = character.value ?: return
         if (char.level < item.levelRequirement) return
-        viewModelScope.launch {
-            try {
-                gameRepository.equipItem(item.id, item.type.name)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Equipping ${item.name}") {
+            gameRepository.equipItem(item.id, item.type.name)
         }
     }
 
     fun unequipItem(slot: String) {
-        viewModelScope.launch {
-            try {
-                gameRepository.unequipItem(slot)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Unequipping $slot") {
+            gameRepository.unequipItem(slot)
         }
     }
 
     fun useItem(item: Item) {
-        viewModelScope.launch {
-            try {
-                gameRepository.useItem(item.id)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Using ${item.name}") {
+            gameRepository.useItem(item.id)
         }
     }
 
@@ -76,62 +86,38 @@ class EconomyViewModel @Inject constructor(
             _errorMessage.value = "A God's Eye user does not cook. They create or annihilate."
             return
         }
-        viewModelScope.launch {
-            try {
-                gameRepository.cookFish(item.id)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Cooking ${item.name}") {
+            gameRepository.cookFish(item.id)
         }
     }
 
     fun sellItem(item: Item) {
-        viewModelScope.launch {
-            try {
-                gameRepository.sellItem(item.id)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Selling ${item.name}") {
+            gameRepository.sellItem(item.id)
         }
     }
 
     fun purchaseItem(itemId: String, shopId: String) {
-        viewModelScope.launch {
-            try {
-                gameRepository.purchaseItem(itemId, shopId)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Purchasing Item") {
+            gameRepository.purchaseItem(itemId, shopId)
         }
     }
 
     fun purchaseShip(shipId: String) {
-        viewModelScope.launch {
-            try {
-                gameRepository.purchaseShip(shipId)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Purchasing Ship") {
+            gameRepository.purchaseShip(shipId)
         }
     }
 
     fun claimMailRewards(mailId: String) {
-        viewModelScope.launch {
-            try {
-                gameRepository.claimMailRewards(mailId)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Claiming Rewards") {
+            gameRepository.claimMailRewards(mailId)
         }
     }
 
     fun deleteMail(mailId: String) {
-        viewModelScope.launch {
-            try {
-                gameRepository.deleteMail(mailId)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Deleting Mail") {
+            gameRepository.deleteMail(mailId)
         }
     }
 

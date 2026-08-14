@@ -3,14 +3,22 @@ package com.alifeatseammo.util
 import android.content.Context
 import android.media.MediaPlayer
 import android.util.Log
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
-object MusicManager {
+@Singleton
+class MusicManager @Inject constructor(
+    @ApplicationContext private val context: Context
+) : DefaultLifecycleObserver {
     private var mediaPlayer: MediaPlayer? = null
     private var currentResId: Int = -1
-    private var isPausedManually: Boolean = false
+    private var isPausedAutomatically: Boolean = false
     private var volume: Float = 0.5f
 
-    fun play(context: Context, resId: Int, loop: Boolean = true) {
+    fun play(resId: Int, loop: Boolean = true) {
         if (currentResId == resId && mediaPlayer?.isPlaying == true) return
 
         try {
@@ -23,13 +31,13 @@ object MusicManager {
                 return
             }
 
-            mediaPlayer = MediaPlayer.create(context.applicationContext, resId).apply {
+            mediaPlayer = MediaPlayer.create(context, resId).apply {
                 isLooping = loop
                 setVolume(volume, volume)
                 start()
             }
             currentResId = resId
-            isPausedManually = false
+            isPausedAutomatically = false
             Log.d("MusicManager", "Playing: $resName")
         } catch (e: Exception) {
             Log.e("MusicManager", "Error playing music", e)
@@ -39,14 +47,26 @@ object MusicManager {
     fun pause() {
         if (mediaPlayer?.isPlaying == true) {
             mediaPlayer?.pause()
-            isPausedManually = true
         }
     }
 
     fun resume() {
-        if (isPausedManually && mediaPlayer != null) {
+        if (mediaPlayer != null && mediaPlayer?.isPlaying == false) {
             mediaPlayer?.start()
-            isPausedManually = false
+        }
+    }
+
+    override fun onStart(owner: LifecycleOwner) {
+        if (isPausedAutomatically) {
+            resume()
+            isPausedAutomatically = false
+        }
+    }
+
+    override fun onStop(owner: LifecycleOwner) {
+        if (mediaPlayer?.isPlaying == true) {
+            pause()
+            isPausedAutomatically = true
         }
     }
 

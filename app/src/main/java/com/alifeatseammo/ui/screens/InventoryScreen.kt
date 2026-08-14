@@ -20,6 +20,7 @@ import com.alifeatseammo.data.model.Rarity
 @Composable
 fun InventoryScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     onEquipItem: (Item) -> Unit,
     onUnequipItem: (String) -> Unit,
     onUseItem: (Item) -> Unit,
@@ -28,6 +29,7 @@ fun InventoryScreen(
     onBackClick: () -> Unit
 ) {
     var itemToUseWithWarning by remember { mutableStateOf<Item?>(null) }
+    val isLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
 
     if (itemToUseWithWarning != null) {
         AlertDialog(
@@ -72,21 +74,26 @@ fun InventoryScreen(
                 .padding(16.dp)
         ) {
             // Equipment Section
-            Text(
-                text = "EQUIPMENT",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "EQUIPMENT",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             
-            EquipmentGrid(character.equipment, onUnequipItem)
+            EquipmentGrid(character.equipment, onUnequipItem, isLoading)
             
             Spacer(modifier = Modifier.height(24.dp))
             
             // Inventory Section
             Text(
-                text = "BACKPACK (${character.inventory.size})",
+                text = "BACKPACK (${character.inventory.size}/${character.inventoryCapacity})",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -104,6 +111,7 @@ fun InventoryScreen(
                     items(character.inventory) { item ->
                         InventoryItemCard(
                             item = item,
+                            isLoading = isLoading,
                             onEquip = { onEquipItem(item) },
                             onUse = {
                                 if (item.type == ItemType.Artifact && character.mythicArt != null) {
@@ -123,30 +131,46 @@ fun InventoryScreen(
 }
 
 @Composable
-fun EquipmentGrid(equipment: Map<String, Item?>, onUnequip: (String) -> Unit) {
-    val slots = listOf("Weapon", "Armor", "Accessory")
+fun EquipmentGrid(equipment: Map<String, Item?>, onUnequip: (String) -> Unit, isLoading: Boolean) {
+    val slots = listOf("Weapon", "Armor", "Accessory", "Bag")
     
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        slots.forEach { slot ->
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            slots.take(3).forEach { slot ->
+                EquipmentSlot(
+                    slotName = slot,
+                    item = equipment[slot],
+                    modifier = Modifier.weight(1f),
+                    enabled = !isLoading,
+                    onUnequip = { onUnequip(slot) }
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             EquipmentSlot(
-                slotName = slot,
-                item = equipment[slot],
+                slotName = "Bag",
+                item = equipment["Bag"],
                 modifier = Modifier.weight(1f),
-                onUnequip = { onUnequip(slot) }
+                enabled = !isLoading,
+                onUnequip = { onUnequip("Bag") }
             )
+            Spacer(modifier = Modifier.weight(2f))
         }
     }
 }
 
 @Composable
-fun EquipmentSlot(slotName: String, item: Item?, modifier: Modifier = Modifier, onUnequip: () -> Unit) {
+fun EquipmentSlot(slotName: String, item: Item?, modifier: Modifier = Modifier, enabled: Boolean, onUnequip: () -> Unit) {
     OutlinedCard(
         modifier = modifier.height(100.dp),
         onClick = { if (item != null) onUnequip() },
-        enabled = item != null,
+        enabled = item != null && enabled,
         colors = CardDefaults.cardColors(
             containerColor = if (item != null) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
         )
@@ -175,6 +199,7 @@ fun EquipmentSlot(slotName: String, item: Item?, modifier: Modifier = Modifier, 
 @Composable
 fun InventoryItemCard(
     item: Item,
+    isLoading: Boolean,
     onEquip: () -> Unit,
     onUse: () -> Unit,
     onCook: () -> Unit,
@@ -209,13 +234,21 @@ fun InventoryItemCard(
             
             Column(horizontalAlignment = Alignment.End) {
                 when (item.type) {
-                    ItemType.Weapon, ItemType.Armor, ItemType.Accessory -> {
-                        Button(onClick = onEquip, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                    ItemType.Weapon, ItemType.Armor, ItemType.Accessory, ItemType.Bag -> {
+                        Button(
+                            onClick = onEquip,
+                            enabled = !isLoading,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
                             Text("Equip", fontSize = 12.sp)
                         }
                     }
                     ItemType.Consumable, ItemType.Food, ItemType.Artifact -> {
-                        Button(onClick = onUse, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                        Button(
+                            onClick = onUse,
+                            enabled = !isLoading,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
                             Text(when(item.type) {
                                 ItemType.Food -> "Eat"
                                 ItemType.Artifact -> "Awaken"
@@ -224,14 +257,22 @@ fun InventoryItemCard(
                         }
                     }
                     ItemType.Fish -> {
-                        Button(onClick = onCook, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                        Button(
+                            onClick = onCook,
+                            enabled = !isLoading,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
                             Text("Cook", fontSize = 12.sp)
                         }
                     }
                     else -> {}
                 }
-                TextButton(onClick = onSell, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Text("Sell (${item.price / 2} G)", fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
+                TextButton(
+                    onClick = onSell,
+                    enabled = !isLoading,
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("Sell (${item.price / 2} G)", fontSize = 10.sp, color = if (isLoading) Color.Gray else MaterialTheme.colorScheme.error)
                 }
             }
         }

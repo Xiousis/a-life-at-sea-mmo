@@ -70,19 +70,38 @@ fun CrewScreen(
                     // Create/Join Section
                     Text(text = "You are not in a crew.", style = MaterialTheme.typography.headlineSmall)
                     Spacer(modifier = Modifier.height(24.dp))
+
+                    if (character.faction == com.alifeatseammo.data.model.Faction.Neutral) {
+                        Text(
+                            text = "You must join the Navy or become a Pirate to create a crew.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    if (character.faction == com.alifeatseammo.data.model.Faction.Navy && character.infamy > 80) {
+                        Text(
+                            text = "WARNING: High Infamy (${character.infamy}). At 100 you will be kicked from the Navy!",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                     
                     var crewName by remember { mutableStateOf("") }
                     OutlinedTextField(
                         value = crewName,
                         onValueChange = { crewName = it },
                         label = { Text("Crew Name") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = character.faction != com.alifeatseammo.data.model.Faction.Neutral
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = { onCreateCrew(crewName, "") },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = crewName.length >= 3
+                        enabled = crewName.length >= 3 && character.faction != com.alifeatseammo.data.model.Faction.Neutral
                     ) {
                         Text("Create Crew (10,000 Gold)")
                     }
@@ -129,9 +148,15 @@ fun CrewScreen(
                     
                     crew?.members?.forEach { memberId ->
                         val role = crew.roles[memberId] ?: com.alifeatseammo.data.model.CrewRole.Member
+                        val roleDisplay = if (role == com.alifeatseammo.data.model.CrewRole.Captain && crew.faction == com.alifeatseammo.data.model.Faction.Pirate) {
+                            "Pirate Captain"
+                        } else {
+                            role.name
+                        }
+
                         ListItem(
                             headlineContent = { Text(text = memberId) }, // In real app, fetch name
-                            supportingContent = { Text(text = role.name) },
+                            supportingContent = { Text(text = roleDisplay) },
                             trailingContent = {
                                 if (crew.captainId == character.id && memberId != character.id) {
                                     IconButton(onClick = { onPromoteMember(memberId, "Officer") }) {

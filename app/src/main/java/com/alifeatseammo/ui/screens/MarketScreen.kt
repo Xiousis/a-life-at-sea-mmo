@@ -19,12 +19,14 @@ import com.alifeatseammo.data.model.Rarity
 @Composable
 fun MarketScreen(
     character: Character,
+    actionState: com.alifeatseammo.ui.UIActionState,
     marketItems: List<Item>,
     onBuyItem: (Item) -> Unit,
     onSellItem: (Item) -> Unit,
     onBackClick: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    val isLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
     
     Scaffold(
         topBar = {
@@ -52,16 +54,16 @@ fun MarketScreen(
             }
             
             if (selectedTab == 0) {
-                BuyTab(marketItems, character.gold, onBuyItem)
+                BuyTab(marketItems, character.gold, isLoading, onBuyItem)
             } else {
-                SellTab(character.inventory, onSellItem)
+                SellTab(character.inventory, isLoading, onSellItem)
             }
         }
     }
 }
 
 @Composable
-fun BuyTab(items: List<Item>, playerGold: Int, onBuyItem: (Item) -> Unit) {
+fun BuyTab(items: List<Item>, playerGold: Int, isLoading: Boolean, onBuyItem: (Item) -> Unit) {
     if (items.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No items for sale here")
@@ -69,14 +71,14 @@ fun BuyTab(items: List<Item>, playerGold: Int, onBuyItem: (Item) -> Unit) {
     } else {
         LazyColumn {
             items(items) { item ->
-                MarketItemRow(item, playerGold >= item.price, "Buy", onBuyItem)
+                MarketItemRow(item, !isLoading && playerGold >= item.price, "Buy", onBuyItem)
             }
         }
     }
 }
 
 @Composable
-fun SellTab(inventory: List<Item>, onSellItem: (Item) -> Unit) {
+fun SellTab(inventory: List<Item>, isLoading: Boolean, onSellItem: (Item) -> Unit) {
     if (inventory.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Inventory is empty")
@@ -84,7 +86,7 @@ fun SellTab(inventory: List<Item>, onSellItem: (Item) -> Unit) {
     } else {
         LazyColumn {
             items(inventory) { item ->
-                MarketItemRow(item, true, "Sell (${item.price / 2})", onSellItem)
+                MarketItemRow(item, !isLoading, "Sell (${item.price / 2})", onSellItem)
             }
         }
     }

@@ -22,6 +22,7 @@ fun MoreScreen(
         MoreMenuItem("Inventory", "📦"),
         MoreMenuItem("Stats", "📊"),
         MoreMenuItem("Skills", "📜"),
+        MoreMenuItem("Auction House", "⚖️"),
         MoreMenuItem("Leaderboard", "🏆"),
         MoreMenuItem("Chat", "💬"),
         MoreMenuItem("Mail", "✉"),

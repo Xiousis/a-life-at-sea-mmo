@@ -2,7 +2,6 @@ package com.alifeatseammo.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -12,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -26,16 +26,44 @@ import kotlinx.coroutines.launch
 fun AppNavigation(
     navController: NavHostController,
     currentChar: com.alifeatseammo.data.model.Character,
-    viewModel: GameViewModel,
-    authViewModel: AuthViewModel,
-    combatViewModel: CombatViewModel,
-    travelViewModel: TravelViewModel,
-    socialViewModel: SocialViewModel,
-    economyViewModel: EconomyViewModel,
-    profileViewModel: PlayerProfileViewModel,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier
 ) {
+    val viewModel: GameViewModel = hiltViewModel()
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val combatViewModel: CombatViewModel = hiltViewModel()
+    val travelViewModel: TravelViewModel = hiltViewModel()
+    val socialViewModel: SocialViewModel = hiltViewModel()
+    val economyViewModel: EconomyViewModel = hiltViewModel()
+    val profileViewModel: PlayerProfileViewModel = hiltViewModel()
+    val auctionViewModel: AuctionViewModel = hiltViewModel()
+
+    val actionState by viewModel.actionState.collectAsState()
+    val travelActionState by travelViewModel.actionState.collectAsState()
+    val economyActionState by economyViewModel.actionState.collectAsState()
+    val auctionActionState by auctionViewModel.actionState.collectAsState()
+
+    // Global Error Handling inside Navigation
+    val errorMsg by viewModel.errorMessage.collectAsState()
+    val combatErrorMsg by combatViewModel.errorMessage.collectAsState()
+    val travelErrorMsg by travelViewModel.errorMessage.collectAsState()
+    val socialErrorMsg by socialViewModel.errorMessage.collectAsState()
+    val economyErrorMsg by economyViewModel.errorMessage.collectAsState()
+    val auctionErrorMsg by auctionViewModel.errorMessage.collectAsState()
+
+    LaunchedEffect(errorMsg, combatErrorMsg, travelErrorMsg, socialErrorMsg, economyErrorMsg, auctionErrorMsg) {
+        val message = errorMsg ?: combatErrorMsg ?: travelErrorMsg ?: socialErrorMsg ?: economyErrorMsg ?: auctionErrorMsg
+        message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearErrorMessage()
+            combatViewModel.clearErrorMessage()
+            travelViewModel.clearErrorMessage()
+            socialViewModel.clearErrorMessage()
+            economyViewModel.clearErrorMessage()
+            auctionViewModel.clearErrorMessage()
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Dashboard.route,
@@ -91,6 +119,7 @@ fun AppNavigation(
             val scope = rememberCoroutineScope()
             MissionScreen(
                 character = currentChar,
+                actionState = actionState,
                 missions = missions,
                 onMissionClick = {
                     scope.launch {
@@ -106,6 +135,7 @@ fun AppNavigation(
             val locations by travelViewModel.locations.collectAsState()
             TravelScreen(
                 character = currentChar,
+                actionState = travelActionState,
                 locations = locations,
                 onTravelClick = { dest -> travelViewModel.startTravel(dest) },
                 onBackClick = { navController.popBackStack() }
@@ -162,6 +192,7 @@ fun AppNavigation(
         composable(Screen.Training.route) {
             TrainingScreen(
                 character = currentChar,
+                actionState = actionState,
                 onTrainClick = { viewModel.train(it) },
                 onBackClick = { navController.popBackStack() }
             )
@@ -225,6 +256,7 @@ fun AppNavigation(
                         "Inventory" -> navController.navigate(Screen.Inventory.route)
                         "Stats" -> navController.navigate(Screen.Stats.route)
                         "Skills" -> navController.navigate(Screen.Skills.route)
+                        "Auction House" -> navController.navigate(Screen.Auction.route)
                         "Leaderboard" -> navController.navigate(Screen.Leaderboard.route)
                         "Chat" -> navController.navigate(Screen.Chat.route)
                         "Mail" -> navController.navigate(Screen.Mail.route)
@@ -238,6 +270,7 @@ fun AppNavigation(
         composable(Screen.Inventory.route) {
             InventoryScreen(
                 character = currentChar,
+                actionState = economyActionState,
                 onEquipItem = { economyViewModel.equipItem(it) },
                 onUnequipItem = { economyViewModel.unequipItem(it) },
                 onUseItem = { economyViewModel.useItem(it) },
@@ -265,6 +298,7 @@ fun AppNavigation(
             val skill = backStackEntry.arguments?.getString("skill") ?: "all"
             ProfessionsScreen(
                 character = currentChar,
+                actionState = actionState,
                 skillFilter = skill,
                 onTrainClick = { viewModel.train(it) },
                 onBackClick = { navController.popBackStack() }
@@ -280,6 +314,7 @@ fun AppNavigation(
             val marketItems by economyViewModel.marketItems.collectAsState()
             MarketScreen(
                 character = currentChar,
+                actionState = economyActionState,
                 marketItems = marketItems,
                 onBuyItem = { economyViewModel.purchaseItem(it.id, currentChar.currentLocation) },
                 onSellItem = { economyViewModel.sellItem(it) },
@@ -309,6 +344,7 @@ fun AppNavigation(
             val playersNearby by viewModel.playersAtLocation.collectAsState()
             InfirmaryScreen(
                 character = currentChar,
+                actionState = actionState,
                 playersAtLocation = playersNearby,
                 onStartRest = { viewModel.startHealing() },
                 onInstantHeal = { viewModel.instantHeal() },
@@ -321,6 +357,7 @@ fun AppNavigation(
             val playersNearby by viewModel.playersAtLocation.collectAsState()
             CampScreen(
                 character = currentChar,
+                actionState = actionState,
                 playersAtLocation = playersNearby,
                 onStartRest = { viewModel.startHealing() },
                 onInstantHeal = { viewModel.instantHeal() },
@@ -380,8 +417,21 @@ fun AppNavigation(
         composable(Screen.MythicArt.route) {
             MythicArtScreen(
                 character = currentChar,
+                actionState = actionState,
                 onRollClick = { viewModel.rollMythicArt() },
                 onAdminGrantTestItems = { viewModel.adminGrantTestItems() },
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.Auction.route) {
+            val listings by auctionViewModel.auctionListings.collectAsState()
+            AuctionScreen(
+                character = currentChar,
+                listings = listings,
+                actionState = auctionActionState,
+                onListButtonClick = { item, price -> auctionViewModel.listAuctionItem(item, price) },
+                onBuyButtonClick = { auctionViewModel.buyAuctionItem(it) },
+                onCancelButtonClick = { auctionViewModel.cancelAuctionListing(it) },
                 onBackClick = { navController.popBackStack() }
             )
         }

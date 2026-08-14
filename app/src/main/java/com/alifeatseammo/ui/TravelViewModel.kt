@@ -19,16 +19,34 @@ class TravelViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _actionState = MutableStateFlow<UIActionState>(UIActionState.Idle)
+    val actionState: StateFlow<UIActionState> = _actionState.asStateFlow()
+
+    private fun performAction(label: String, block: suspend () -> Unit) {
+        if (_actionState.value is UIActionState.Loading) return
+
+        viewModelScope.launch {
+            _actionState.value = UIActionState.Loading(label)
+            try {
+                block()
+                _actionState.value = UIActionState.Success(label)
+                kotlinx.coroutines.delay(2000)
+                if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
+                    _actionState.value = UIActionState.Idle
+                }
+            } catch (e: Exception) {
+                _actionState.value = UIActionState.Error(e.message ?: "Action failed")
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
     val locations: StateFlow<List<LocationDef>> = gameRepository.getLocations()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun startTravel(destination: String) {
-        viewModelScope.launch {
-            try {
-                gameRepository.startTravel(destination)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Traveling to $destination") {
+            gameRepository.startTravel(destination)
         }
     }
 
