@@ -225,13 +225,33 @@ export function calculateCurrentEnergy(character: any): { energy: number, energy
     const elapsed = now - character.energyUpdatedAt;
     const regenerated = Math.floor(elapsed / ENERGY_REGEN_RATE_MS);
 
-    const currentMaxEnergy = character.maxEnergy || MAX_ENERGY;
+    const currentMaxEnergy = character.maxEnergy ?? MAX_ENERGY;
     if (regenerated <= 0) return { energy: character.energy, energyUpdatedAt: character.energyUpdatedAt };
 
     const newEnergy = Math.min(currentMaxEnergy, character.energy + regenerated);
-    const newTimestamp = character.energy + regenerated >= currentMaxEnergy ? now : character.energyUpdatedAt + (regenerated * ENERGY_REGEN_RATE_MS);
+    const newTimestamp = (character.energy + regenerated >= currentMaxEnergy) ? now : character.energyUpdatedAt + (regenerated * ENERGY_REGEN_RATE_MS);
 
     return { energy: newEnergy, energyUpdatedAt: newTimestamp };
+}
+
+function assertCanPerformAction(character: any, actionName: string, options: { requireHp?: boolean, blockBusy?: boolean, blockHealing?: boolean } = {}) {
+    if (character.isBanned) {
+        throw new functions.https.HttpsError("permission-denied", "User is banned.");
+    }
+
+    if (options.requireHp !== false && character.hp <= 0) {
+        throw new functions.https.HttpsError("failed-precondition", `You are too injured to ${actionName}. Visit an infirmary.`);
+    }
+
+    if (options.blockBusy) {
+        if (character.travelState || character.trainingState || character.combatState) {
+             throw new functions.https.HttpsError("failed-precondition", `You are too busy to ${actionName}.`);
+        }
+    }
+
+    if (options.blockHealing && character.healingState) {
+        throw new functions.https.HttpsError("failed-precondition", `You cannot ${actionName} while resting in the infirmary.`);
+    }
 }
 
 function checkLevelUp(character: any) {
@@ -239,7 +259,8 @@ function checkLevelUp(character: any) {
     const MAX_LEVEL = 300;
 
     if (level >= MAX_LEVEL) {
-        return { ...character, level: MAX_LEVEL, xp: 0, leveledUp: false };
+        // Keep XP but don't level up
+        return { ...character, level: MAX_LEVEL, leveledUp: false };
     }
 
     let xpNeeded = level * level * 100;
@@ -266,8 +287,6 @@ function checkLevelUp(character: any) {
 
         if (level < MAX_LEVEL) {
             xpNeeded = level * level * 100;
-        } else {
-            xp = 0; // Cap XP at level 300
         }
         leveledUp = true;
     }
@@ -286,12 +305,9 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to roll for Mythic Arts. Visit an infirmary.");
-        }
+
+        assertCanPerformAction(character, "roll for Mythic Arts", { blockBusy: true, blockHealing: true });
 
         // Location check
         if (character.currentLocation !== "Island of World Secrets") {
@@ -314,40 +330,43 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
 
         // Inventory check
         const inventory = character.inventory || [];
-        if (inventory.length + 3 > INVENTORY_CAPACITY) {
-            throw new functions.https.HttpsError("failed-precondition", "Inventory does not have enough space for 3 artifacts.");
+
+        if (inventory.length >= INVENTORY_CAPACITY) {
+            throw new functions.https.HttpsError(
+                "failed-precondition",
+                "Inventory is full."
+            );
         }
 
-        const rolledArtifacts = [];
-        for (let i = 0; i < 3; i++) {
-            const rand = Math.random() * 100;
-            let tier = "F";
-            if (rand < 0.000001) tier = "Z";
-            else if (rand < 0.000101) tier = "SSS";
-            else if (rand < 0.001101) tier = "SS";
-            else if (rand < 0.011101) tier = "S";
-            else if (rand < 0.111101) tier = "A";
-            else if (rand < 1.111101) tier = "B";
-            else if (rand < 6.111101) tier = "C";
-            else if (rand < 26.111101) tier = "D";
+        const rand = Math.random() * 100;
 
-            const artifactItem = {
-                id: `mythic_artifact_${tier}_${Date.now()}_${i}`,
-                name: `${tier} Tier Artifact`,
-                description: `A mysterious artifact that contains a random ${tier} tier Mythic Art. Use it to awaken its power.`,
-                type: "Artifact",
-                rarity: getRarityForTier(tier),
-                price: getPriceForTier(tier),
-                mythicTier: tier,
-                levelRequirement: 1
-            };
-            rolledArtifacts.push(artifactItem);
-        }
+        let tier = "F";
+
+        if (rand < 0.000001) tier = "Z";
+        else if (rand < 0.000101) tier = "SSS";
+        else if (rand < 0.001101) tier = "SS";
+        else if (rand < 0.011101) tier = "S";
+        else if (rand < 0.111101) tier = "A";
+        else if (rand < 1.111101) tier = "B";
+        else if (rand < 6.111101) tier = "C";
+        else if (rand < 26.111101) tier = "D";
+
+        const artifactItem = {
+            id: `mythic_artifact_${tier}_${Date.now()}`,
+            name: `${tier} Tier Artifact`,
+            description:
+                `A mysterious artifact that contains a random ${tier} tier Mythic Art. Use it to awaken its power.`,
+            type: "Artifact",
+            rarity: getRarityForTier(tier),
+            price: getPriceForTier(tier),
+            mythicTier: tier,
+            levelRequirement: 1
+        };
 
         const updates: any = {
             hp: character.hp,
             healingState: character.healingState,
-            inventory: admin.firestore.FieldValue.arrayUnion(...rolledArtifacts)
+            inventory: admin.firestore.FieldValue.arrayUnion(artifactItem)
         };
 
         if (freeRolls > 0) {
@@ -357,10 +376,20 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
         }
 
         transaction.update(playerRef, updates);
-        const rolledTiers = rolledArtifacts.map(a => a.mythicTier).join(", ");
-        recordLog(transaction, userId, "RollMythicArt", `Rolled 3 artifacts: ${rolledTiers}`, -goldCost, 0);
 
-        return { success: true, tiers: rolledTiers };
+        recordLog(
+            transaction,
+            userId,
+            "RollMythicArt",
+            `Rolled ${tier} tier artifact`,
+            -goldCost,
+            0
+        );
+
+        return {
+            success: true,
+            tier
+        };
     });
 });
 
@@ -379,6 +408,7 @@ function getRarityForTier(tier: string): string {
 
 function getPriceForTier(tier: string): number {
     switch (tier) {
+        case "Z": return 50000000;
         case "SSS": return 10000000;
         case "SS": return 5000000;
         case "S": return 2000000;
@@ -524,9 +554,9 @@ export const joinFaction = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         const character = snapshot.data() as any;
+        assertCanPerformAction(character, "join a faction", { blockBusy: true, blockHealing: true });
+
         if (character.faction !== "Neutral") {
-            throw new functions.https.HttpsError("failed-precondition", "You already belong to a faction.");
-        }
 
         if (faction === "Pirate") {
             if (character.currentLocation !== "Pirate\u0027s Den") {
@@ -566,17 +596,9 @@ export const train = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
 
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to train. Visit an infirmary.");
-        }
-
-        if (character.trainingState) {
-             throw new functions.https.HttpsError("failed-precondition", "You are already training.");
-        }
+        assertCanPerformAction(character, "train", { blockBusy: true, blockHealing: true });
 
         if (statType === "Medical") {
             throw new functions.https.HttpsError("failed-precondition", "Medical skill can only be trained by healing patients in an infirmary.");
@@ -630,6 +652,10 @@ export const finishTraining = functions.https.onCall(async (data, context) => {
         const statType = training.statType;
         const mappedStat = STAT_MAPPING[statType];
 
+        if (!mappedStat) {
+            throw new functions.https.HttpsError("internal", `Corrupted training state: Invalid statType ${statType}`);
+        }
+
         // Ensure stats object exists
         const stats = { ...character.stats };
         const pStats = { ...(character.professionStats || {}) };
@@ -672,21 +698,9 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
 
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to travel. Visit an infirmary.");
-        }
-
-        if (character.healingState) {
-            throw new functions.https.HttpsError("failed-precondition", "You cannot travel while resting in the infirmary.");
-        }
-
-        if (character.travelState || character.combatState || character.trainingState) {
-            throw new functions.https.HttpsError("failed-precondition", "Player is already busy.");
-        }
+        assertCanPerformAction(character, "travel", { blockBusy: true, blockHealing: true });
 
         if (character.currentLocation === destination) {
             throw new functions.https.HttpsError("invalid-argument", "Already at destination.");
@@ -810,8 +824,10 @@ export const purchaseShip = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
-        const character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+        let character = snapshot.data() as any;
+        character = processHealing(character);
+
+        assertCanPerformAction(character, "purchase a ship", { blockBusy: true, blockHealing: true });
 
         // Validate location has a shipyard
         const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
@@ -1508,9 +1524,7 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
         let attacker = attackerSnap.data() as any;
         attacker = processHealing(attacker);
 
-        if (attacker.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to fight. Visit an infirmary.");
-        }
+        assertCanPerformAction(attacker, "fight", { blockBusy: true, blockHealing: true });
 
         const defender = defenderSnap.data() as any;
         const defenderWithHealing = processHealing(defender);
@@ -1535,8 +1549,9 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("failed-precondition", "PvP is not allowed in safe zones.");
         }
 
-        if (attacker.combatState || attacker.travelState) throw new functions.https.HttpsError("failed-precondition", "You are already busy.");
-        if (defender.combatState || defender.travelState) throw new functions.https.HttpsError("failed-precondition", "Target is already busy.");
+        if (defenderFinal.combatState || defenderFinal.travelState || defenderFinal.trainingState || defenderFinal.healingState) {
+            throw new functions.https.HttpsError("failed-precondition", "Target is already busy or resting.");
+        }
 
         // Faction-based attack rules and infamy
         let infamyGain = 0;
@@ -1637,7 +1652,7 @@ export const startHealing = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         const character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+        assertCanPerformAction(character, "heal", { requireHp: false, blockBusy: true });
 
         if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
         if (character.healingState) throw new functions.https.HttpsError("failed-precondition", "You are already resting.");
@@ -1663,7 +1678,7 @@ export const instantHeal = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         const character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+        assertCanPerformAction(character, "heal", { requireHp: false, blockBusy: true });
 
         if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
         if (character.gold < 50) throw new functions.https.HttpsError("failed-precondition", "Not enough gold for instant treatment.");
@@ -1692,7 +1707,10 @@ export const purchaseMedicalLicense = functions.https.onCall(async (data, contex
     return db.runTransaction(async (transaction) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        character = processHealing(character);
+
+        assertCanPerformAction(character, "purchase a license", { blockBusy: true, blockHealing: true });
 
         if (character.hasMedicalLicense) throw new functions.https.HttpsError("already-exists", "You already have a medical license.");
         if (character.gold < 15000) throw new functions.https.HttpsError("failed-precondition", "Not enough gold (15,000 required).");
@@ -1730,7 +1748,7 @@ export const healPlayer = functions.https.onCall(async (data, context) => {
         healer = processHealing(healer);
         target = processHealing(target);
 
-        if (healer.hp <= 0) throw new functions.https.HttpsError("failed-precondition", "You are too injured to heal others.");
+        assertCanPerformAction(healer, "heal others", { blockBusy: true, blockHealing: true });
 
         if (userId === targetPlayerId) throw new functions.https.HttpsError("invalid-argument", "You cannot heal yourself for Medical skill XP. Use resting or items.");
 
@@ -1785,17 +1803,9 @@ export const startMonsterHunt = functions.https.onCall(async (data, context) => 
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
 
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to hunt monsters. Visit a camp.");
-        }
-
-        if (character.travelState || character.combatState || character.trainingState || character.healingState) {
-            throw new functions.https.HttpsError("failed-precondition", "Player is already busy.");
-        }
+        assertCanPerformAction(character, "hunt monsters", { blockBusy: true, blockHealing: true });
 
         const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
         const location = locationSnap.data();
@@ -2445,12 +2455,9 @@ export const equipItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to change equipment.");
-        }
+
+        assertCanPerformAction(character, "change equipment", { blockBusy: true, blockHealing: true });
 
         const allowedSlots = ["Weapon", "Armor", "Accessory", "Helmet", "Boots", "Gloves"];
         if (!allowedSlots.includes(slot)) throw new functions.https.HttpsError("invalid-argument", "Invalid equipment slot.");
@@ -2490,12 +2497,9 @@ export const unequipItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to change equipment.");
-        }
+
+        assertCanPerformAction(character, "change equipment", { blockBusy: true, blockHealing: true });
 
         const equipment = character.equipment || {};
         delete equipment[slot];
@@ -2526,7 +2530,11 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
         if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         if (!itemSnap.exists) throw new functions.https.HttpsError("not-found", "Item not found.");
 
-        const character = playerSnap.data() as any;
+        let character = playerSnap.data() as any;
+        character = processHealing(character);
+
+        assertCanPerformAction(character, "purchase items", { blockBusy: true, blockHealing: true });
+
         const item = itemSnap.data() as any;
 
         // Validate location has a market
@@ -2576,12 +2584,9 @@ export const sellItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to sell items.");
-        }
+
+        assertCanPerformAction(character, "sell items", { blockBusy: true, blockHealing: true });
 
         // Protection: Check if item is equipped
         const isEquipped = Object.values(character.equipment || {}).some((i: any) => i && i.id === itemId);
@@ -2623,12 +2628,9 @@ export const useItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to use items.");
-        }
+
+        assertCanPerformAction(character, "use items", { blockBusy: true, blockHealing: true });
 
         const inventory = character.inventory || [];
         const itemIndex = inventory.findIndex((i: any) => i.id === itemId);
@@ -2947,12 +2949,9 @@ export const catchFish = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to fish.");
-        }
+
+        assertCanPerformAction(character, "fish", { blockBusy: true, blockHealing: true });
 
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
         if (energy < 5) throw new functions.https.HttpsError("failed-precondition", "Not enough energy (5 required).");
@@ -3003,12 +3002,9 @@ export const cookFish = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-
         character = processHealing(character);
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to cook.");
-        }
+
+        assertCanPerformAction(character, "cook", { blockBusy: true, blockHealing: true });
 
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
         if (energy < 2) throw new functions.https.HttpsError("failed-precondition", "Not enough energy (2 required).");

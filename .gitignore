@@ -32,3 +32,6 @@ Thumbs.db
 # Project specific secrets
 google-services.json
 secrets.xml
+
+# Agent artifacts
+.artifacts/
