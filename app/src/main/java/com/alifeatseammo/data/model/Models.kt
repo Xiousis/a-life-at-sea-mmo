@@ -50,7 +50,8 @@ data class Character(
         val regenMultiplier = (mythicArt?.energyRegainMultiplier ?: 1.0f).coerceAtLeast(0.01f)
         val regenRateMs = (baseRegenRateMs / regenMultiplier).toLong().coerceAtLeast(1000L)
         
-        val elapsed = System.currentTimeMillis() - energyUpdatedAt
+        val now = System.currentTimeMillis()
+        val elapsed = (now - energyUpdatedAt).coerceAtLeast(0L)
         val regenerated = (elapsed / regenRateMs).toInt()
         return (energy + regenerated).coerceAtMost(maxEnergy)
     }

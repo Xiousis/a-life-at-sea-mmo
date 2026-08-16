@@ -15,6 +15,26 @@ const TRAINING_DURATION_MS = 20 * 1000; // 20 seconds
 const TRAINING_GOLD_COST = 50;
 const MYTHIC_ROLL_GOLD_COST = 1000000;
 const ROLL_COOLDOWN_MS = 1000;
+const MAX_AUCTION_PRICE = 999999999;
+
+const FISH_TYPES: Record<string, any> = {
+    "sardine": { name: "Sardine", price: 10, healAmount: 5, weight: 60 },
+    "mackerel": { name: "Mackerel", price: 20, healAmount: 8, weight: 25 },
+    "salmon": { name: "Salmon", price: 50, healAmount: 12, weight: 10 },
+    "tuna": { name: "Tuna", price: 100, healAmount: 20, weight: 4 },
+    "swordfish": { name: "Swordfish", price: 250, healAmount: 35, weight: 0.9 },
+    "kraken_tentacle": { name: "Kraken Tentacle", price: 1000, healAmount: 60, weight: 0.1 }
+};
+
+function determineCaughtFish(level: number): string {
+    const rand = Math.random() * 100;
+    let cumulative = 0;
+    for (const [id, data] of Object.entries(FISH_TYPES)) {
+        cumulative += data.weight;
+        if (rand < cumulative) return id;
+    }
+    return "sardine";
+}
 
 const MYTHIC_ARTS: Record<string, Array<{
     name: string,
@@ -256,7 +276,7 @@ function assertCanPerformAction(character: any, actionName: string, options: { r
     }
 
     if (options.blockBusy) {
-        if (character.travelState || character.trainingState || character.combatState) {
+        if (character.travelState || character.trainingState || character.combatState || character.fishingState) {
              throw new functions.https.HttpsError("failed-precondition", `You are too busy to ${actionName}.`);
         }
     }
@@ -2894,6 +2914,7 @@ export const listAuctionItem = functions.https.onCall(async (data, context) => {
     const playerRef = db.collection("players").doc(userId);
 
     if (!price || price <= 0) throw new functions.https.HttpsError("invalid-argument", "Price must be positive.");
+    if (price > MAX_AUCTION_PRICE) throw new functions.https.HttpsError("invalid-argument", `Price exceeds maximum allowed (${MAX_AUCTION_PRICE}).`);
 
     return db.runTransaction(async (transaction) => {
         const snapshot = await transaction.get(playerRef);
@@ -2958,6 +2979,8 @@ export const buyAuctionItem = functions.https.onCall(async (data, context) => {
         const buyer = buyerSnap.data() as any;
         const listing = listingSnap.data() as any;
 
+        assertCanPerformAction(buyer, "buy items from auction", { blockBusy: true, blockHealing: true });
+
         if (buyerId === listing.sellerId) throw new functions.https.HttpsError("failed-precondition", "You cannot buy your own item.");
         if (buyer.gold < listing.price) throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
 
@@ -3015,6 +3038,8 @@ export const cancelAuctionListing = functions.https.onCall(async (data, context)
         const playerRef = db.collection("players").doc(userId);
         const playerSnap = await transaction.get(playerRef);
         const character = playerSnap.data() as any;
+
+        assertCanPerformAction(character, "cancel auction listing", { blockBusy: true, blockHealing: true });
 
         const inventory = character.inventory || [];
         const maxCapacity = calculateMaxCapacity(character);
@@ -3258,10 +3283,9 @@ export const promoteMember = functions.https.onCall(async (data, context) => {
     });
 });
 
-export const catchFish = functions.https.onCall(async (data, context) => {
+export const startFishing = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
-    const { fishId } = data;
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
 
@@ -3274,8 +3298,55 @@ export const catchFish = functions.https.onCall(async (data, context) => {
 
         assertCanPerformAction(character, "fish", { blockBusy: true, blockHealing: true });
 
+        if (character.mythicArt?.tier === "Z") {
+            throw new functions.https.HttpsError("failed-precondition", "Your Mythic Art is too powerful for such a mundane activity as fishing.");
+        }
+
+        const inventory = character.inventory || [];
+        const hasRod = inventory.some((it: any) => it.id.startsWith("rod_") || (it.type === "Tool" && it.name.includes("Rod")));
+        if (!hasRod) {
+             throw new functions.https.HttpsError("failed-precondition", "You need a fishing rod to fish!");
+        }
+
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
         if (energy < 5) throw new functions.https.HttpsError("failed-precondition", "Not enough energy (5 required).");
+
+        const fishId = determineCaughtFish(character.level);
+
+        transaction.update(playerRef, {
+            hp: character.hp,
+            energy: energy - 5,
+            energyUpdatedAt,
+            healingState: character.healingState,
+            fishingState: {
+                startTime: Date.now(),
+                expectedFishId: fishId
+            }
+        });
+
+        return { success: true, fishId };
+    });
+});
+
+export const catchFish = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        let character = snapshot.data() as any;
+        if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+
+        const fishing = character.fishingState;
+        if (!fishing) throw new functions.https.HttpsError("failed-precondition", "No active fishing session.");
+
+        if (Date.now() - fishing.startTime < 2000) {
+            throw new functions.https.HttpsError("failed-precondition", "You reeled in too quickly!");
+        }
 
         const inventory = character.inventory || [];
         const maxCapacity = calculateMaxCapacity(character);
@@ -3283,18 +3354,13 @@ export const catchFish = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("failed-precondition", "Inventory is full.");
         }
 
-        const fishTypes: Record<string, any> = {
-            "sardine": { name: "Sardine", price: 10, healAmount: 5 },
-            "mackerel": { name: "Mackerel", price: 20, healAmount: 8 },
-            "salmon": { name: "Salmon", price: 50, healAmount: 12 },
-            "tuna": { name: "Tuna", price: 100, healAmount: 20 },
-            "swordfish": { name: "Swordfish", price: 250, healAmount: 35 },
-            "kraken_tentacle": { name: "Kraken Tentacle", price: 1000, healAmount: 60 }
-        };
-
-        const caught = fishTypes[fishId] || fishTypes["sardine"];
+        const fishId = fishing.expectedFishId;
+        if (!fishId || !FISH_TYPES[fishId]) {
+            throw new functions.https.HttpsError("internal", "Corrupted fishing state: missing fish ID.");
+        }
+        const caught = FISH_TYPES[fishId];
         const fishItem = {
-            id: `fish_${fishId || "sardine"}_${Date.now()}`,
+            id: `fish_${fishId}_${Date.now()}`,
             name: caught.name,
             type: "Fish",
             price: caught.price,
@@ -3302,17 +3368,13 @@ export const catchFish = functions.https.onCall(async (data, context) => {
             rarity: (fishId === "kraken_tentacle") ? "Legendary" : (fishId === "swordfish" ? "Rare" : "Common")
         };
 
-        const updates: any = {
-            energy: energy - 5,
-            energyUpdatedAt: energyUpdatedAt,
+        transaction.update(playerRef, {
             inventory: admin.firestore.FieldValue.arrayUnion(fishItem),
-            hp: character.hp,
-            healingState: character.healingState,
             "professionStats.fishing": admin.firestore.FieldValue.increment(1),
-            xp: admin.firestore.FieldValue.increment(5)
-        };
+            xp: admin.firestore.FieldValue.increment(5),
+            fishingState: null
+        });
 
-        transaction.update(playerRef, updates);
         recordLog(transaction, userId, "CatchFish", `Caught a ${caught.name}`, 0, 5);
 
         return { success: true, fish: caught.name };

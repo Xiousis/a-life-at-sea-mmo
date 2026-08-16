@@ -43,8 +43,10 @@ fun AppNavigation(
     val economyActionState by economyViewModel.actionState.collectAsState()
     val auctionActionState by auctionViewModel.actionState.collectAsState()
 
-    // Consolidated Global Error Handling
-    val errorList = listOf(
+    // Consolidated Global Error Handling with Queue
+    val errorQueue = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateListOf<String>() }
+
+    val errorStates = listOf(
         viewModel.errorMessage.collectAsState(),
         combatViewModel.errorMessage.collectAsState(),
         travelViewModel.errorMessage.collectAsState(),
@@ -53,11 +55,22 @@ fun AppNavigation(
         auctionViewModel.errorMessage.collectAsState()
     )
 
-    LaunchedEffect(errorList.map { it.value }) {
-        val firstError = errorList.firstOrNull { it.value != null }?.value
-        firstError?.let {
-            snackbarHostState.showSnackbar(it)
-            // Clear all to reset state
+    androidx.compose.runtime.LaunchedEffect(errorStates.map { it.value }) {
+        errorStates.forEach { state ->
+            state.value?.let { error ->
+                if (!errorQueue.contains(error)) {
+                    errorQueue.add(error)
+                }
+            }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(errorQueue.size) {
+        if (errorQueue.isNotEmpty()) {
+            val error = errorQueue.first()
+            snackbarHostState.showSnackbar(error)
+            errorQueue.removeAt(0)
+            // Clear VMs once handled
             viewModel.clearErrorMessage()
             combatViewModel.clearErrorMessage()
             travelViewModel.clearErrorMessage()

@@ -44,7 +44,8 @@ interface GameRepository {
     suspend fun deleteMail(mailId: String): Boolean
     suspend fun claimMailRewards(mailId: String): Boolean
     fun getMarketItems(): Flow<List<Item>>
-    suspend fun catchFish(fishId: String): Boolean
+    suspend fun startFishing(): String?
+    suspend fun catchFish(): Boolean
     suspend fun cookFish(itemId: String): Boolean
     suspend fun purchaseMedicalLicense(): Boolean
     suspend fun healPlayer(targetPlayerId: String): Boolean
@@ -274,18 +275,14 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun getLocations(): Flow<List<LocationDef>> = callbackFlow {
-        val subscription = db.collection("gameData").document("world").collection("locations")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("FirestoreGameRepository", "Error fetching locations", error)
-                    return@addSnapshotListener
-                }
-                snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<LocationDef>() })
-                }
-            }
-        awaitClose { subscription.remove() }
+    override fun getLocations(): Flow<List<LocationDef>> = flow {
+        try {
+            val snapshot = db.collection("gameData").document("world").collection("locations").get().await()
+            emit(snapshot.documents.mapNotNull { it.toObject<LocationDef>() })
+        } catch (e: Exception) {
+            android.util.Log.e("FirestoreGameRepository", "Error fetching locations", e)
+            emit(emptyList())
+        }
     }
 
     override fun getEnemyDefs(): Flow<List<EnemyDef>> = callbackFlow {
@@ -302,18 +299,14 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun getTechniques(): Flow<List<Technique>> = callbackFlow {
-        val subscription = db.collection("gameData").document("skills").collection("techniques")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("FirestoreGameRepository", "Error fetching techniques", error)
-                    return@addSnapshotListener
-                }
-                snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Technique>() })
-                }
-            }
-        awaitClose { subscription.remove() }
+    override fun getTechniques(): Flow<List<Technique>> = flow {
+        try {
+            val snapshot = db.collection("gameData").document("skills").collection("techniques").get().await()
+            emit(snapshot.documents.mapNotNull { it.toObject<Technique>() })
+        } catch (e: Exception) {
+            android.util.Log.e("FirestoreGameRepository", "Error fetching techniques", e)
+            emit(emptyList())
+        }
     }
 
     override fun getMissionDefs(): Flow<List<Mission>> = callbackFlow {
@@ -376,8 +369,14 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override suspend fun catchFish(fishId: String): Boolean {
-        functions.getHttpsCallable("catchFish").call(hashMapOf("fishId" to fishId)).await()
+    override suspend fun startFishing(): String? {
+        val result = functions.getHttpsCallable("startFishing").call().await()
+        val data = result.data as? Map<String, Any>
+        return data?.get("fishId") as? String
+    }
+
+    override suspend fun catchFish(): Boolean {
+        functions.getHttpsCallable("catchFish").call().await()
         return true
     }
 

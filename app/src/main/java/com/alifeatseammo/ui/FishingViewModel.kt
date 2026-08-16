@@ -69,21 +69,17 @@ class FishingViewModel @Inject constructor(
                     return@launch
                 }
 
-                val hasRod = character.inventory.any { it.id.startsWith("rod_") || it.type == ItemType.Tool && it.name.contains("Rod", ignoreCase = true) }
-                
-                if (!hasRod) {
-                    _errorMessage.value = "You need a fishing rod to fish!"
-                    return@launch
-                }
+                val fishId = gameRepository.startFishing() ?: throw Exception("Failed to start fishing session")
+                val fish = availableFish.find { it.id == fishId } ?: availableFish.first()
 
                 _state.value = FishingState.CASTING
                 delay(1000)
                 if (_state.value != FishingState.CASTING) return@launch // Cancelled
-                
+
                 _state.value = FishingState.WAITING
                 delay(Random.nextLong(2000, 5000))
                 if (_state.value == FishingState.WAITING) {
-                    hookFish()
+                    hookFish(fish)
                 }
             } catch (e: Exception) {
                 _errorMessage.value = e.message ?: "Failed to start fishing"
@@ -96,9 +92,8 @@ class FishingViewModel @Inject constructor(
         _errorMessage.value = null
     }
 
-    private fun hookFish() {
+    private fun hookFish(fish: FishDef) {
         _state.value = FishingState.HOOKED
-        val fish = availableFish.random()
         _caughtFish.value = fish
         _progress.value = 30f
         _barPosition.value = 50f
@@ -172,8 +167,7 @@ class FishingViewModel @Inject constructor(
         viewModelScope.launch {
             if (success) {
                 _state.value = FishingState.SUCCESS
-                val caughtId = _caughtFish.value?.id ?: "sardine"
-                gameRepository.catchFish(caughtId)
+                gameRepository.catchFish()
             } else {
                 _state.value = FishingState.FAILURE
             }
