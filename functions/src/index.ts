@@ -747,6 +747,20 @@ function processCharacterUpdates(character: any): any {
             delete updated.mythicArt.element;
         }
 
+        // Repair: If elements is still missing/empty, sync from Registry by name
+        if (!updated.mythicArt.elements || updated.mythicArt.elements.length === 0) {
+            const artName = updated.mythicArt.name;
+            const tier = updated.mythicArt.tier;
+            const artsInTier = MYTHIC_ARTS[tier] || [];
+            const registryArt = artsInTier.find((a: any) => a.name === artName);
+            if (registryArt && registryArt.elements) {
+                updated.mythicArt.elements = registryArt.elements;
+                if (registryArt.elementalWeaknesses) {
+                    updated.mythicArt.elementalWeaknesses = registryArt.elementalWeaknesses;
+                }
+            }
+        }
+
         const manaResult = calculateCurrentMythicMana(updated);
         updated.mythicMana = manaResult.mythicMana;
         updated.mythicManaUpdatedAt = manaResult.mythicManaUpdatedAt;
