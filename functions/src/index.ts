@@ -42,7 +42,7 @@ function determineCaughtFish(level: number): string {
         "kraken_tentacle": krakenWeight
     };
 
-    const totalWeight = Object.values(adjustedWeights).reduce((a: any, b: any) => a + b, 0);
+    const totalWeight = Object.values(adjustedWeights).reduce((a: any, b: any) => a + b, 0) as number;
     const rand = Math.random() * totalWeight;
     let cumulative = 0;
     for (const id of Object.keys(adjustedWeights)) {
@@ -300,6 +300,52 @@ function assertCanPerformAction(character: any, actionName: string, options: { r
     if (options.blockHealing && character.healingState) {
         throw new functions.https.HttpsError("failed-precondition", `You cannot ${actionName} while resting in the infirmary.`);
     }
+}
+
+function executeCrewJoin(transaction: admin.firestore.Transaction, userId: string, playerRef: admin.firestore.DocumentReference, playerSnap: admin.firestore.DocumentSnapshot, crewRef: admin.firestore.DocumentReference, crewSnap: admin.firestore.DocumentSnapshot, inviteRef: admin.firestore.DocumentReference, crewId: string) {
+    if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+    if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "Crew not found.");
+
+    let character = playerSnap.data() as any;
+    character = processCharacterUpdates(character);
+    assertCanPerformAction(character, "join a crew", { blockBusy: true });
+
+    if (character.crewId) throw new functions.https.HttpsError("already-exists", "Player is already in a crew.");
+
+    const crew = crewSnap.data() as any;
+    const members = crew.members || [];
+    if (members.length >= 20) throw new functions.https.HttpsError("resource-exhausted", "Crew is full.");
+
+    transaction.update(crewRef, {
+        members: admin.firestore.FieldValue.arrayUnion(userId),
+        totalBounty: admin.firestore.FieldValue.increment(character.bounty || 0)
+    });
+    transaction.update(playerRef, {
+        hp: character.hp,
+        energy: character.energy,
+        energyUpdatedAt: character.energyUpdatedAt,
+        healingState: character.healingState,
+        crewId: crewId
+    });
+    transaction.update(inviteRef, { status: "accepted" });
+}
+
+function mergeStatusEffects(existingEffects: any[], newEffects: any[]): any[] {
+    const effectsMap = new Map<string, any>();
+    for (const effect of (existingEffects || [])) {
+        effectsMap.set(effect.type, { ...effect });
+    }
+    for (const effect of (newEffects || [])) {
+        if (effectsMap.has(effect.type)) {
+            const existing = effectsMap.get(effect.type);
+            existing.duration = Math.max(existing.duration, effect.duration);
+            existing.magnitude = Math.max(existing.magnitude || 0, effect.magnitude || 0);
+            if (existing.magnitude > 50) existing.magnitude = 50;
+        } else {
+            effectsMap.set(effect.type, { ...effect });
+        }
+    }
+    return Array.from(effectsMap.values());
 }
 
 function checkLevelUp(character: any) {
@@ -1336,48 +1382,65 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     if ((combat.cooldowns || {})[techniqueId] > 0) throw new functions.https.HttpsError("failed-precondition", "Technique on cooldown.");
 
                     playerEnergy -= tech.energyCost;
-                    const cooldowns = { ...(combat.cooldowns || {}) };
-                    cooldowns[techniqueId] = tech.cooldown;
-                    combat.cooldowns = cooldowns;
+                    const hitRoll = Math.random() * 100;
+                    const hitChance = Math.min(100, Math.max(0, pStats.accuracy - targetStats.dodge + (tech.accuracyBonus || 0)));
 
-                    const mappedTechSkill = STAT_MAPPING[tech.type] || "strength";
-                    const techSkillVal = (pStats as any)[mappedTechSkill] || pStats.strength;
-                    let techDamage = Math.floor(techSkillVal * tech.power * 2);
+                    if (hitRoll < hitChance) {
+                        const cooldowns = { ...(combat.cooldowns || {}) };
+                        cooldowns[techniqueId] = tech.cooldown;
+                        combat.cooldowns = cooldowns;
 
-                    // --- Elemental & Weakness Logic ---
-                    const attackerMythicArt = character.mythicArt;
-                    const defenderMythicArt = combat.isPvP ? opponent.mythicArt : enemy.mythicArt;
+                        const mappedTechSkill = STAT_MAPPING[tech.type] || "strength";
+                        const techSkillVal = (pStats as any)[mappedTechSkill] || pStats.strength;
+                        let techDamage = Math.floor(techSkillVal * tech.power * 2);
 
-                    // 1. Skill Type Weakness (e.g., Swordsmanship vs Spear)
-                    if (defenderMythicArt && defenderMythicArt.weakAgainst && tech.type) {
-                        if (defenderMythicArt.weakAgainst.includes(tech.type)) {
-                            techDamage = Math.floor(techDamage * 1.5);
+                        // --- Elemental & Weakness Logic ---
+                        const attackerMythicArt = character.mythicArt;
+                        const defenderMythicArt = combat.isPvP ? opponent.mythicArt : enemy.mythicArt;
+
+                        // 1. Skill Type Weakness (e.g., Swordsmanship vs Spear)
+                        if (defenderMythicArt && defenderMythicArt.weakAgainst && tech.type) {
+                            if (defenderMythicArt.weakAgainst.includes(tech.type)) {
+                                techDamage = Math.floor(techDamage * 1.5);
+                            }
                         }
-                    }
 
-                    // 2. Elemental Weakness (Inherit element from Mythic Art)
-                    const techElement = attackerMythicArt?.element || tech.element;
-                    if (techElement && defenderMythicArt && defenderMythicArt.elementalWeaknesses) {
-                        if (defenderMythicArt.elementalWeaknesses.includes(techElement)) {
-                            techDamage = Math.floor(techDamage * 1.5);
+                        // 2. Elemental Weakness (Inherit element from Mythic Art)
+                        const techElement = attackerMythicArt?.element || tech.element;
+                        if (techElement && defenderMythicArt && defenderMythicArt.elementalWeaknesses) {
+                            if (defenderMythicArt.elementalWeaknesses.includes(techElement)) {
+                                techDamage = Math.floor(techDamage * 1.5);
+                            }
                         }
-                    }
 
-                    techDamage = Math.max(1, Math.floor(techDamage - targetStats.defense * 0.3));
-                    techDamage = Math.floor(techDamage * (0.9 + Math.random() * 0.2)); // Add some variance
-
-                    if (combat.isPvP) {
-                        opponent.hp = Math.max(0, opponent.hp - techDamage);
-                        if (tech.effects) {
-                            opponent.combatState.playerEffects = [...(opponent.combatState.playerEffects || []), ...tech.effects];
+                        // Apply Weaken/Fortify to Technique too
+                        if (pActiveEffects.some((e: any) => e.type === "Weaken")) {
+                            techDamage = Math.floor(techDamage * 0.7);
                         }
+
+                        let defense = targetStats.defense;
+                        if (targetEffects.some((e: any) => e.type === "Fortify")) {
+                            defense *= 1.5;
+                        }
+
+                        techDamage = Math.max(1, Math.floor(techDamage - defense * 0.3));
+                        techDamage = Math.floor(techDamage * (0.9 + Math.random() * 0.2));
+
+                        if (combat.isPvP) {
+                            opponent.hp = Math.max(0, opponent.hp - techDamage);
+                            if (tech.effects) {
+                                opponent.combatState.playerEffects = mergeStatusEffects(opponent.combatState.playerEffects, tech.effects);
+                            }
+                        } else {
+                            enemy.hp = Math.max(0, enemy.hp - techDamage);
+                            if (tech.effects) {
+                                combat.enemyEffects = mergeStatusEffects(combat.enemyEffects, tech.effects);
+                            }
+                        }
+                        logs.push(`You use ${tech.name}! Target takes ${techDamage} damage.`);
                     } else {
-                        enemy.hp = Math.max(0, enemy.hp - techDamage);
-                        if (tech.effects) {
-                            combat.enemyEffects = [...(combat.enemyEffects || []), ...tech.effects];
-                        }
+                        logs.push(`You used ${tech.name} but it missed!`);
                     }
-                    logs.push(`You use ${tech.name}! Target takes ${techDamage} damage.`);
                 } else if (action === "Defend") {
                     logs.push("You take a defensive stance.");
                     combat.defending = true;
@@ -1435,12 +1498,16 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                         // Enemy Ability Logic
                         const useAbility = Math.random() < 0.3;
                         if (useAbility) {
-                            const abilityDamage = Math.floor(eStats.strength * 2.5);
+                            let abilityDamage = Math.floor(eStats.strength * 2.5);
+                            if (combat.defending) {
+                                abilityDamage = Math.floor(abilityDamage * 0.5);
+                                logs.push(`${enemy.name} uses a special ability, but you were defending!`);
+                            }
                             playerHp = Math.max(0, playerHp - abilityDamage);
-                            logs.push(`${enemy.name} uses a special ability and strikes you for ${abilityDamage} damage!`);
+                            logs.push(`${enemy.name} strikes you for ${abilityDamage} damage!`);
                         } else {
                             const eHitRoll = Math.random() * 100;
-                            const eHitChance = eStats.accuracy - pStats.dodge;
+                            const eHitChance = Math.min(100, Math.max(0, eStats.accuracy - pStats.dodge));
                             if (eHitRoll < eHitChance) {
                                 const attackerCombatType = getHighestCombatSkill(enemy);
                                 const defenderMythicArt = character.mythicArt;
@@ -1448,7 +1515,6 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                                 let eDamage = calculateDamage(eStats, pStats, eActiveEffects, pActiveEffects, false, attackerCombatType, defenderMythicArt, attackerMythicArt);
                                 if (combat.defending) {
                                     eDamage = Math.floor(eDamage * 0.5);
-                                    combat.defending = false;
                                 }
                                 playerHp = Math.max(0, playerHp - eDamage);
                                 logs.push(`${enemy.name} hits you for ${eDamage} damage.`);
@@ -1459,6 +1525,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     } else {
                         logs.push(`${enemy.name} is stunned!`);
                     }
+                    combat.defending = false;
 
                     if (playerHp <= 0) {
                         logs.push("You were defeated...");
@@ -2109,35 +2176,11 @@ export const joinCrew = functions.https.onCall(async (data, context) => {
             transaction.get(inviteRef)
         ]);
 
-        if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
-        if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "Crew not found.");
-
         if (!inviteSnap.exists || inviteSnap.data()?.status !== "pending") {
             throw new functions.https.HttpsError("failed-precondition", "A pending invitation is required to join a crew.");
         }
 
-        let character = playerSnap.data() as any;
-        character = processCharacterUpdates(character);
-        assertCanPerformAction(character, "join a crew", { blockBusy: true });
-
-        const crew = crewSnap.data() as any;
-        const members = crew.members || [];
-
-        if (character.crewId) throw new functions.https.HttpsError("already-exists", "Player is already in a crew.");
-        if (members.length >= 20) throw new functions.https.HttpsError("resource-exhausted", "Crew is full.");
-
-        transaction.update(crewRef, {
-            members: admin.firestore.FieldValue.arrayUnion(userId),
-            totalBounty: admin.firestore.FieldValue.increment(character.bounty || 0)
-        });
-        transaction.update(playerRef, {
-            hp: character.hp,
-            energy: character.energy,
-            energyUpdatedAt: character.energyUpdatedAt,
-            healingState: character.healingState,
-            crewId: crewId
-        });
-        transaction.update(inviteRef, { status: "accepted" });
+        executeCrewJoin(transaction, userId, playerRef, playerSnap, crewRef, crewSnap, inviteRef, crewId);
 
         return { success: true };
     });
@@ -3204,28 +3247,7 @@ export const respondToInvite = functions.https.onCall(async (data, context) => {
             transaction.get(crewRef)
         ]);
 
-        if (!crewSnap.exists) {
-            throw new functions.https.HttpsError("not-found", "Crew no longer exists.");
-        }
-
-        const character = playerSnap.data() as any;
-        const crew = crewSnap.data() as any;
-
-        if (character.crewId) throw new functions.https.HttpsError("already-exists", "Already in a crew.");
-        if (crew.members.length >= 20) throw new functions.https.HttpsError("resource-exhausted", "Crew is full.");
-
-        transaction.update(crewRef, {
-            members: admin.firestore.FieldValue.arrayUnion(userId),
-            totalBounty: admin.firestore.FieldValue.increment(character.bounty)
-        });
-        transaction.update(playerRef, {
-            hp: character.hp,
-            energy: character.energy,
-            energyUpdatedAt: character.energyUpdatedAt,
-            healingState: character.healingState,
-            crewId
-        });
-        transaction.update(inviteRef, { status: "accepted" });
+        executeCrewJoin(transaction, userId, playerRef, playerSnap, crewRef, crewSnap, inviteRef, crewId);
 
         return { success: true, accepted: true };
     });
