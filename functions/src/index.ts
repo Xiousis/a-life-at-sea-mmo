@@ -27,10 +27,26 @@ const FISH_TYPES: Record<string, any> = {
 };
 
 function determineCaughtFish(level: number): string {
-    const rand = Math.random() * 100;
+    // Adjust weights based on level: higher level = better fish
+    const weights: Record<string, number> = { ...FISH_TYPES };
+    const sardineWeight = Math.max(5, FISH_TYPES.sardine.weight - level);
+    const krakenWeight = FISH_TYPES.kraken_tentacle.weight + (level * 0.01);
+    const swordfishWeight = FISH_TYPES.swordfish.weight + (level * 0.05);
+
+    const adjustedWeights: any = {
+        "sardine": sardineWeight,
+        "mackerel": FISH_TYPES.mackerel.weight,
+        "salmon": FISH_TYPES.salmon.weight,
+        "tuna": FISH_TYPES.tuna.weight,
+        "swordfish": swordfishWeight,
+        "kraken_tentacle": krakenWeight
+    };
+
+    const totalWeight = Object.values(adjustedWeights).reduce((a: any, b: any) => a + b, 0);
+    const rand = Math.random() * totalWeight;
     let cumulative = 0;
-    for (const [id, data] of Object.entries(FISH_TYPES)) {
-        cumulative += data.weight;
+    for (const id of Object.keys(adjustedWeights)) {
+        cumulative += adjustedWeights[id];
         if (rand < cumulative) return id;
     }
     return "sardine";
@@ -1220,9 +1236,29 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         // Turn Timeout Check
         const now = Date.now();
         if (combat.turnExpiresAt && now > combat.turnExpiresAt) {
-            combat.logs.push(`${combat.playerTurn ? "You" : "Opponent"} took too long! Forfeiting turn.`);
+            const logs = combat.logs || [];
+            const forfeitedPlayer = combat.playerTurn ? "You" : "Opponent";
+            logs.push(`${forfeitedPlayer} took too long! Forfeiting turn.`);
+
             combat.playerTurn = !combat.playerTurn;
             combat.turnExpiresAt = now + TURN_TIMEOUT_MS;
+            combat.logs = logs;
+
+            if (combat.isPvP) {
+                const opponentRef = db.collection("players").doc(combat.opponentId);
+                const opponentSnap = await transaction.get(opponentRef);
+                if (opponentSnap.exists) {
+                    const opponentData = opponentSnap.data() as any;
+                    const opponentCombat = {
+                        ...(opponentData.combatState || {}),
+                        playerTurn: !opponentData.combatState.playerTurn,
+                        turnExpiresAt: now + TURN_TIMEOUT_MS,
+                        logs: logs
+                    };
+                    transaction.update(opponentRef, { combatState: opponentCombat });
+                }
+            }
+
             transaction.update(playerRef, { combatState: combat });
             return { success: true, timeout: true };
         }
@@ -1267,7 +1303,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 // --- Player Action ---
                 if (action === "Attack") {
                     const hitRoll = Math.random() * 100;
-                    const hitChance = pStats.accuracy - targetStats.dodge;
+                    const hitChance = Math.min(100, Math.max(0, pStats.accuracy - targetStats.dodge));
 
                     if (hitRoll < hitChance) {
                         const isCrit = Math.random() * 100 < pStats.critChance;
@@ -1355,7 +1391,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     if (item.type !== "Consumable") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
 
                     // Healing logic
-                    const healAmount = item.healAmount || 30;
+                    const healAmount = item.healAmount ?? 30;
                     playerHp = Math.min(character.maxHp, playerHp + healAmount);
                     logs.push(`You used ${item.name} and recovered ${healAmount} HP.`);
 
@@ -1363,7 +1399,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     character.inventory.splice(itemIndex, 1);
                 } else if (action === "Flee") {
                     if (combat.isPvP) throw new functions.https.HttpsError("failed-precondition", "Cannot flee from a duel.");
-                    const fleeChance = 40 + (pStats.agility - targetStats.agility) * 2;
+                    const fleeChance = Math.min(100, Math.max(0, 40 + (pStats.agility - targetStats.agility) * 2));
                     if (Math.random() * 100 < fleeChance) {
                         transaction.update(playerRef, { combatState: null });
                         return { fled: true };
@@ -1449,7 +1485,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
 
                 const stealAmount = Math.floor(loser.gold * 0.15);
                 const collectedBounty = loser.bounty || 0;
-                const totalGoldGained = stealAmount + collectedBounty;
+                const totalGoldGained = stealAmount + Math.floor(collectedBounty * 0.1);
 
                 // Update Winner
                 const winnerUpdate: any = {
@@ -1487,6 +1523,13 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 };
                 if (!playerWon) loserUpdate.inventory = character.inventory;
                 transaction.update(loserRef, loserUpdate);
+
+                // Update Loser's Crew Bounty
+                if (loser.crewId && loser.faction === "Pirate") {
+                    transaction.update(db.collection("crews").doc(loser.crewId), {
+                        totalBounty: admin.firestore.FieldValue.increment(-(loser.bounty || 0))
+                    });
+                }
 
                 recordLog(transaction, winner.id, "PvPWin", `Defeated ${loser.name} and collected ${collectedBounty}B bounty`, totalGoldGained, 0);
                 recordLog(transaction, loser.id, "PvPLoss", `Lost to ${winner.name}`, -stealAmount, 0);
@@ -1784,10 +1827,10 @@ export const instantHeal = functions.https.onCall(async (data, context) => {
         if (!hasHealingAction) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary or camp at your current location.");
 
         transaction.update(playerRef, {
-            hp: character.hp,
+            hp: character.maxHp,
             energy: character.energy,
             energyUpdatedAt: character.energyUpdatedAt,
-            healingState: character.healingState,
+            healingState: null,
             gold: admin.firestore.FieldValue.increment(-50),
         });
         recordLog(transaction, userId, "InstantHeal", "Paid for immediate treatment", -50, 0);
@@ -2057,27 +2100,44 @@ export const joinCrew = functions.https.onCall(async (data, context) => {
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
     const crewRef = db.collection("crews").doc(crewId);
+    const inviteRef = db.collection("crewInvites").doc(`${crewId}_${userId}`);
 
     return db.runTransaction(async (transaction) => {
-        const [playerSnap, crewSnap] = await Promise.all([
+        const [playerSnap, crewSnap, inviteSnap] = await Promise.all([
             transaction.get(playerRef),
-            transaction.get(crewRef)
+            transaction.get(crewRef),
+            transaction.get(inviteRef)
         ]);
 
         if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "Crew not found.");
 
-        const character = playerSnap.data() as any;
+        if (!inviteSnap.exists || inviteSnap.data()?.status !== "pending") {
+            throw new functions.https.HttpsError("failed-precondition", "A pending invitation is required to join a crew.");
+        }
+
+        let character = playerSnap.data() as any;
+        character = processCharacterUpdates(character);
+        assertCanPerformAction(character, "join a crew", { blockBusy: true });
+
         const crew = crewSnap.data() as any;
+        const members = crew.members || [];
 
         if (character.crewId) throw new functions.https.HttpsError("already-exists", "Player is already in a crew.");
-        if (crew.members.length >= 20) throw new functions.https.HttpsError("resource-exhausted", "Crew is full.");
+        if (members.length >= 20) throw new functions.https.HttpsError("resource-exhausted", "Crew is full.");
 
         transaction.update(crewRef, {
             members: admin.firestore.FieldValue.arrayUnion(userId),
-            totalBounty: admin.firestore.FieldValue.increment(character.bounty)
+            totalBounty: admin.firestore.FieldValue.increment(character.bounty || 0)
         });
-        transaction.update(playerRef, { crewId: crewId });
+        transaction.update(playerRef, {
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
+            crewId: crewId
+        });
+        transaction.update(inviteRef, { status: "accepted" });
 
         return { success: true };
     });
@@ -2106,37 +2166,6 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
             energyUpdatedAt: character.energyUpdatedAt
         };
 
-        // ADMIN GOLD BOOST
-        const admins = ["sedna", "von"];
-        const charNameLower = (character.nameLower || character.name || "").toLowerCase();
-
-        if (admins.includes(charNameLower) && (character.gold || 0) < 900000000) {
-            updates.gold = 900000000;
-        }
-
-        // TEST MYTHICS FOR ADMINS
-        if (admins.includes(charNameLower)) {
-            const hasHighTier = (character.inventory || []).some((i: any) => i.id.startsWith("test_artifact_SSS_"));
-            if (!hasHighTier) {
-                const testItems = [];
-                const tiers = ["S", "S", "SS", "SS", "SSS", "SSS"];
-                for (let i = 0; i < tiers.length; i++) {
-                    const tier = tiers[i];
-                    testItems.push({
-                        id: `test_artifact_${tier}_${Date.now()}_${i}`,
-                        name: `${tier} Tier Artifact (Test)`,
-                        description: `A mysterious artifact that contains a random ${tier} tier Mythic Art. Use it to awaken its power.`,
-                        type: "Artifact",
-                        rarity: getRarityForTier(tier),
-                        price: getPriceForTier(tier),
-                        mythicTier: tier,
-                        levelRequirement: 1
-                    });
-                }
-                updates.inventory = admin.firestore.FieldValue.arrayUnion(...testItems);
-            }
-        }
-
         // Rank Repair Logic: Ensure faction members have their correct starting rank if it was lost
         if (character.faction === "Navy" && (character.rank === "Novice Sailor" || !character.rank)) {
             updates.rank = "Navy Recruit";
@@ -2144,22 +2173,21 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
             updates.rank = "Rogue Sailor";
         }
 
-        // Skill Repair Logic: Ensure learnedTechniques only contains baseline skills + current Mythic Art skills
+        // Skill Repair Logic: Ensure required techniques are learned (baseline + current Mythic Art)
         const currentTechs = character.learnedTechniques || [];
         const baseline = ["bash"];
-        let expectedTechs = [...baseline];
+        let requiredTechs = [...baseline];
 
         if (character.mythicArt) {
             const artTechs = character.mythicArt.techniques || [];
-            expectedTechs = [...new Set([...baseline, ...artTechs])];
+            requiredTechs = [...new Set([...baseline, ...artTechs])];
         }
 
-        // Check if they match (order independent)
-        const isCorrect = currentTechs.length === expectedTechs.length &&
-                          currentTechs.every((t: string) => expectedTechs.includes(t));
+        // Only add missing required techniques, don't remove existing ones
+        const missingTechs = requiredTechs.filter(t => !currentTechs.includes(t));
 
-        if (!isCorrect) {
-            updates.learnedTechniques = expectedTechs;
+        if (missingTechs.length > 0) {
+            updates.learnedTechniques = admin.firestore.FieldValue.arrayUnion(...missingTechs);
         }
 
         transaction.update(playerRef, updates);
@@ -2913,7 +2941,7 @@ export const listAuctionItem = functions.https.onCall(async (data, context) => {
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
 
-    if (!price || price <= 0) throw new functions.https.HttpsError("invalid-argument", "Price must be positive.");
+    if (!price || !Number.isSafeInteger(price) || price <= 0) throw new functions.https.HttpsError("invalid-argument", "Price must be a positive safe integer.");
     if (price > MAX_AUCTION_PRICE) throw new functions.https.HttpsError("invalid-argument", `Price exceeds maximum allowed (${MAX_AUCTION_PRICE}).`);
 
     return db.runTransaction(async (transaction) => {
@@ -3037,6 +3065,7 @@ export const cancelAuctionListing = functions.https.onCall(async (data, context)
 
         const playerRef = db.collection("players").doc(userId);
         const playerSnap = await transaction.get(playerRef);
+        if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         const character = playerSnap.data() as any;
 
         assertCanPerformAction(character, "cancel auction listing", { blockBusy: true, blockHealing: true });
@@ -3129,6 +3158,7 @@ export const inviteToCrew = functions.https.onCall(async (data, context) => {
 
         const crewRef = db.collection("crews").doc(sender.crewId);
         const crewSnap = await transaction.get(crewRef);
+        if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "Crew not found.");
         const crew = crewSnap.data() as any;
 
         if (crew.captainId !== senderId && (!crew.roles || crew.roles[senderId] !== "Officer")) {
@@ -3205,7 +3235,10 @@ export const markMailAsRead = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
     const { mailId } = data;
     const userId = context.auth.uid;
-    await db.collection("players").doc(userId).collection("mail").doc(mailId).update({ isRead: true });
+    const mailRef = db.collection("players").doc(userId).collection("mail").doc(mailId);
+    const mailSnap = await mailRef.get();
+    if (!mailSnap.exists) throw new functions.https.HttpsError("not-found", "Mail not found.");
+    await mailRef.update({ isRead: true });
     return { success: true };
 });
 
@@ -3213,8 +3246,20 @@ export const deleteMail = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
     const { mailId } = data;
     const userId = context.auth.uid;
-    await db.collection("players").doc(userId).collection("mail").doc(mailId).delete();
-    return { success: true };
+    const mailRef = db.collection("players").doc(userId).collection("mail").doc(mailId);
+
+    return db.runTransaction(async (transaction) => {
+        const mailSnap = await transaction.get(mailRef);
+        if (!mailSnap.exists) throw new functions.https.HttpsError("not-found", "Mail not found.");
+        const mail = mailSnap.data() as any;
+
+        if (mail.rewards && !mail.claimed) {
+            throw new functions.https.HttpsError("failed-precondition", "Cannot delete mail with unclaimed rewards.");
+        }
+
+        transaction.delete(mailRef);
+        return { success: true };
+    });
 });
 
 export const claimMailRewards = functions.https.onCall(async (data, context) => {
@@ -3238,7 +3283,8 @@ export const claimMailRewards = functions.https.onCall(async (data, context) => 
         const character = playerSnap.data() as any;
         const rewards = mail.rewards;
 
-        const updates: any = {
+        let updatedChar = {
+            ...character,
             gold: character.gold + (rewards.gold || 0),
             xp: character.xp + (rewards.xp || 0),
         };
@@ -3249,10 +3295,12 @@ export const claimMailRewards = functions.https.onCall(async (data, context) => 
              if (inventory.length + rewards.items.length > maxCapacity) {
                   throw new functions.https.HttpsError("resource-exhausted", "Inventory full.");
              }
-             updates.inventory = [...inventory, ...rewards.items.map((i: any) => ({ ...i, id: `${i.id}_${Date.now()}_${Math.random()}` }))];
+             updatedChar.inventory = [...inventory, ...rewards.items.map((i: any) => ({ ...i, id: `${i.id}_${Date.now()}_${Math.random()}` }))];
         }
 
-        transaction.update(playerRef, updates);
+        updatedChar = checkLevelUp(updatedChar);
+
+        transaction.update(playerRef, updatedChar);
         transaction.update(mailRef, { claimed: true, isRead: true });
 
         return { success: true };
