@@ -64,6 +64,14 @@ fun CombatScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         // Player Section
+        var currentMp by remember { mutableStateOf(character.getCurrentMythicMana()) }
+        LaunchedEffect(character.mythicArt) {
+            while (character.mythicArt != null) {
+                currentMp = character.getCurrentMythicMana()
+                kotlinx.coroutines.delay(1000) // Update every second
+            }
+        }
+
         CombatantStatus(
             name = "YOU",
             hp = character.hp,
@@ -71,6 +79,15 @@ fun CombatScreen(
             barColor = Color(0xFF4CAF50),
             effects = combatState.playerEffects
         )
+        
+        if (character.mythicArt != null) {
+            StatusBar(
+                label = "MP",
+                current = currentMp,
+                max = character.maxMythicMana,
+                color = Color(0xFF2196F3)
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
         Text(text = "vs", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
@@ -182,8 +199,10 @@ fun CombatScreen(
                                     },
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                 ) {
-                                    val symbol = character.mythicArt?.element?.symbol ?: ""
-                                    Text("$techId $symbol".trim().uppercase())
+                                    val techType = TechniqueRegistry.getTypeFor(techId)
+                                    val element = if (character.mythicArt != null && techType == character.mythicArt.multipliedSkill) character.mythicArt.elements.firstOrNull() else null
+                                    val elementSymbol = element?.symbol ?: ""
+                                    Text("$techId $elementSymbol".trim().uppercase())
                                 }
                             }
                         }
@@ -224,141 +243,6 @@ fun CombatScreen(
                 TextButton(onClick = { showItems = false }) { Text("Cancel") }
             }
         )
-    }
-
-    if (combatState.isFinished) {
-        if (combatState.playerWon) {
-            VictoryScreen(
-                enemyName = enemy.name,
-                xpEarned = combatState.xpEarned,
-                goldEarned = combatState.goldEarned,
-                loot = combatState.loot,
-                onClose = { onActionClick(CombatAction.Flee, null, null) }
-            )
-        } else {
-            // Basic Defeat handling
-            AlertDialog(
-                onDismissRequest = { },
-                title = { Text("DEFEAT", color = Color.Red) },
-                text = { Text("You have been defeated by ${enemy.name}...") },
-                confirmButton = {
-                    Button(onClick = { onActionClick(CombatAction.Flee, null, null) }) {
-                        Text("Retreat")
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-fun VictoryScreen(
-    enemyName: String,
-    xpEarned: Int,
-    goldEarned: Int,
-    loot: List<Item>,
-    onClose: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "VICTORY",
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF4CAF50),
-                letterSpacing = 8.sp
-            )
-            
-            Text(
-                text = "────────────────────────",
-                color = Color(0xFF4CAF50).copy(alpha = 0.5f)
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = "You have defeated",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = enemyName.uppercase(),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                RewardCard("XP Gained", "+$xpEarned", Color(0xFF2196F3))
-                RewardCard("Gold Earned", "+$goldEarned", Color(0xFFFFC107))
-            }
-
-            if (loot.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(32.dp))
-                Text(
-                    text = "LOOT ACQUIRED",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    loot.forEach { item ->
-                        Text(
-                            text = "• ${item.name}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = when(item.rarity) {
-                                Rarity.Common -> Color.Gray
-                                Rarity.Uncommon -> Color(0xFF4CAF50)
-                                Rarity.Rare -> Color(0xFF2196F3)
-                                Rarity.Epic -> Color(0xFF9C27B0)
-                                Rarity.Legendary -> Color(0xFFFF9800)
-                            }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(64.dp))
-
-            Button(
-                onClick = onClose,
-                modifier = Modifier.fillMaxWidth(0.7f).height(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
-            ) {
-                Text("CLAIM REWARDS", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun RewardCard(label: String, value: String, color: Color) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-            .padding(16.dp)
-            .width(100.dp)
-    ) {
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text = value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = color)
     }
 }
 

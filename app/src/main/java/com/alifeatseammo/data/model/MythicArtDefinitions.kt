@@ -16,7 +16,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.MartialArts),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Physical),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -32,7 +32,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Endurance,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Brawling),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -48,7 +48,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
         MythicArt(
@@ -64,7 +64,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.MartialArts),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -80,7 +80,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Perception,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -96,7 +96,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Willpower,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Light,
+            elements = listOf(ElementType.Light),
             elementalWeaknesses = listOf(ElementType.Dark)
         ),
         MythicArt(
@@ -112,7 +112,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Luck,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Light,
+            elements = listOf(ElementType.Light),
             elementalWeaknesses = listOf(ElementType.Dark)
         ),
         MythicArt(
@@ -128,7 +128,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
         MythicArt(
@@ -144,7 +144,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.MartialArts),
-            element = ElementType.Water,
+            elements = listOf(ElementType.Water),
             elementalWeaknesses = listOf(ElementType.Lightning)
         ),
         MythicArt(
@@ -160,7 +160,7 @@ object MythicArtDefinitions {
                         hugeBuffType = StatType.Endurance,
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Brawling),
-            element = ElementType.Water,
+            elements = listOf(ElementType.Water),
             elementalWeaknesses = listOf(ElementType.Lightning)
         ),
 
@@ -178,7 +178,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -194,7 +194,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Endurance,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -210,7 +210,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
         MythicArt(
@@ -226,7 +226,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Perception,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Lightning,
+            elements = listOf(ElementType.Lightning),
             elementalWeaknesses = listOf(ElementType.Earth)
         ),
         MythicArt(
@@ -242,7 +242,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Willpower,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -258,7 +258,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Luck,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Chaos,
+            elements = listOf(ElementType.Chaos),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
         MythicArt(
@@ -274,7 +274,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Swordsmanship,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Physical),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -290,7 +290,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -306,7 +306,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Perception,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Lightning,
+            elements = listOf(ElementType.Lightning),
             elementalWeaknesses = listOf(ElementType.Earth)
         ),
         MythicArt(
@@ -322,7 +322,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
-            element = ElementType.Fire,
+            elements = listOf(ElementType.Fire),
             elementalWeaknesses = listOf(ElementType.Water)
         ),
 
@@ -340,7 +340,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Swordsmanship,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Water,
+            elements = listOf(ElementType.Hybrid),
             elementalWeaknesses = listOf(ElementType.Lightning)
         ),
         MythicArt(
@@ -356,7 +356,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Endurance,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -372,7 +372,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
         MythicArt(
@@ -388,7 +388,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Sniper,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Lightning,
+            elements = listOf(ElementType.Lightning),
             elementalWeaknesses = listOf(ElementType.Earth)
         ),
         MythicArt(
@@ -404,7 +404,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MartialArts,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -420,7 +420,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
         MythicArt(
@@ -436,7 +436,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Spear,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
         MythicArt(
@@ -452,7 +452,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Water,
+            elements = listOf(ElementType.Water),
             elementalWeaknesses = listOf(ElementType.Lightning)
         ),
         MythicArt(
@@ -468,7 +468,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Lightning,
+            elements = listOf(ElementType.Lightning),
             elementalWeaknesses = listOf(ElementType.Earth)
         ),
         MythicArt(
@@ -484,7 +484,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
 
@@ -502,7 +502,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Swordsmanship,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Water,
+            elements = listOf(ElementType.Hybrid),
             elementalWeaknesses = listOf(ElementType.Lightning)
         ),
         MythicArt(
@@ -518,7 +518,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -534,7 +534,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
         MythicArt(
@@ -550,7 +550,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Perception,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Lightning,
+            elements = listOf(ElementType.Lightning),
             elementalWeaknesses = listOf(ElementType.Earth)
         ),
         MythicArt(
@@ -566,7 +566,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Light,
+            elements = listOf(ElementType.Light),
             elementalWeaknesses = listOf(ElementType.Dark)
         ),
         MythicArt(
@@ -582,7 +582,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Swordsmanship,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Dark,
+            elements = listOf(ElementType.Hybrid),
             elementalWeaknesses = listOf(ElementType.Light)
         ),
         MythicArt(
@@ -598,7 +598,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Lightning,
+            elements = listOf(ElementType.Lightning),
             elementalWeaknesses = listOf(ElementType.Earth)
         ),
         MythicArt(
@@ -614,7 +614,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Strength,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -630,7 +630,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Air,
+            elements = listOf(ElementType.Air),
             elementalWeaknesses = listOf(ElementType.Ice)
         ),
         MythicArt(
@@ -646,7 +646,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Willpower,
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
-            element = ElementType.Fire,
+            elements = listOf(ElementType.Fire),
             elementalWeaknesses = listOf(ElementType.Water)
         ),
 
@@ -664,7 +664,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Fire,
+            elements = listOf(ElementType.Fire),
             elementalWeaknesses = listOf(ElementType.Water)
         ),
         MythicArt(
@@ -680,7 +680,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Strength,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -696,7 +696,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Lightning,
+            elements = listOf(ElementType.Lightning),
             elementalWeaknesses = listOf(ElementType.Earth)
         ),
         MythicArt(
@@ -712,7 +712,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Perception,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Light,
+            elements = listOf(ElementType.Light),
             elementalWeaknesses = listOf(ElementType.Dark)
         ),
         MythicArt(
@@ -728,7 +728,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Willpower,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Void,
+            elements = listOf(ElementType.Void),
             elementalWeaknesses = listOf(ElementType.Chaos)
         ),
         MythicArt(
@@ -744,7 +744,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Luck,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Celestial,
+            elements = listOf(ElementType.Celestial),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
         MythicArt(
@@ -760,7 +760,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Ice,
+            elements = listOf(ElementType.Ice),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -776,7 +776,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Swordsmanship,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Water,
+            elements = listOf(ElementType.Water),
             elementalWeaknesses = listOf(ElementType.Lightning)
         ),
         MythicArt(
@@ -792,7 +792,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Dark,
+            elements = listOf(ElementType.Dark),
             elementalWeaknesses = listOf(ElementType.Light)
         ),
         MythicArt(
@@ -808,7 +808,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
-            element = ElementType.Celestial,
+            elements = listOf(ElementType.Celestial),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
 
@@ -826,7 +826,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Celestial,
+            elements = listOf(ElementType.Celestial),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
         MythicArt(
@@ -842,7 +842,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Strength,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -858,7 +858,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Agility,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Void,
+            elements = listOf(ElementType.Void),
             elementalWeaknesses = listOf(ElementType.Chaos)
         ),
         MythicArt(
@@ -874,7 +874,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Dark,
+            elements = listOf(ElementType.Dark),
             elementalWeaknesses = listOf(ElementType.Light)
         ),
         MythicArt(
@@ -890,7 +890,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Endurance,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -906,7 +906,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Willpower,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Divine,
+            elements = listOf(ElementType.Divine),
             elementalWeaknesses = listOf(ElementType.Chaos)
         ),
         MythicArt(
@@ -922,7 +922,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Earth,
+            elements = listOf(ElementType.Earth),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -938,7 +938,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Luck,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Celestial,
+            elements = listOf(ElementType.Celestial),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
         MythicArt(
@@ -954,7 +954,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Fire,
+            elements = listOf(ElementType.Fire),
             elementalWeaknesses = listOf(ElementType.Water)
         ),
         MythicArt(
@@ -970,7 +970,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
-            element = ElementType.Dark,
+            elements = listOf(ElementType.Dark),
             elementalWeaknesses = listOf(ElementType.Light)
         ),
 
@@ -989,7 +989,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 15.00f,
             restrictedSkillTypes = listOf(StatType.Spear, StatType.Sniper),
             weakAgainst = listOf(StatType.Brawling),
-            element = ElementType.Void,
+            elements = listOf(ElementType.Void),
             elementalWeaknesses = listOf(ElementType.Chaos)
         ),
         MythicArt(
@@ -1006,7 +1006,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 15.00f,
             restrictedSkillTypes = listOf(StatType.Gunslinging, StatType.MartialArts),
             weakAgainst = listOf(StatType.Brawling),
-            element = ElementType.Chaos,
+            elements = listOf(ElementType.Physical),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
         MythicArt(
@@ -1023,7 +1023,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 15.00f,
             restrictedSkillTypes = listOf(StatType.Brawling, StatType.Spear),
             weakAgainst = listOf(StatType.Brawling),
-            element = ElementType.Void,
+            elements = listOf(ElementType.Void),
             elementalWeaknesses = listOf(ElementType.Chaos)
         ),
         MythicArt(
@@ -1040,7 +1040,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 15.00f,
             restrictedSkillTypes = listOf(StatType.Swordsmanship, StatType.Sniper),
             weakAgainst = listOf(StatType.Brawling),
-            element = ElementType.Ice,
+            elements = listOf(ElementType.Ice),
             elementalWeaknesses = listOf(ElementType.Air)
         ),
         MythicArt(
@@ -1057,7 +1057,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 15.00f,
             restrictedSkillTypes = listOf(StatType.Gunslinging, StatType.Brawling),
             weakAgainst = listOf(StatType.Brawling),
-            element = ElementType.Divine,
+            elements = listOf(ElementType.Divine),
             elementalWeaknesses = listOf(ElementType.Chaos)
         ),
 
@@ -1076,7 +1076,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 50.00f,
             restrictedSkillTypes = listOf(StatType.Swordsmanship, StatType.Spear, StatType.Sniper, StatType.MartialArts),
             weakAgainst = listOf(StatType.MartialArts),
-            element = ElementType.Chaos,
+            elements = listOf(ElementType.Chaos),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
         MythicArt(
@@ -1093,7 +1093,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 50.00f,
             restrictedSkillTypes = listOf(StatType.Brawling, StatType.Gunslinging, StatType.Spear, StatType.Sniper),
             weakAgainst = listOf(StatType.MartialArts),
-            element = ElementType.Celestial,
+            elements = listOf(ElementType.Celestial),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
         MythicArt(
@@ -1110,7 +1110,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 50.00f,
             restrictedSkillTypes = listOf(StatType.Brawling, StatType.Gunslinging, StatType.MysticArts, StatType.MartialArts),
             weakAgainst = listOf(StatType.MartialArts),
-            element = ElementType.Void,
+            elements = listOf(ElementType.Hybrid),
             elementalWeaknesses = listOf(ElementType.Celestial)
         ),
         MythicArt(
@@ -1132,7 +1132,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 50.00f,
             restrictedSkillTypes = listOf(StatType.Swordsmanship, StatType.Gunslinging, StatType.Spear, StatType.Sniper),
             weakAgainst = listOf(StatType.MartialArts),
-            element = ElementType.Genesis,
+            elements = listOf(ElementType.Genesis),
             elementalWeaknesses = listOf(ElementType.Void)
         ),
 
@@ -1150,7 +1150,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Swordsmanship,
             hugeBuffValue = 250.00f,
             restrictedSkillTypes = listOf(StatType.Brawling, StatType.Gunslinging, StatType.Spear, StatType.MartialArts, StatType.Sniper, StatType.MysticArts),
-            element = ElementType.Divine,
+            elements = listOf(ElementType.Hybrid, ElementType.Divine),
             elementalWeaknesses = listOf(ElementType.Chaos)
         ),
         MythicArt(
@@ -1166,7 +1166,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.MysticArts,
             hugeBuffValue = 250.00f,
             restrictedSkillTypes = listOf(StatType.Swordsmanship, StatType.Brawling, StatType.Gunslinging, StatType.Spear, StatType.MartialArts, StatType.Sniper),
-            element = ElementType.Void,
+            elements = listOf(ElementType.Void, ElementType.Celestial),
             elementalWeaknesses = listOf(ElementType.Creation)
         ),
         MythicArt(
@@ -1182,7 +1182,7 @@ object MythicArtDefinitions {
             hugeBuffType = StatType.Willpower,
             hugeBuffValue = 250.00f,
             restrictedSkillTypes = listOf(StatType.Swordsmanship, StatType.Brawling, StatType.Gunslinging, StatType.Spear, StatType.MartialArts, StatType.Sniper, StatType.MysticArts),
-            element = ElementType.Creation,
+            elements = listOf(ElementType.Creation),
             elementalWeaknesses = listOf(ElementType.Annihilation)
         )
     )
@@ -1217,7 +1217,7 @@ object MythicArtDefinitions {
                 StatType.Cooking, StatType.Navigating, StatType.TreasureHunting,
                 StatType.Blacksmith, StatType.Fishing, StatType.Medical
             ),
-            element = ElementType.Annihilation,
+            elements = listOf(ElementType.Annihilation),
             elementalWeaknesses = listOf(ElementType.Creation)
         ),
         MythicArt(
@@ -1249,7 +1249,7 @@ object MythicArtDefinitions {
                 StatType.Cooking, StatType.Navigating, StatType.TreasureHunting,
                 StatType.Blacksmith, StatType.Fishing, StatType.Medical
             ),
-            element = ElementType.Creation,
+            elements = listOf(ElementType.Creation),
             elementalWeaknesses = listOf(ElementType.Annihilation)
         )
     )

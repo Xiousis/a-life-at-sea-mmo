@@ -43,7 +43,10 @@ data class Character(
     val trainingState: TrainingState? = null,
     val ship: Ship = Ship(),
     val mythicArt: MythicArt? = null,
-    val freeMythicRolls: Int = 3
+    val freeMythicRolls: Int = 3,
+    val mythicMana: Int = 100,
+    val maxMythicMana: Int = 100,
+    val mythicManaUpdatedAt: Long = System.currentTimeMillis()
 ) {
     fun getCurrentEnergy(): Int {
         val baseRegenRateMs = 3 * 60 * 1000L // 3 minutes
@@ -54,6 +57,18 @@ data class Character(
         val elapsed = (now - energyUpdatedAt).coerceAtLeast(0L)
         val regenerated = (elapsed / regenRateMs).toInt()
         return (energy + regenerated).coerceAtMost(maxEnergy)
+    }
+
+    fun getCurrentMythicMana(): Int {
+        if (mythicArt == null) return 0
+        val baseRegenRateMs = 2 * 1000L // 2 seconds for mythic mana
+        val regenMultiplier = (mythicArt.energyRegainMultiplier).coerceAtLeast(0.01f)
+        val regenRateMs = (baseRegenRateMs / regenMultiplier).toLong().coerceAtLeast(1000L)
+
+        val now = System.currentTimeMillis()
+        val elapsed = (now - mythicManaUpdatedAt).coerceAtLeast(0L)
+        val regenerated = (elapsed / regenRateMs).toInt()
+        return (mythicMana + regenerated).coerceAtMost(maxMythicMana)
     }
 
 }
@@ -85,7 +100,10 @@ data class CharacterPrivate(
     val trainingState: TrainingState? = null,
     val ship: Ship = Ship(),
     val mythicArt: MythicArt? = null,
-    val freeMythicRolls: Int = 3
+    val freeMythicRolls: Int = 3,
+    val mythicMana: Int = 100,
+    val maxMythicMana: Int = 100,
+    val mythicManaUpdatedAt: Long = System.currentTimeMillis()
 )
 
 data class MythicArt(
@@ -104,7 +122,7 @@ data class MythicArt(
     val weakAgainst: List<StatType> = emptyList(),
     val travelTimeMultiplier: Float = 1.0f,
     val canLearnNonCombatSkills: Boolean = true,
-    val element: ElementType? = null,
+    val elements: List<ElementType> = emptyList(),
     val elementalWeaknesses: List<ElementType> = emptyList()
 )
 
@@ -245,6 +263,7 @@ enum class EffectType {
 }
 
 enum class ElementType(val symbol: String) {
+    Physical("⚔️"), Hybrid("🌀"),
     Fire("🔥"), Water("💧"), Earth("🌍"), Air("💨"), Lightning("⚡"), Ice("❄️"), Light("✨"), Dark("🌑"),
     // Special Elements (S+)
     Void("🌌"), Chaos("🌋"), Celestial("🌠"), Genesis("🌱"), Divine("🔱"), Annihilation("💀"), Creation("🎨")
@@ -265,7 +284,8 @@ data class Item(
     val statBonus: Stats = Stats(),
     val storageBonus: Int = 0,
     val levelRequirement: Int = 1,
-    val mythicTier: String? = null
+    val mythicTier: String? = null,
+    val weaponCategory: String? = null
 )
 
 enum class ItemType {

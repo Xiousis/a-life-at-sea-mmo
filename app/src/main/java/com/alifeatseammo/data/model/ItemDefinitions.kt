@@ -106,6 +106,25 @@ object ItemDefinitions {
         price = 10
     )
 
+    // Food
+    val COOKED_FISH = Item(
+        id = "cooked_fish",
+        name = "Cooked Fish",
+        description = "A simple meal that restores HP and MP.",
+        type = ItemType.Consumable,
+        rarity = Rarity.Common,
+        price = 25
+    )
+
+    val SEA_STEW = Item(
+        id = "sea_stew",
+        name = "Sea Stew",
+        description = "A hearty stew that restores a good amount of HP and MP.",
+        type = ItemType.Consumable,
+        rarity = Rarity.Uncommon,
+        price = 150
+    )
+
     // Bags
     val SMALL_BAG = Item(
         id = "bag_small",

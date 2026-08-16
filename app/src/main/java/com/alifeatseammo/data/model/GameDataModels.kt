@@ -19,7 +19,8 @@ data class LocationDef(
 data class ActionDef(
     val type: ActionType = ActionType.Market,
     val label: String = "",
-    val icon: String = ""
+    val icon: String = "",
+    val parameter: String? = null
 )
 
 data class EnemyDef(

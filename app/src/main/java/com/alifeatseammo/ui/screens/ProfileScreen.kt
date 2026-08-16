@@ -50,13 +50,18 @@ fun ProfileScreen(
                     
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     
-                    if (mythicArt.element != null) {
-                        Text(
-                            text = "Element: ${mythicArt.element}",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = getElementColor(mythicArt.element)
-                        )
+                    if (mythicArt.elements.isNotEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(text = "Elements:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            mythicArt.elements.forEach { element ->
+                                Text(
+                                    text = "${element.symbol} $element",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = getElementColor(element)
+                                )
+                            }
+                        }
                     }
 
                     if (mythicArt.elementalWeaknesses.isNotEmpty()) {

@@ -16,6 +16,7 @@ import com.alifeatseammo.data.model.CrewRole
 fun CrewScreen(
     character: Character,
     crew: Crew?,
+    members: List<Character>,
     invites: List<CrewInvite>,
     onCreateCrew: (String, String) -> Unit,
     onJoinCrew: (String) -> Unit,
@@ -146,20 +147,33 @@ fun CrewScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(text = "MEMBERS", style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.Start))
                     
-                    crew?.members?.forEach { memberId ->
-                        val role = crew.roles[memberId] ?: com.alifeatseammo.data.model.CrewRole.Member
-                        val roleDisplay = if (role == com.alifeatseammo.data.model.CrewRole.Captain && crew.faction == com.alifeatseammo.data.model.Faction.Pirate) {
+                    members.sortedByDescending { it.id == crew?.captainId }.forEach { member ->
+                        val role = crew?.roles?.get(member.id) ?: com.alifeatseammo.data.model.CrewRole.Member
+                        val roleDisplay = if (role == com.alifeatseammo.data.model.CrewRole.Captain && crew?.faction == com.alifeatseammo.data.model.Faction.Pirate) {
                             "Pirate Captain"
                         } else {
                             role.name
                         }
 
+                        val onlineStatus = if (member.isOnline) "Online" else "Offline"
+                        val statusColor = if (member.isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+
                         ListItem(
-                            headlineContent = { Text(text = memberId) }, // In real app, fetch name
-                            supportingContent = { Text(text = roleDisplay) },
+                            headlineContent = { 
+                                Text(
+                                    text = if (member.id == character.id) "${member.name} (You)" else member.name,
+                                    fontWeight = if (member.id == character.id) androidx.compose.ui.text.font.FontWeight.Bold else null
+                                ) 
+                            },
+                            supportingContent = { 
+                                Column {
+                                    Text(text = roleDisplay)
+                                    Text(text = onlineStatus, color = statusColor, style = MaterialTheme.typography.labelSmall)
+                                }
+                            },
                             trailingContent = {
-                                if (crew.captainId == character.id && memberId != character.id) {
-                                    IconButton(onClick = { onPromoteMember(memberId, "Officer") }) {
+                                if (crew?.captainId == character.id && member.id != character.id) {
+                                    IconButton(onClick = { onPromoteMember(member.id, "Officer") }) {
                                         Text("↑")
                                     }
                                 }

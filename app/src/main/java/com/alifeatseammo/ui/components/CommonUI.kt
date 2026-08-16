@@ -19,6 +19,8 @@ import com.alifeatseammo.data.model.ElementType
 @Composable
 fun getElementColor(element: ElementType?): Color {
     return when (element) {
+        ElementType.Physical -> Color(0xFFC0C0C0)
+        ElementType.Hybrid -> Color(0xFF9370DB)
         ElementType.Fire -> Color(0xFFF44336)
         ElementType.Water -> Color(0xFF2196F3)
         ElementType.Earth -> Color(0xFF795548)
@@ -86,5 +88,19 @@ fun StatusBar(
                     )
             )
         }
+    }
+}
+
+@Composable
+fun RewardCard(label: String, value: String, color: Color) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+            .padding(16.dp)
+            .width(100.dp)
+    ) {
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = color)
     }
 }

@@ -35,6 +35,7 @@ interface GameRepository {
     fun getPlayersAtLocation(location: String): Flow<List<Character>>
     fun getTopPlayers(limit: Int, faction: Faction? = null): Flow<List<Character>>
     fun getPlayerProfile(playerId: String): Flow<Character?>
+    fun getCharacters(ids: List<String>): Flow<List<Character>>
     fun getLocations(): Flow<List<LocationDef>>
     fun getEnemyDefs(): Flow<List<EnemyDef>>
     fun getTechniques(): Flow<List<Technique>>
@@ -43,7 +44,7 @@ interface GameRepository {
     suspend fun markMailAsRead(mailId: String): Boolean
     suspend fun deleteMail(mailId: String): Boolean
     suspend fun claimMailRewards(mailId: String): Boolean
-    fun getMarketItems(): Flow<List<Item>>
+    fun getMarketItems(category: String? = null): Flow<List<Item>>
     suspend fun startFishing(): String?
     suspend fun catchFish(): Boolean
     suspend fun cookFish(itemId: String): Boolean
@@ -275,6 +276,29 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
+    override fun getCharacters(ids: List<String>): Flow<List<Character>> = callbackFlow {
+        if (ids.isEmpty()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        
+        // Firestore whereIn limit is 10 or 30 depending on version, but crew limit is 20.
+        // We'll assume whereIn works for up to 30 as per recent Firebase updates.
+        val subscription = db.collection("players")
+            .whereIn("id", ids)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching characters: $ids", error)
+                    return@addSnapshotListener
+                }
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Character>() })
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
     override fun getLocations(): Flow<List<LocationDef>> = flow {
         try {
             val snapshot = db.collection("gameData").document("world").collection("locations").get().await()
@@ -353,10 +377,15 @@ class FirestoreGameRepository(
         return true
     }
 
-    override fun getMarketItems(): Flow<List<Item>> = callbackFlow {
-        val subscription = db.collection("gameData").document("items").collection("all")
+    override fun getMarketItems(category: String?): Flow<List<Item>> = callbackFlow {
+        var query = db.collection("gameData").document("items").collection("all")
             .whereNotEqualTo("type", "Artifact")
-            .limit(20)
+        
+        if (category != null) {
+            query = query.whereEqualTo("weaponCategory", category)
+        }
+
+        val subscription = query.limit(20)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     android.util.Log.e("FirestoreGameRepository", "Error fetching market items", error)

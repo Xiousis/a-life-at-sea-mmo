@@ -17,6 +17,7 @@ import com.alifeatseammo.data.model.Technique
 import com.alifeatseammo.data.model.ElementType
 import com.alifeatseammo.data.model.TechniqueRegistry
 import com.alifeatseammo.data.model.StatType
+import com.alifeatseammo.ui.components.getElementColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,8 +84,8 @@ fun SkillsScreen(
                 items(availableTechniques) { techniqueId ->
                     val baseTech = allTechniques.find { it.id == techniqueId } ?: Technique(id = techniqueId, name = techniqueId.replace("_", " ").uppercase())
                     // Override element with Mythic Art element if present
-                    val techInfo = if (character.mythicArt != null) {
-                        baseTech.copy(element = character.mythicArt.element)
+                    val techInfo = if (character.mythicArt?.elements?.isNotEmpty() == true) {
+                        baseTech.copy(element = character.mythicArt.elements.first())
                     } else {
                         baseTech
                     }
@@ -105,7 +106,8 @@ fun SkillsScreen(
                         }
                         
                         Text(text = "Stat Type: ${tech.type}", style = MaterialTheme.typography.labelMedium)
-                        Text(text = "Energy Cost: ${tech.energyCost}", style = MaterialTheme.typography.labelMedium)
+                        val costLabel = if (character.mythicArt != null) "Mythic Mana Cost" else "Energy Cost"
+                        Text(text = "$costLabel: ${tech.energyCost}", style = MaterialTheme.typography.labelMedium)
                         if (tech.cooldown > 0) {
                             Text(text = "Cooldown: ${tech.cooldown} turns", style = MaterialTheme.typography.labelMedium)
                         }
@@ -166,24 +168,3 @@ fun TechniqueItem(technique: Technique, onClick: () -> Unit) {
     }
 }
 
-@Composable
-fun getElementColor(element: ElementType?): Color {
-    return when (element) {
-        ElementType.Fire -> Color(0xFFFF4500)
-        ElementType.Water -> Color(0xFF1E90FF)
-        ElementType.Earth -> Color(0xFF8B4513)
-        ElementType.Air -> Color(0xFF87CEEB)
-        ElementType.Lightning -> Color(0xFFFFD700)
-        ElementType.Ice -> Color(0xFFAFEEEE)
-        ElementType.Light -> Color(0xFFFFEB3B)
-        ElementType.Dark -> Color(0xFF4B0082)
-        ElementType.Void -> Color(0xFF000000)
-        ElementType.Chaos -> Color(0xFFDC143C)
-        ElementType.Celestial -> Color(0xFFE6E6FA)
-        ElementType.Genesis -> Color(0xFF00FF7F)
-        ElementType.Divine -> Color(0xFFFFD700)
-        ElementType.Annihilation -> Color(0xFF8B0000)
-        ElementType.Creation -> Color(0xFFF5F5F5)
-        null -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-}

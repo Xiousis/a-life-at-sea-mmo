@@ -18,7 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
 import com.alifeatseammo.data.model.*
 import com.alifeatseammo.ui.components.StatusBar
 import com.alifeatseammo.R
@@ -33,7 +33,7 @@ fun DashboardScreen(
     missionCount: Int,
     mailCount: Int,
     travelResult: String? = null,
-    onActionClick: (ActionType) -> Unit,
+    onActionClick: (ActionType, String?) -> Unit,
     onPlayerClick: (Character) -> Unit,
     onMissionsClick: () -> Unit,
     onMailClick: () -> Unit,
@@ -156,7 +156,23 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 StatusBar("HP", character.hp, character.maxHp, Color(0xFFE57373))
-                StatusBar("Energy", character.getCurrentEnergy(), character.maxEnergy, Color(0xFF64B5F6))
+                
+                var currentEnergy by remember { mutableStateOf(character.getCurrentEnergy()) }
+                var currentMp by remember { mutableStateOf(character.getCurrentMythicMana()) }
+                
+                LaunchedEffect(character) {
+                    while (true) {
+                        currentEnergy = character.getCurrentEnergy()
+                        currentMp = character.getCurrentMythicMana()
+                        kotlinx.coroutines.delay(1000)
+                    }
+                }
+                
+                StatusBar("Energy", currentEnergy, character.maxEnergy, Color(0xFF64B5F6))
+                
+                if (character.mythicArt != null) {
+                    StatusBar("Mythic Mana", currentMp, character.maxMythicMana, Color(0xFF2196F3))
+                }
                 
                 if (character.level < 300) {
                     val xpNeeded = character.getXpNeeded()
@@ -310,7 +326,7 @@ fun DashboardScreen(
                             label = action.label,
                             icon = action.icon,
                             modifier = Modifier.weight(1f),
-                            onClick = { onActionClick(action.type) }
+                            onClick = { onActionClick(action.type, action.parameter) }
                         )
                     }
                     if (rowActions.size < 2) {

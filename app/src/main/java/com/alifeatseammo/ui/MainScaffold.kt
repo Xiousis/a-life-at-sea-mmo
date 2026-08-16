@@ -19,7 +19,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.alifeatseammo.ui.screens.CombatScreen
+import com.alifeatseammo.ui.screens.VictoryScreen
+import com.alifeatseammo.ui.screens.DefeatScreen
 import com.alifeatseammo.ui.screens.TravelingScreen
+import com.alifeatseammo.data.model.CombatAction
 
 @Composable
 fun MainScaffold(
@@ -33,7 +36,8 @@ fun MainScaffold(
     val viewModel: GameViewModel = hiltViewModel()
     val combatViewModel: CombatViewModel = hiltViewModel()
 
-    val inCombat = currentChar.combatState != null
+    val combatState = currentChar.combatState
+    val inCombat = combatState != null
     val inTravel = currentChar.travelState != null
 
     Scaffold(
@@ -87,11 +91,25 @@ fun MainScaffold(
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            if (inCombat) {
-                CombatScreen(
-                    character = currentChar,
-                    onActionClick = { action, techId, itemId -> combatViewModel.combatAction(action, techId, itemId) }
-                )
+            if (combatState != null) {
+                if (combatState.isFinished) {
+                    if (combatState.playerWon) {
+                        VictoryScreen(
+                            combatState = combatState,
+                            onClaimRewards = { combatViewModel.combatAction(CombatAction.Flee, null, null) }
+                        )
+                    } else {
+                        DefeatScreen(
+                            combatState = combatState,
+                            onRetreat = { combatViewModel.combatAction(CombatAction.Flee, null, null) }
+                        )
+                    }
+                } else {
+                    CombatScreen(
+                        character = currentChar,
+                        onActionClick = { action, techId, itemId -> combatViewModel.combatAction(action, techId, itemId) }
+                    )
+                }
             } else if (inTravel) {
                 TravelingScreen(
                     character = currentChar,

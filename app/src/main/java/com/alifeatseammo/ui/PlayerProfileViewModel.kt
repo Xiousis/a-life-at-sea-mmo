@@ -35,6 +35,15 @@ class PlayerProfileViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val crewMembers: StateFlow<List<Character>> = playerCrew
+        .map { it?.members ?: emptyList() }
+        .distinctUntilChanged()
+        .flatMapLatest { ids ->
+            gameRepository.getCharacters(ids)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun loadPlayer(playerId: String) {
         _playerId.value = playerId
     }

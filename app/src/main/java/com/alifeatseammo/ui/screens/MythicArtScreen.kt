@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.MythicArt
 import com.alifeatseammo.data.model.ElementType
+import com.alifeatseammo.ui.components.getElementColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -247,30 +248,25 @@ fun CurrentMythicArtCard(mythicArt: MythicArt?) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                if (mythicArt.element != null) {
-                    val elementColor = when (mythicArt.element) {
-                        ElementType.Fire -> Color(0xFFFF4500)
-                        ElementType.Water -> Color(0xFF1E90FF)
-                        ElementType.Earth -> Color(0xFF8B4513)
-                        ElementType.Air -> Color(0xFF87CEEB)
-                        ElementType.Lightning -> Color(0xFFFFD700)
-                        ElementType.Ice -> Color(0xFFAFEEEE)
-                        ElementType.Light -> Color(0xFFFFFACD)
-                        ElementType.Dark -> Color(0xFF4B0082)
-                        ElementType.Void -> Color(0xFF000000)
-                        ElementType.Chaos -> Color(0xFFDC143C)
-                        ElementType.Celestial -> Color(0xFFE6E6FA)
-                        ElementType.Genesis -> Color(0xFF00FF7F)
-                        ElementType.Divine -> Color(0xFFFFDF00)
-                        ElementType.Annihilation -> Color(0xFF800000)
-                        ElementType.Creation -> Color(0xFFF5F5F5)
+                if (mythicArt.elements.isNotEmpty()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Elements:",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        mythicArt.elements.forEach { element ->
+                            Text(
+                                text = "${element.symbol} $element",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = getElementColor(element)
+                            )
+                        }
                     }
-                    Text(
-                        text = "Mythic Art Stat: ${mythicArt.element.symbol} ${mythicArt.element}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = elementColor
-                    )
                 }
 
                 if (mythicArt.elementalWeaknesses.isNotEmpty()) {

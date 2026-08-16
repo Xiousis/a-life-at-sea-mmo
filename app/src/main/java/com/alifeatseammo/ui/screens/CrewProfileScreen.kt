@@ -7,6 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Crew
 import java.util.Locale
 
@@ -14,6 +15,7 @@ import java.util.Locale
 @Composable
 fun CrewProfileScreen(
     crew: Crew?,
+    members: List<Character>,
     onBackClick: () -> Unit,
     onJoinClick: (String) -> Unit
 ) {
@@ -76,11 +78,19 @@ fun CrewProfileScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(text = "MEMBERS", style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.Start))
                     
-                    crew.members.forEach { memberId ->
-                        val role = crew.roles[memberId] ?: com.alifeatseammo.data.model.CrewRole.Member
+                    members.sortedByDescending { it.id == crew.captainId }.forEach { member ->
+                        val role = crew.roles[member.id] ?: com.alifeatseammo.data.model.CrewRole.Member
+                        val onlineStatus = if (member.isOnline) "Online" else "Offline"
+                        val statusColor = if (member.isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+
                         ListItem(
-                            headlineContent = { Text(text = memberId) },
-                            supportingContent = { Text(text = role.name) }
+                            headlineContent = { Text(text = member.name) },
+                            supportingContent = { 
+                                Column {
+                                    Text(text = role.name)
+                                    Text(text = onlineStatus, color = statusColor, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
                         )
                     }
                 }

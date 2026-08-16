@@ -80,6 +80,20 @@ fun AppNavigation(
         }
     }
 
+    val travelResult by viewModel.travelResult.collectAsState()
+
+    // Global navigation for travel completion
+    LaunchedEffect(travelResult) {
+        if (travelResult != null) {
+            navController.navigate(Screen.Dashboard.route) {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = false
+                }
+                launchSingleTop = true
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Dashboard.route,
@@ -90,7 +104,6 @@ fun AppNavigation(
             val playersNearby by viewModel.playersAtLocation.collectAsState()
             val missions by viewModel.missions.collectAsState()
             val mailMessages by economyViewModel.mailMessages.collectAsState()
-            val travelResult by viewModel.travelResult.collectAsState()
             DashboardScreen(
                 character = currentChar,
                 location = location,
@@ -99,7 +112,7 @@ fun AppNavigation(
                 missionCount = missions.size,
                 mailCount = mailMessages.count { !it.isRead },
                 travelResult = travelResult,
-                onActionClick = { actionType ->
+                onActionClick = { actionType, parameter ->
                     when (actionType) {
                         ActionType.Training -> navController.navigate(Screen.Training.route)
                         ActionType.Docks -> navController.navigate(Screen.Travel.route)
@@ -108,7 +121,10 @@ fun AppNavigation(
                             navController.navigate(Screen.Leaderboard.route)
                         }
                         ActionType.Crew -> navController.navigate(Screen.Crew.route)
-                        ActionType.Market -> navController.navigate(Screen.Market.route)
+                        ActionType.Market -> {
+                            economyViewModel.setMarketCategory(parameter)
+                            navController.navigate(Screen.Market.route)
+                        }
                         ActionType.Tavern -> navController.navigate(Screen.Tavern.route)
                         ActionType.Infirmary -> navController.navigate(Screen.Infirmary.route)
                         ActionType.Camp -> navController.navigate(Screen.Camp.route)
@@ -218,6 +234,7 @@ fun AppNavigation(
         }
         composable(Screen.Crew.route) {
             val crew by profileViewModel.playerCrew.collectAsState()
+            val crewMembers by profileViewModel.crewMembers.collectAsState()
             val invites by socialViewModel.crewInvites.collectAsState()
             LaunchedEffect(currentChar.crewId) {
                 currentChar.crewId?.let { profileViewModel.loadPlayer(currentChar.id) }
@@ -225,6 +242,7 @@ fun AppNavigation(
             CrewScreen(
                 character = currentChar,
                 crew = crew,
+                members = crewMembers,
                 invites = invites,
                 onCreateCrew = { name, desc -> socialViewModel.createCrew(name, desc) },
                 onJoinCrew = { id -> socialViewModel.joinCrew(id) },
@@ -414,14 +432,19 @@ fun AppNavigation(
         }
         composable(Screen.CrewProfile.route) {
             val crew by profileViewModel.playerCrew.collectAsState()
+            val crewMembers by profileViewModel.crewMembers.collectAsState()
             CrewProfileScreen(
                 crew = crew,
+                members = crewMembers,
                 onBackClick = { navController.popBackStack() },
                 onJoinClick = { crewId -> socialViewModel.joinCrew(crewId) }
             )
         }
         composable(Screen.Traveling.route) {
-            TravelingScreen(character = currentChar)
+            TravelingScreen(
+                character = currentChar,
+                onCompleteClick = { viewModel.finishTravel() }
+            )
         }
         composable(Screen.Fishing.route) {
             FishingScreen(

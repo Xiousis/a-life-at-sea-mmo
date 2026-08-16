@@ -7,6 +7,7 @@ const db = admin.firestore();
 
 // --- Constants & Config ---
 const ENERGY_REGEN_RATE_MS = 3 * 60 * 1000; // 1 energy per 3 minutes
+const MYTHIC_MANA_REGEN_RATE_MS = 2 * 1000; // 1 mana per 2 seconds
 const MAX_ENERGY = 100;
 const BASE_INVENTORY_CAPACITY = 20;
 const TURN_TIMEOUT_MS = 60 * 1000; // 1 minute per turn
@@ -217,101 +218,101 @@ const MYTHIC_ARTS: Record<string, Array<{
     debuffPercentage?: number,
     energyRegainMultiplier?: number,
     weakAgainst?: string[],
-    element?: string,
+    elements: string[],
     elementalWeaknesses?: string[],
     travelTimeMultiplier?: number,
     canLearnNonCombatSkills?: boolean,
     restrictedSkillTypes?: string[]
 }>> = {
     "F": [
-        { name: "Novice Strike", description: "A basic strike taught to every beginner.", stats: { strength: 1 }, skillMultiplier: 1.10, multipliedSkill: "Swordsmanship", techniques: ["Horizontal Slash"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Rusty Guard", description: "Using a worn blade to deflect blows.", stats: { endurance: 1 }, skillMultiplier: 1.10, multipliedSkill: "Blacksmith", techniques: ["Sturdy Block"], hugeBuffType: "Endurance", hugeBuffValue: 0.05, weakAgainst: ["Brawling"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Quick Step", description: "A simple movement to reposition.", stats: { agility: 1 }, skillMultiplier: 1.10, multipliedSkill: "Navigating", techniques: ["Dash"], hugeBuffType: "Agility", hugeBuffValue: 0.05, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
-        { name: "Dull Edge", description: "Attacking with a poorly maintained weapon.", stats: { strength: 1, agility: 1 }, skillMultiplier: 1.10, multipliedSkill: "Brawling", techniques: ["Heavy Chop"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Simple Thrust", description: "A straightforward piercing attack.", stats: { perception: 1 }, skillMultiplier: 1.10, multipliedSkill: "Spear", techniques: ["Point Strike"], hugeBuffType: "Perception", hugeBuffValue: 0.05, weakAgainst: ["Swordsmanship"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Steady Breath", description: "Focusing on breathing to maintain stamina.", stats: { willpower: 1 }, skillMultiplier: 1.10, multipliedSkill: "Medical", techniques: ["Calm State"], hugeBuffType: "Willpower", hugeBuffValue: 0.05, weakAgainst: ["Gunslinging"], element: "Light", elementalWeaknesses: ["Dark"] },
-        { name: "Lucky Swipe", description: "An unplanned attack that somehow lands.", stats: { luck: 1 }, skillMultiplier: 1.10, multipliedSkill: "TreasureHunting", techniques: ["Wild Swing"], hugeBuffType: "Luck", hugeBuffValue: 0.05, weakAgainst: ["Spear"], element: "Light", elementalWeaknesses: ["Dark"] },
-        { name: "Basic Flourish", description: "A simple showy move with no real power.", stats: { agility: 1, luck: 1 }, skillMultiplier: 1.10, multipliedSkill: "Cooking", techniques: ["Distraction"], hugeBuffType: "Agility", hugeBuffValue: 0.05, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
-        { name: "Fisherman's Hook", description: "A technique derived from daily chores.", stats: { strength: 1, perception: 1 }, skillMultiplier: 1.10, multipliedSkill: "Fishing", techniques: ["Pull"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], element: "Water", elementalWeaknesses: ["Lightning"] },
-        { name: "Sailor's Balance", description: "Maintaining footing on uneven ground.", stats: { agility: 1, endurance: 1 }, skillMultiplier: 1.10, multipliedSkill: "Navigating", techniques: ["Brace"], hugeBuffType: "Endurance", hugeBuffValue: 0.05, weakAgainst: ["Brawling"], element: "Water", elementalWeaknesses: ["Lightning"] }
+        { name: "Novice Strike", description: "A basic strike taught to every beginner.", stats: { strength: 1 }, skillMultiplier: 1.10, multipliedSkill: "Swordsmanship", techniques: ["Horizontal Slash"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], elements: ["Physical"], elementalWeaknesses: ["Air"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Rusty Guard", description: "Using a worn blade to deflect blows.", stats: { endurance: 1 }, skillMultiplier: 1.10, multipliedSkill: "Blacksmith", techniques: ["Sturdy Block"], hugeBuffType: "Endurance", hugeBuffValue: 0.05, weakAgainst: ["Brawling"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Quick Step", description: "A simple movement to reposition.", stats: { agility: 1 }, skillMultiplier: 1.10, multipliedSkill: "Navigating", techniques: ["Dash"], hugeBuffType: "Agility", hugeBuffValue: 0.05, weakAgainst: ["Sniper"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Dull Edge", description: "Attacking with a poorly maintained weapon.", stats: { strength: 1, agility: 1 }, skillMultiplier: 1.10, multipliedSkill: "Brawling", techniques: ["Heavy Chop"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Simple Thrust", description: "A straightforward piercing attack.", stats: { perception: 1 }, skillMultiplier: 1.10, multipliedSkill: "Spear", techniques: ["Point Strike"], hugeBuffType: "Perception", hugeBuffValue: 0.05, weakAgainst: ["Swordsmanship"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Steady Breath", description: "Focusing on breathing to maintain stamina.", stats: { willpower: 1 }, skillMultiplier: 1.10, multipliedSkill: "Medical", techniques: ["Calm State"], hugeBuffType: "Willpower", hugeBuffValue: 0.05, weakAgainst: ["Gunslinging"], elements: ["Light"], elementalWeaknesses: ["Dark"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Lucky Swipe", description: "An unplanned attack that somehow lands.", stats: { luck: 1 }, skillMultiplier: 1.10, multipliedSkill: "TreasureHunting", techniques: ["Wild Swing"], hugeBuffType: "Luck", hugeBuffValue: 0.05, weakAgainst: ["Spear"], elements: ["Light"], elementalWeaknesses: ["Dark"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Basic Flourish", description: "A simple showy move with no real power.", stats: { agility: 1, luck: 1 }, skillMultiplier: 1.10, multipliedSkill: "Cooking", techniques: ["Distraction"], hugeBuffType: "Agility", hugeBuffValue: 0.05, weakAgainst: ["Sniper"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Fisherman's Hook", description: "A technique derived from daily chores.", stats: { strength: 1, perception: 1 }, skillMultiplier: 1.10, multipliedSkill: "Fishing", techniques: ["Pull"], hugeBuffType: "Strength", hugeBuffValue: 0.05, weakAgainst: ["MartialArts"], elements: ["Water"], elementalWeaknesses: ["Lightning"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 },
+        { name: "Sailor's Balance", description: "Maintaining footing on uneven ground.", stats: { agility: 1, endurance: 1 }, skillMultiplier: 1.10, multipliedSkill: "Navigating", techniques: ["Brace"], hugeBuffType: "Endurance", hugeBuffValue: 0.05, weakAgainst: ["Brawling"], elements: ["Water"], elementalWeaknesses: ["Lightning"], debuffPercentage: 0.40, energyRegainMultiplier: 1.05 }
     ],
     "E": [
-        { name: "Steel Bite", description: "A more focused strike that pierces deeper.", stats: { strength: 4 }, skillMultiplier: 1.30, multipliedSkill: "Gunslinging", techniques: ["Deep Cut"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Vanguard Defense", description: "A defensive stance used by front-line soldiers.", stats: { endurance: 4 }, skillMultiplier: 1.30, multipliedSkill: "MartialArts", techniques: ["Iron Wall"], hugeBuffType: "Endurance", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Fleet Foot", description: "Agile movements that baffle the inexperienced.", stats: { agility: 4 }, skillMultiplier: 1.30, multipliedSkill: "Sniper", techniques: ["Evasion"], hugeBuffType: "Agility", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Air", elementalWeaknesses: ["Ice"] },
-        { name: "Sharpened Senses", description: "Heightened awareness on the battlefield.", stats: { perception: 4 }, skillMultiplier: 1.30, multipliedSkill: "MysticArts", techniques: ["Pre-empt"], hugeBuffType: "Perception", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Lightning", elementalWeaknesses: ["Earth"] },
-        { name: "Stone Heart", description: "Resisting fear and mental pressure.", stats: { willpower: 4 }, skillMultiplier: 1.30, multipliedSkill: "Brawling", techniques: ["Unshakable"], hugeBuffType: "Willpower", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Gambler's Strike", description: "A high-risk, high-reward attack.", stats: { luck: 5 }, skillMultiplier: 1.30, multipliedSkill: "TreasureHunting", techniques: ["Double or Nothing"], hugeBuffType: "Luck", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Chaos", elementalWeaknesses: ["Void"] },
-        { name: "Twin Fang", description: "A rapid two-hit combination.", stats: { strength: 2, agility: 3 }, skillMultiplier: 1.30, multipliedSkill: "Swordsmanship", techniques: ["Double Slash"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Crushing Weight", description: "Leveraging body weight into a strike.", stats: { strength: 5 }, skillMultiplier: 1.30, multipliedSkill: "Brawling", techniques: ["Slam"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Eagle Eye", description: "Spotting weaknesses from a distance.", stats: { perception: 5 }, skillMultiplier: 1.30, multipliedSkill: "Sniper", techniques: ["Precision Hit"], hugeBuffType: "Perception", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Lightning", elementalWeaknesses: ["Earth"] },
-        { name: "Brave Charge", description: "Rushing forward with reckless abandon.", stats: { willpower: 5, strength: 2 }, skillMultiplier: 1.30, multipliedSkill: "MartialArts", techniques: ["Stampede"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], element: "Fire", elementalWeaknesses: ["Water"] }
+        { name: "Steel Bite", description: "A more focused strike that pierces deeper.", stats: { strength: 4 }, skillMultiplier: 1.30, multipliedSkill: "Gunslinging", techniques: ["Deep Cut"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Vanguard Defense", description: "A defensive stance used by front-line soldiers.", stats: { endurance: 4 }, skillMultiplier: 1.30, multipliedSkill: "MartialArts", techniques: ["Iron Wall"], hugeBuffType: "Endurance", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Fleet Foot", description: "Agile movements that baffle the inexperienced.", stats: { agility: 4 }, skillMultiplier: 1.30, multipliedSkill: "Sniper", techniques: ["Evasion"], hugeBuffType: "Agility", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Sharpened Senses", description: "Heightened awareness on the battlefield.", stats: { perception: 4 }, skillMultiplier: 1.30, multipliedSkill: "MysticArts", techniques: ["Pre-empt"], hugeBuffType: "Perception", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Lightning"], elementalWeaknesses: ["Earth"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Stone Heart", description: "Resisting fear and mental pressure.", stats: { willpower: 4 }, skillMultiplier: 1.30, multipliedSkill: "Brawling", techniques: ["Unshakable"], hugeBuffType: "Willpower", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Gambler's Strike", description: "A high-risk, high-reward attack.", stats: { luck: 5 }, skillMultiplier: 1.30, multipliedSkill: "TreasureHunting", techniques: ["Double or Nothing"], hugeBuffType: "Luck", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Chaos"], elementalWeaknesses: ["Void"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Twin Fang", description: "A rapid two-hit combination.", stats: { strength: 2, agility: 3 }, skillMultiplier: 1.30, multipliedSkill: "Swordsmanship", techniques: ["Double Slash"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Crushing Weight", description: "Leveraging body weight into a strike.", stats: { strength: 5 }, skillMultiplier: 1.30, multipliedSkill: "Brawling", techniques: ["Slam"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Eagle Eye", description: "Spotting weaknesses from a distance.", stats: { perception: 5 }, skillMultiplier: 1.30, multipliedSkill: "Sniper", techniques: ["Precision Hit"], hugeBuffType: "Perception", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Lightning"], elementalWeaknesses: ["Earth"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 },
+        { name: "Brave Charge", description: "Rushing forward with reckless abandon.", stats: { willpower: 5, strength: 2 }, skillMultiplier: 1.30, multipliedSkill: "MartialArts", techniques: ["Stampede"], hugeBuffType: "Strength", hugeBuffValue: 0.15, weakAgainst: ["Gunslinging"], elements: ["Fire"], elementalWeaknesses: ["Water"], debuffPercentage: 0.35, energyRegainMultiplier: 1.10 }
     ],
     "D": [
-        { name: "Rippling Blade", description: "A fluid attack that bypasses simple parries.", stats: { swordsmanship: 7, agility: 2 }, skillMultiplier: 1.60, multipliedSkill: "Swordsmanship", techniques: ["Flowing Strike"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Water", elementalWeaknesses: ["Lightning"] },
-        { name: "Mountain's Resolve", description: "Standing firm against a tide of enemies.", stats: { endurance: 8, willpower: 2 }, skillMultiplier: 1.60, multipliedSkill: "Blacksmith", techniques: ["Immovable"], hugeBuffType: "Endurance", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Whirlwind Spin", description: "A spinning attack that hits multiple targets.", stats: { agility: 8, strength: 2 }, skillMultiplier: 1.60, multipliedSkill: "Spear", techniques: ["Cyclone"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
-        { name: "Hunter's Mark", description: "Tracking a target with lethal intent.", stats: { perception: 8, luck: 2 }, skillMultiplier: 1.60, multipliedSkill: "Sniper", techniques: ["Focused Fire"], hugeBuffType: "Sniper", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Lightning", elementalWeaknesses: ["Earth"] },
-        { name: "Iron Fist", description: "Combining martial arts with swordplay.", stats: { martialArts: 7, strength: 3 }, skillMultiplier: 1.60, multipliedSkill: "MartialArts", techniques: ["Grip Smash"], hugeBuffType: "MartialArts", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Silent Step", description: "Moving without a sound to ambush foes.", stats: { agility: 10 }, skillMultiplier: 1.60, multipliedSkill: "TreasureHunting", techniques: ["Shadow Strike"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
-        { name: "Piercing Gale", description: "A thrust that carries the force of a gust.", stats: { strength: 10 }, skillMultiplier: 1.60, multipliedSkill: "Spear", techniques: ["Air Piercer"], hugeBuffType: "Spear", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] },
-        { name: "Serpent's Coil", description: "A deceptive technique that traps weapons.", stats: { agility: 7, perception: 3 }, skillMultiplier: 1.60, multipliedSkill: "MysticArts", techniques: ["Disarm"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Water", elementalWeaknesses: ["Lightning"] },
-        { name: "Thunderous Clap", description: "An explosive strike that dazes opponents.", stats: { strength: 9, willpower: 3 }, skillMultiplier: 1.60, multipliedSkill: "Brawling", techniques: ["Shockwave"], hugeBuffType: "Strength", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Lightning", elementalWeaknesses: ["Earth"] },
-        { name: "Mirror Image", description: "A feint that leaves an afterimage.", stats: { agility: 9, luck: 4 }, skillMultiplier: 1.60, multipliedSkill: "MysticArts", techniques: ["Flicker"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], element: "Air", elementalWeaknesses: ["Ice"] }
+        { name: "Rippling Blade", description: "A fluid attack that bypasses simple parries.", stats: { swordsmanship: 7, agility: 2 }, skillMultiplier: 1.60, multipliedSkill: "Swordsmanship", techniques: ["Flowing Strike"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Hybrid"], elementalWeaknesses: ["Lightning"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Mountain's Resolve", description: "Standing firm against a tide of enemies.", stats: { endurance: 8, willpower: 2 }, skillMultiplier: 1.60, multipliedSkill: "Blacksmith", techniques: ["Immovable"], hugeBuffType: "Endurance", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Whirlwind Spin", description: "A spinning attack that hits multiple targets.", stats: { agility: 8, strength: 2 }, skillMultiplier: 1.60, multipliedSkill: "Spear", techniques: ["Cyclone"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Hunter's Mark", description: "Tracking a target with lethal intent.", stats: { perception: 8, luck: 2 }, skillMultiplier: 1.60, multipliedSkill: "Sniper", techniques: ["Focused Fire"], hugeBuffType: "Sniper", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Lightning"], elementalWeaknesses: ["Earth"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Iron Fist", description: "Combining martial arts with swordplay.", stats: { martialArts: 7, strength: 3 }, skillMultiplier: 1.60, multipliedSkill: "MartialArts", techniques: ["Grip Smash"], hugeBuffType: "MartialArts", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Silent Step", description: "Moving without a sound to ambush foes.", stats: { agility: 10 }, skillMultiplier: 1.60, multipliedSkill: "TreasureHunting", techniques: ["Shadow Strike"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Piercing Gale", description: "A thrust that carries the force of a gust.", stats: { strength: 10 }, skillMultiplier: 1.60, multipliedSkill: "Spear", techniques: ["Air Piercer"], hugeBuffType: "Spear", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Serpent's Coil", description: "A deceptive technique that traps weapons.", stats: { agility: 7, perception: 3 }, skillMultiplier: 1.60, multipliedSkill: "MysticArts", techniques: ["Disarm"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Water"], elementalWeaknesses: ["Lightning"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Thunderous Clap", description: "An explosive strike that dazes opponents.", stats: { strength: 9, willpower: 3 }, skillMultiplier: 1.60, multipliedSkill: "Brawling", techniques: ["Shockwave"], hugeBuffType: "Strength", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Lightning"], elementalWeaknesses: ["Earth"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 },
+        { name: "Mirror Image", description: "A feint that leaves an afterimage.", stats: { agility: 9, luck: 4 }, skillMultiplier: 1.60, multipliedSkill: "MysticArts", techniques: ["Flicker"], hugeBuffType: "Agility", hugeBuffValue: 0.30, weakAgainst: ["Sniper"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.30, energyRegainMultiplier: 1.15 }
     ],
     "C": [
-        { name: "Azure Flow", description: "Mastering the rhythm of combat.", stats: { swordsmanship: 12, agility: 5 }, skillMultiplier: 2.00, multipliedSkill: "Swordsmanship", techniques: ["Water Slicer"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Water", elementalWeaknesses: ["Lightning"] },
-        { name: "Grizzly Crush", description: "An overwhelming strike with brute force.", stats: { strength: 15, endurance: 5 }, skillMultiplier: 2.00, multipliedSkill: "Brawling", techniques: ["Bone Breaker"], hugeBuffType: "Strength", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Wind Runner", description: "Moving as fast as the breeze.", stats: { agility: 15, luck: 5 }, skillMultiplier: 2.00, multipliedSkill: "Navigating", techniques: ["Breeze Step"], hugeBuffType: "Agility", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Air", elementalWeaknesses: ["Ice"] },
-        { name: "Watcher's Gaze", description: "Seeing through illusions and feints.", stats: { perception: 15, willpower: 5 }, skillMultiplier: 2.00, multipliedSkill: "Sniper", techniques: ["True Vision"], hugeBuffType: "Perception", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Lightning", elementalWeaknesses: ["Earth"] },
-        { name: "Soul Shield", description: "Protecting the mind from dark arts.", stats: { willpower: 15, mysticArts: 5 }, skillMultiplier: 2.00, multipliedSkill: "MysticArts", techniques: ["Purge"], hugeBuffType: "MysticArts", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Light", elementalWeaknesses: ["Dark"] },
-        { name: "Crimson Edge", description: "A blood-soaked blade that thirsts for battle.", stats: { luck: 15, strength: 5 }, skillMultiplier: 2.00, multipliedSkill: "Swordsmanship", techniques: ["Bleed Out"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Dark", elementalWeaknesses: ["Light"] },
-        { name: "Storm Caller", description: "Infusing attacks with static energy.", stats: { mysticArts: 12, agility: 5 }, skillMultiplier: 2.00, multipliedSkill: "MysticArts", techniques: ["Bolt Strike"], hugeBuffType: "MysticArts", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Lightning", elementalWeaknesses: ["Earth"] },
-        { name: "Earth Shaker", description: "Striking the ground to disrupt balance.", stats: { strength: 14, endurance: 6 }, skillMultiplier: 2.00, multipliedSkill: "Blacksmith", techniques: ["Tremor"], hugeBuffType: "Strength", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Desert Mirage", description: "A shimmering technique that hides intent.", stats: { agility: 14, perception: 6 }, skillMultiplier: 2.00, multipliedSkill: "TreasureHunting", techniques: ["Sand Trap"], hugeBuffType: "Agility", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Air", elementalWeaknesses: ["Ice"] },
-        { name: "Phoenix Rise", description: "Recovering from the brink with newfound vigor.", stats: { willpower: 14, luck: 6 }, skillMultiplier: 2.00, multipliedSkill: "Medical", techniques: ["Rebirth"], hugeBuffType: "Willpower", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], element: "Fire", elementalWeaknesses: ["Water"] }
+        { name: "Azure Flow", description: "Mastering the rhythm of combat.", stats: { swordsmanship: 12, agility: 5 }, skillMultiplier: 2.00, multipliedSkill: "Swordsmanship", techniques: ["Water Slicer"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Hybrid"], elementalWeaknesses: ["Lightning"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Grizzly Crush", description: "An overwhelming strike with brute force.", stats: { strength: 15, endurance: 5 }, skillMultiplier: 2.00, multipliedSkill: "Brawling", techniques: ["Bone Breaker"], hugeBuffType: "Strength", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Wind Runner", description: "Moving as fast as the breeze.", stats: { agility: 15, luck: 5 }, skillMultiplier: 2.00, multipliedSkill: "Navigating", techniques: ["Breeze Step"], hugeBuffType: "Agility", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Watcher's Gaze", description: "Seeing through illusions and feints.", stats: { perception: 15, willpower: 5 }, skillMultiplier: 2.00, multipliedSkill: "Sniper", techniques: ["True Vision"], hugeBuffType: "Perception", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Lightning"], elementalWeaknesses: ["Earth"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Soul Shield", description: "Protecting the mind from dark arts.", stats: { willpower: 15, mysticArts: 5 }, skillMultiplier: 2.00, multipliedSkill: "MysticArts", techniques: ["Purge"], hugeBuffType: "MysticArts", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Light"], elementalWeaknesses: ["Dark"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Crimson Edge", description: "A blood-soaked blade that thirsts for battle.", stats: { luck: 15, strength: 5 }, skillMultiplier: 2.00, multipliedSkill: "Swordsmanship", techniques: ["Bleed Out"], hugeBuffType: "Swordsmanship", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Hybrid"], elementalWeaknesses: ["Light"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Storm Caller", description: "Infusing attacks with static energy.", stats: { mysticArts: 12, agility: 5 }, skillMultiplier: 2.00, multipliedSkill: "MysticArts", techniques: ["Bolt Strike"], hugeBuffType: "MysticArts", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Lightning"], elementalWeaknesses: ["Earth"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Earth Shaker", description: "Striking the ground to disrupt balance.", stats: { strength: 14, endurance: 6 }, skillMultiplier: 2.00, multipliedSkill: "Blacksmith", techniques: ["Tremor"], hugeBuffType: "Strength", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Desert Mirage", description: "A shimmering technique that hides intent.", stats: { agility: 14, perception: 6 }, skillMultiplier: 2.00, multipliedSkill: "TreasureHunting", techniques: ["Sand Trap"], hugeBuffType: "Agility", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Air"], elementalWeaknesses: ["Ice"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 },
+        { name: "Phoenix Rise", description: "Recovering from the brink with newfound vigor.", stats: { willpower: 14, luck: 6 }, skillMultiplier: 2.00, multipliedSkill: "Medical", techniques: ["Rebirth"], hugeBuffType: "Willpower", hugeBuffValue: 0.60, weakAgainst: ["Swordsmanship"], elements: ["Fire"], elementalWeaknesses: ["Water"], debuffPercentage: 0.25, energyRegainMultiplier: 1.20 }
     ],
     "B": [
-        { name: "Dragon's Breath", description: "Exhaling power through the blade.", stats: { swordsmanship: 40, mysticArts: 20, strength: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Fire Slash", "Heat Haze"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Fire", elementalWeaknesses: ["Water"] },
-        { name: "Titan's Grip", description: "Wielding massive weapons with ease.", stats: { strength: 50, endurance: 20, willpower: 10 }, skillMultiplier: 4.00, multipliedSkill: "Blacksmith", techniques: ["Colossus Strike", "Earth Breaker"], hugeBuffType: "Strength", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Lightning Reflex", description: "Reacting before the thought even forms.", stats: { agility: 50, perception: 20, luck: 10 }, skillMultiplier: 4.00, multipliedSkill: "Gunslinging", techniques: ["Flash Step", "Afterimage"], hugeBuffType: "Agility", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Lightning", elementalWeaknesses: ["Earth"] },
-        { name: "Oracle's Whisper", description: "Hearing the future of the fight.", stats: { perception: 50, willpower: 20, agility: 10 }, skillMultiplier: 4.00, multipliedSkill: "Navigating", techniques: ["Prevision", "Mind Link"], hugeBuffType: "Perception", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Light", elementalWeaknesses: ["Dark"] },
-        { name: "Void Anchor", description: "Grounding oneself in the fabric of reality.", stats: { willpower: 50, endurance: 20, mysticArts: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Nullify", "Gravity Field"], hugeBuffType: "Willpower", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Void", elementalWeaknesses: ["Chaos"] },
-        { name: "Fortune's Favor", description: "Destiny smiles upon your every move.", stats: { luck: 60, agility: 10, perception: 10 }, skillMultiplier: 4.00, multipliedSkill: "TreasureHunting", techniques: ["Destiny Strike", "Jackpot"], hugeBuffType: "Luck", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Celestial", elementalWeaknesses: ["Void"] },
-        { name: "Frost Bite", description: "Freezing the enemy's movements.", stats: { mysticArts: 40, agility: 20, endurance: 10 }, skillMultiplier: 4.00, multipliedSkill: "Cooking", techniques: ["Ice Prison", "Glacial Wall"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Ice", elementalWeaknesses: ["Air"] },
-        { name: "Raging Torrent", description: "A relentless barrage of attacks.", stats: { swordsmanship: 45, strength: 15, agility: 10 }, skillMultiplier: 4.00, multipliedSkill: "Fishing", techniques: ["Flood", "Tidal Wave"], hugeBuffType: "Swordsmanship", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Water", elementalWeaknesses: ["Lightning"] },
-        { name: "Shadow Weaver", description: "Manipulating shadows to bind foes.", stats: { mysticArts: 45, perception: 15, luck: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Dark Bind", "Nightmare"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Dark", elementalWeaknesses: ["Light"] },
-        { name: "Celestial Alignment", description: "Drawing power from the stars.", stats: { willpower: 45, luck: 15, mysticArts: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Starfall", "Sunbeam"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], element: "Celestial", elementalWeaknesses: ["Void"] }
+        { name: "Dragon's Breath", description: "Exhaling power through the blade.", stats: { swordsmanship: 40, mysticArts: 20, strength: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Fire Slash", "Heat Haze"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Fire"], elementalWeaknesses: ["Water"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Titan's Grip", description: "Wielding massive weapons with ease.", stats: { strength: 50, endurance: 20, willpower: 10 }, skillMultiplier: 4.00, multipliedSkill: "Blacksmith", techniques: ["Colossus Strike", "Earth Breaker"], hugeBuffType: "Strength", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Lightning Reflex", description: "Reacting before the thought even forms.", stats: { agility: 50, perception: 20, luck: 10 }, skillMultiplier: 4.00, multipliedSkill: "Gunslinging", techniques: ["Flash Step", "Afterimage"], hugeBuffType: "Agility", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Lightning"], elementalWeaknesses: ["Earth"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Oracle's Whisper", description: "Hearing the future of the fight.", stats: { perception: 50, willpower: 20, agility: 10 }, skillMultiplier: 4.00, multipliedSkill: "Navigating", techniques: ["Prevision", "Mind Link"], hugeBuffType: "Perception", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Light"], elementalWeaknesses: ["Dark"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Void Anchor", description: "Grounding oneself in the fabric of reality.", stats: { willpower: 50, endurance: 20, mysticArts: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Nullify", "Gravity Field"], hugeBuffType: "Willpower", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Void"], elementalWeaknesses: ["Chaos"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Fortune's Favor", description: "Destiny smiles upon your every move.", stats: { luck: 60, agility: 10, perception: 10 }, skillMultiplier: 4.00, multipliedSkill: "TreasureHunting", techniques: ["Destiny Strike", "Jackpot"], hugeBuffType: "Luck", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Celestial"], elementalWeaknesses: ["Void"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Frost Bite", description: "Freezing the enemy's movements.", stats: { mysticArts: 40, agility: 20, endurance: 10 }, skillMultiplier: 4.00, multipliedSkill: "Cooking", techniques: ["Ice Prison", "Glacial Wall"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Ice"], elementalWeaknesses: ["Air"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Raging Torrent", description: "A relentless barrage of attacks.", stats: { swordsmanship: 45, strength: 15, agility: 10 }, skillMultiplier: 4.00, multipliedSkill: "Fishing", techniques: ["Flood", "Tidal Wave"], hugeBuffType: "Swordsmanship", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Water"], elementalWeaknesses: ["Lightning"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Shadow Weaver", description: "Manipulating shadows to bind foes.", stats: { mysticArts: 45, perception: 15, luck: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Dark Bind", "Nightmare"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Dark"], elementalWeaknesses: ["Light"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 },
+        { name: "Celestial Alignment", description: "Drawing power from the stars.", stats: { willpower: 45, luck: 15, mysticArts: 10 }, skillMultiplier: 4.00, multipliedSkill: "MysticArts", techniques: ["Starfall", "Sunbeam"], hugeBuffType: "MysticArts", hugeBuffValue: 1.50, weakAgainst: ["MysticArts"], elements: ["Celestial"], elementalWeaknesses: ["Void"], debuffPercentage: 0.25, energyRegainMultiplier: 1.30 }
     ],
     "A": [
-        { name: "Nebula Strike", description: "A cosmic strike that transcends dimensions.", stats: { swordsmanship: 80, mysticArts: 50, strength: 30 }, skillMultiplier: 10.00, multipliedSkill: "MysticArts", techniques: ["Cosmic Tear", "Black Hole", "Nova"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Celestial", elementalWeaknesses: ["Void"] },
-        { name: "Atlas Burden", description: "Holding the weight of the heavens.", stats: { strength: 90, endurance: 50, willpower: 30 }, skillMultiplier: 10.00, multipliedSkill: "Blacksmith", techniques: ["Heavenly Smash", "Sky Cracker", "Final Pillar"], hugeBuffType: "Strength", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Chronos Step", description: "Moving through time for a brief moment.", stats: { agility: 90, perception: 50, luck: 30 }, skillMultiplier: 10.00, multipliedSkill: "Navigating", techniques: ["Time Warp", "Stutter", "Future Echo"], hugeBuffType: "Agility", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Void", elementalWeaknesses: ["Chaos"] },
-        { name: "Spirit Reaper", description: "Striking at the very soul of the opponent.", stats: { mysticArts: 90, willpower: 50, perception: 30 }, skillMultiplier: 10.00, multipliedSkill: "Medical", techniques: ["Soul Rend", "Spirit Bind", "Essence Theft"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Dark", elementalWeaknesses: ["Light"] },
-        { name: "Eternal Bastion", description: "An unbreakable defense that reflects damage.", stats: { endurance: 90, luck: 50, strength: 30 }, skillMultiplier: 10.00, multipliedSkill: "Blacksmith", techniques: ["Mirror Shield", "Fortress", "Aegis"], hugeBuffType: "Endurance", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "King's Authority", description: "Commanding the battlefield with presence.", stats: { willpower: 90, perception: 50, agility: 30 }, skillMultiplier: 10.00, multipliedSkill: "Navigating", techniques: ["Overawe", "Command", "Domination"], hugeBuffType: "Willpower", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Divine", elementalWeaknesses: ["Chaos"] },
-        { name: "Nature's Wrath", description: "Harnessing the power of the natural world.", stats: { mysticArts: 80, strength: 40, endurance: 30 }, skillMultiplier: 10.00, multipliedSkill: "Fishing", techniques: ["Entangle", "Root Spike", "Thorn Hail"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Earth", elementalWeaknesses: ["Air"] },
-        { name: "Silver Lining", description: "Finding victory in the direst situations.", stats: { luck: 100, agility: 40, perception: 30 }, skillMultiplier: 10.00, multipliedSkill: "TreasureHunting", techniques: ["Miracle", "Lucky Break", "Twist of Fate"], hugeBuffType: "Luck", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Celestial", elementalWeaknesses: ["Void"] },
-        { name: "Solar Flare", description: "Blinding enemies with the brilliance of the sun.", stats: { mysticArts: 85, perception: 40, willpower: 30 }, skillMultiplier: 10.00, multipliedSkill: "Cooking", techniques: ["Sunburst", "Blinding Light", "Solar Storm"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Fire", elementalWeaknesses: ["Water"] },
-        { name: "Abyssal Maw", description: "Consuming the light and hope of foes.", stats: { mysticArts: 85, willpower: 40, endurance: 30 }, skillMultiplier: 10.00, multipliedSkill: "MysticArts", techniques: ["Devour", "Void Pull", "Darkness Falls"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Dark", elementalWeaknesses: ["Light"] }
+        { name: "Nebula Strike", description: "A cosmic strike that transcends dimensions.", stats: { swordsmanship: 80, mysticArts: 50, strength: 30 }, skillMultiplier: 10.00, multipliedSkill: "MysticArts", techniques: ["Cosmic Tear", "Black Hole", "Nova"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Celestial"], elementalWeaknesses: ["Void"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "Atlas Burden", description: "Holding the weight of the heavens.", stats: { strength: 90, endurance: 50, willpower: 30 }, skillMultiplier: 10.00, multipliedSkill: "Blacksmith", techniques: ["Heavenly Smash", "Sky Cracker", "Final Pillar"], hugeBuffType: "Strength", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "Chronos Step", description: "Moving through time for a brief moment.", stats: { agility: 90, perception: 50, luck: 30 }, skillMultiplier: 10.00, multipliedSkill: "Navigating", techniques: ["Time Warp", "Stutter", "Future Echo"], hugeBuffType: "Agility", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Void"], elementalWeaknesses: ["Chaos"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "Spirit Reaper", description: "Striking at the very soul of the opponent.", stats: { mysticArts: 90, willpower: 50, perception: 30 }, skillMultiplier: 10.00, multipliedSkill: "Medical", techniques: ["Soul Rend", "Spirit Bind", "Essence Theft"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Dark"], elementalWeaknesses: ["Light"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "Eternal Bastion", description: "An unbreakable defense that reflects damage.", stats: { endurance: 90, luck: 50, strength: 30 }, skillMultiplier: 10.00, multipliedSkill: "Blacksmith", techniques: ["Mirror Shield", "Fortress", "Aegis"], hugeBuffType: "Endurance", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "King's Authority", description: "Commanding the battlefield with presence.", stats: { willpower: 90, perception: 50, agility: 30 }, skillMultiplier: 10.00, multipliedSkill: "Navigating", techniques: ["Overawe", "Command", "Domination"], hugeBuffType: "Willpower", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Divine"], elementalWeaknesses: ["Chaos"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "Nature's Wrath", description: "Harnessing the power of the natural world.", stats: { mysticArts: 80, strength: 40, endurance: 30 }, skillMultiplier: 10.00, multipliedSkill: "Fishing", techniques: ["Entangle", "Root Spike", "Thorn Hail"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Earth"], elementalWeaknesses: ["Air"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "Silver Lining", description: "Finding victory in the direst situations.", stats: { luck: 100, agility: 40, perception: 30 }, skillMultiplier: 10.00, multipliedSkill: "TreasureHunting", techniques: ["Miracle", "Lucky Break", "Twist of Fate"], hugeBuffType: "Luck", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Celestial"], elementalWeaknesses: ["Void"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "Solar Flare", description: "Blinding enemies with the brilliance of the sun.", stats: { mysticArts: 85, perception: 40, willpower: 30 }, skillMultiplier: 10.00, multipliedSkill: "Cooking", techniques: ["Sunburst", "Blinding Light", "Solar Storm"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Fire"], elementalWeaknesses: ["Water"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 },
+        { name: "Abyssal Maw", description: "Consuming the light and hope of foes.", stats: { mysticArts: 85, willpower: 40, endurance: 30 }, skillMultiplier: 10.00, multipliedSkill: "MysticArts", techniques: ["Devour", "Void Pull", "Darkness Falls"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], elements: ["Dark"], elementalWeaknesses: ["Light"], debuffPercentage: 0.30, energyRegainMultiplier: 1.40 }
     ],
     "S": [
-        { name: "Godspeed", description: "Surpassing the limits of human speed.", stats: { agility: 60, perception: 30 }, skillMultiplier: 25.00, multipliedSkill: "Sniper", techniques: ["Sonic Boom", "Infinite Afterimage"], hugeBuffType: "Agility", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Spear", "Sniper"], weakAgainst: ["Brawling"], element: "Void", elementalWeaknesses: ["Chaos"] },
-        { name: "World Sunderer", description: "A strike capable of splitting islands.", stats: { strength: 70, swordsmanship: 40 }, skillMultiplier: 25.00, multipliedSkill: "Swordsmanship", techniques: ["Great Divide", "Earth Quake"], hugeBuffType: "Strength", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Gunslinging", "MartialArts"], weakAgainst: ["Brawling"], element: "Chaos", elementalWeaknesses: ["Void"] },
-        { name: "Maelstrom of Souls", description: "A vortex of spiritual energy.", stats: { mysticArts: 65, willpower: 45 }, skillMultiplier: 25.00, multipliedSkill: "MysticArts", techniques: ["Soul Suck", "Spirit Explosion"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Brawling", "Spear"], weakAgainst: ["Brawling"], element: "Void", elementalWeaknesses: ["Chaos"] },
-        { name: "Absolute Zero", description: "Freezing time and space itself.", stats: { mysticArts: 68, endurance: 52 }, skillMultiplier: 25.00, multipliedSkill: "Medical", techniques: ["Frozen Domain", "Shatter"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Swordsmanship", "Sniper"], weakAgainst: ["Brawling"], element: "Ice", elementalWeaknesses: ["Air"] },
-        { name: "Divine Providence", description: "Guided by the hand of fate.", stats: { luck: 100, willpower: 50 }, skillMultiplier: 25.00, multipliedSkill: "TreasureHunting", techniques: ["Fate's Seal", "Unstoppable Force"], hugeBuffType: "Luck", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Gunslinging", "Brawling"], weakAgainst: ["Brawling"], element: "Divine", elementalWeaknesses: ["Chaos"] }
+        { name: "Godspeed", description: "Surpassing the limits of human speed.", stats: { agility: 60, perception: 30 }, skillMultiplier: 25.00, multipliedSkill: "Sniper", techniques: ["Sonic Boom", "Infinite Afterimage"], hugeBuffType: "Agility", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Spear", "Sniper"], weakAgainst: ["Brawling"], elements: ["Void"], elementalWeaknesses: ["Chaos"] },
+        { name: "World Sunderer", description: "A strike capable of splitting islands.", stats: { strength: 70, swordsmanship: 40 }, skillMultiplier: 25.00, multipliedSkill: "Swordsmanship", techniques: ["Great Divide", "Earth Quake"], hugeBuffType: "Strength", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Gunslinging", "MartialArts"], weakAgainst: ["Brawling"], elements: ["Physical"], elementalWeaknesses: ["Void"] },
+        { name: "Maelstrom of Souls", description: "A vortex of spiritual energy.", stats: { mysticArts: 65, willpower: 45 }, skillMultiplier: 25.00, multipliedSkill: "MysticArts", techniques: ["Soul Suck", "Spirit Explosion"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Brawling", "Spear"], weakAgainst: ["Brawling"], elements: ["Void"], elementalWeaknesses: ["Chaos"] },
+        { name: "Absolute Zero", description: "Freezing time and space itself.", stats: { mysticArts: 68, endurance: 52 }, skillMultiplier: 25.00, multipliedSkill: "Medical", techniques: ["Frozen Domain", "Shatter"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Swordsmanship", "Sniper"], weakAgainst: ["Brawling"], elements: ["Ice"], elementalWeaknesses: ["Air"] },
+        { name: "Divine Providence", description: "Guided by the hand of fate.", stats: { luck: 100, willpower: 50 }, skillMultiplier: 25.00, multipliedSkill: "TreasureHunting", techniques: ["Fate's Seal", "Unstoppable Force"], hugeBuffType: "Luck", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Gunslinging", "Brawling"], weakAgainst: ["Brawling"], elements: ["Divine"], elementalWeaknesses: ["Chaos"] }
     ],
     "SS": [
-        { name: "Chaos Theory", description: "Mastering the unpredictability of existence.", stats: { luck: 150, mysticArts: 100, perception: 50 }, skillMultiplier: 100.00, multipliedSkill: "MysticArts", techniques: ["Entropy", "Butterfly Effect", "Singularity"], hugeBuffType: "Luck", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Swordsmanship", "Spear", "Sniper", "MartialArts"], weakAgainst: ["MartialArts"], element: "Chaos", elementalWeaknesses: ["Void"] },
-        { name: "Elysium's Gate", description: "Opening the doors to a higher plane.", stats: { willpower: 150, endurance: 100, mysticArts: 50 }, skillMultiplier: 100.00, multipliedSkill: "Medical", techniques: ["Ascension", "Holy Rain", "Judgment"], hugeBuffType: "Willpower", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Brawling", "Gunslinging", "Spear", "Sniper"], weakAgainst: ["MartialArts"], element: "Celestial", elementalWeaknesses: ["Void"] },
-        { name: "Void Reaver", description: "Erasing anything the blade touches.", stats: { swordsmanship: 120, strength: 100, agility: 80 }, skillMultiplier: 100.00, multipliedSkill: "Swordsmanship", techniques: ["Erasure", "Non-Existence", "Dark Matter"], hugeBuffType: "Swordsmanship", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Brawling", "Gunslinging", "MysticArts", "MartialArts"], weakAgainst: ["MartialArts"], element: "Void", elementalWeaknesses: ["Celestial"] },
-        { name: "Genesis", description: "The power of creation at your fingertips.", stats: { strength: 80, endurance: 80, agility: 80, perception: 80, willpower: 80, luck: 80, swordsmanship: 80, brawling: 80, gunslinging: 80, spear: 80, martialArts: 80, sniper: 80, mysticArts: 80 }, skillMultiplier: 100.00, multipliedSkill: "Cooking", techniques: ["Creation", "Renewal", "Alpha Strike"], hugeBuffType: "MysticArts", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Swordsmanship", "Gunslinging", "Spear", "Sniper"], weakAgainst: ["MartialArts"], element: "Genesis", elementalWeaknesses: ["Void"] }
+        { name: "Chaos Theory", description: "Mastering the unpredictability of existence.", stats: { luck: 150, mysticArts: 100, perception: 50 }, skillMultiplier: 100.00, multipliedSkill: "MysticArts", techniques: ["Entropy", "Butterfly Effect", "Singularity"], hugeBuffType: "Luck", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Swordsmanship", "Spear", "Sniper", "MartialArts"], weakAgainst: ["MartialArts"], elements: ["Chaos"], elementalWeaknesses: ["Void"] },
+        { name: "Elysium's Gate", description: "Opening the doors to a higher plane.", stats: { willpower: 150, endurance: 100, mysticArts: 50 }, skillMultiplier: 100.00, multipliedSkill: "Medical", techniques: ["Ascension", "Holy Rain", "Judgment"], hugeBuffType: "Willpower", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Brawling", "Gunslinging", "Spear", "Sniper"], weakAgainst: ["MartialArts"], elements: ["Celestial"], elementalWeaknesses: ["Void"] },
+        { name: "Void Reaver", description: "Erasing anything the blade touches.", stats: { swordsmanship: 120, strength: 100, agility: 80 }, skillMultiplier: 100.00, multipliedSkill: "Swordsmanship", techniques: ["Erasure", "Non-Existence", "Dark Matter"], hugeBuffType: "Swordsmanship", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Brawling", "Gunslinging", "MysticArts", "MartialArts"], weakAgainst: ["MartialArts"], elements: ["Hybrid"], elementalWeaknesses: ["Celestial"] },
+        { name: "Genesis", description: "The power of creation at your fingertips.", stats: { strength: 80, endurance: 80, agility: 80, perception: 80, willpower: 80, luck: 80, swordsmanship: 80, brawling: 80, gunslinging: 80, spear: 80, martialArts: 80, sniper: 80, mysticArts: 80 }, skillMultiplier: 100.00, multipliedSkill: "Cooking", techniques: ["Creation", "Renewal", "Alpha Strike"], hugeBuffType: "MysticArts", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Swordsmanship", "Gunslinging", "Spear", "Sniper"], weakAgainst: ["MartialArts"], elements: ["Genesis"], elementalWeaknesses: ["Void"] }
     ],
     "SSS": [
-        { name: "Zenith", description: "The absolute pinnacle of martial prowess.", stats: { strength: 300, agility: 300, swordsmanship: 500, perception: 200 }, skillMultiplier: 500.00, multipliedSkill: "Swordsmanship", techniques: ["One Strike", "Universal Cut", "End of All"], hugeBuffType: "Swordsmanship", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper", "MysticArts"], element: "Divine", elementalWeaknesses: ["Chaos"] },
-        { name: "Omegalyth", description: "The beginning and the end of all things.", stats: { mysticArts: 500, willpower: 400, luck: 300, endurance: 300 }, skillMultiplier: 500.00, multipliedSkill: "MysticArts", techniques: ["Erasure", "Rebirth", "Finality"], hugeBuffType: "MysticArts", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Swordsmanship", "Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper"], element: "Void", elementalWeaknesses: ["Creation"] },
-        { name: "The Author's Pen", description: "Rewriting the very laws of reality.", stats: { luck: 999, willpower: 999, perception: 999 }, skillMultiplier: 500.00, multipliedSkill: "TreasureHunting", techniques: ["Rewrite", "Delete", "Absolute Command"], hugeBuffType: "Willpower", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Swordsmanship", "Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper", "MysticArts"], element: "Creation", elementalWeaknesses: ["Annihilation"] }
+        { name: "Zenith", description: "The absolute pinnacle of martial prowess.", stats: { strength: 300, agility: 300, swordsmanship: 500, perception: 200 }, skillMultiplier: 500.00, multipliedSkill: "Swordsmanship", techniques: ["One Strike", "Universal Cut", "End of All"], hugeBuffType: "Swordsmanship", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper", "MysticArts"], elements: ["Hybrid", "Divine"], elementalWeaknesses: ["Chaos"] },
+        { name: "Omegalyth", description: "The beginning and the end of all things.", stats: { mysticArts: 500, willpower: 400, luck: 300, endurance: 300 }, skillMultiplier: 500.00, multipliedSkill: "MysticArts", techniques: ["Erasure", "Rebirth", "Finality"], hugeBuffType: "MysticArts", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Swordsmanship", "Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper"], elements: ["Void", "Celestial"], elementalWeaknesses: ["Creation"] },
+        { name: "The Author's Pen", description: "Rewriting the very laws of reality.", stats: { luck: 999, willpower: 999, perception: 999 }, skillMultiplier: 500.00, multipliedSkill: "TreasureHunting", techniques: ["Rewrite", "Delete", "Absolute Command"], hugeBuffType: "Willpower", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Swordsmanship", "Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper", "MysticArts"], elements: ["Creation"], elementalWeaknesses: ["Annihilation"] }
     ],
     "Z": [
         {
@@ -323,7 +324,7 @@ const MYTHIC_ARTS: Record<string, Array<{
             hugeBuffType: "MysticArts", hugeBuffValue: 2500.0, debuffPercentage: 0.0, energyRegainMultiplier: 10.0,
             travelTimeMultiplier: 2.0, canLearnNonCombatSkills: false,
             restrictedSkillTypes: ["Cooking", "Navigating", "TreasureHunting", "Blacksmith", "Fishing", "Medical"],
-            element: "Annihilation", elementalWeaknesses: ["Creation"]
+            elements: ["Annihilation"], elementalWeaknesses: ["Creation"]
         },
         {
             name: "Celestial Eye of Creation",
@@ -334,7 +335,7 @@ const MYTHIC_ARTS: Record<string, Array<{
             hugeBuffType: "MysticArts", hugeBuffValue: 2500.0, debuffPercentage: 0.0, energyRegainMultiplier: 10.0,
             travelTimeMultiplier: 2.0, canLearnNonCombatSkills: false,
             restrictedSkillTypes: ["Cooking", "Navigating", "TreasureHunting", "Blacksmith", "Fishing", "Medical"],
-            element: "Creation", elementalWeaknesses: ["Annihilation"]
+            elements: ["Creation"], elementalWeaknesses: ["Annihilation"]
         }
     ]
 };
@@ -433,6 +434,25 @@ export function calculateCurrentEnergy(character: any): { energy: number, energy
     const newTimestamp = (character.energy + regenerated >= currentMaxEnergy) ? now : character.energyUpdatedAt + Math.floor(regenerated * regenRateMs);
 
     return { energy: newEnergy, energyUpdatedAt: newTimestamp };
+}
+
+export function calculateCurrentMythicMana(character: any): { mythicMana: number, mythicManaUpdatedAt: number } {
+    if (!character.mythicArt) return { mythicMana: 0, mythicManaUpdatedAt: character.mythicManaUpdatedAt || Date.now() };
+
+    const now = Date.now();
+    const regenMultiplier = (character.mythicArt?.energyRegainMultiplier || 1.0);
+    const regenRateMs = Math.max(1000, MYTHIC_MANA_REGEN_RATE_MS / regenMultiplier);
+
+    const elapsed = now - (character.mythicManaUpdatedAt || now);
+    const regenerated = Math.floor(elapsed / regenRateMs);
+
+    const currentMaxMana = character.maxMythicMana ?? 100;
+    if (regenerated <= 0) return { mythicMana: character.mythicMana || 0, mythicManaUpdatedAt: character.mythicManaUpdatedAt || now };
+
+    const newMana = Math.min(currentMaxMana, (character.mythicMana || 0) + regenerated);
+    const newTimestamp = ((character.mythicMana || 0) + regenerated >= currentMaxMana) ? now : (character.mythicManaUpdatedAt || now) + Math.floor(regenerated * regenRateMs);
+
+    return { mythicMana: newMana, mythicManaUpdatedAt: newTimestamp };
 }
 
 function assertCanPerformAction(character: any, actionName: string, options: { requireHp?: boolean, blockBusy?: boolean, blockHealing?: boolean } = {}) {
@@ -718,6 +738,19 @@ function processCharacterUpdates(character: any): any {
     const energyResult = calculateCurrentEnergy(updated);
     updated.energy = energyResult.energy;
     updated.energyUpdatedAt = energyResult.energyUpdatedAt;
+
+    // 3. Process Mythic Mana Regeneration
+    if (updated.mythicArt) {
+        // Migration: element -> elements
+        if (updated.mythicArt.element && (!updated.mythicArt.elements || updated.mythicArt.elements.length === 0)) {
+            updated.mythicArt.elements = [updated.mythicArt.element];
+            delete updated.mythicArt.element;
+        }
+
+        const manaResult = calculateCurrentMythicMana(updated);
+        updated.mythicMana = manaResult.mythicMana;
+        updated.mythicManaUpdatedAt = manaResult.mythicManaUpdatedAt;
+    }
 
     return updated;
 }
@@ -1416,8 +1449,8 @@ function calculateDamage(attackerStats: CombatStats, defenderStats: CombatStats,
     }
 
     // Elemental Logic
-    if (attackerMythicArt && attackerMythicArt.element && defenderMythicArt && defenderMythicArt.elementalWeaknesses) {
-        if (defenderMythicArt.elementalWeaknesses.includes(attackerMythicArt.element)) {
+    if (attackerMythicArt && attackerMythicArt.elements && defenderMythicArt && defenderMythicArt.elementalWeaknesses) {
+        if (attackerMythicArt.elements.some((e: string) => defenderMythicArt.elementalWeaknesses.includes(e))) {
             damage *= 1.5; // 50% more damage if elemental advantage
         }
     }
@@ -1455,7 +1488,16 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         character = processCharacterUpdates(character);
 
         let combat = character.combatState;
-        if (!combat || combat.isFinished) throw new functions.https.HttpsError("failed-precondition", "No active combat.");
+        if (!combat) throw new functions.https.HttpsError("failed-precondition", "No active combat.");
+
+        // If battle is already finished, only allow Flee to clean up
+        if (combat.isFinished) {
+            if (action === "Flee") {
+                transaction.update(playerRef, { combatState: null });
+                return { success: true, cleanedUp: true };
+            }
+            throw new functions.https.HttpsError("failed-precondition", "Battle is already finished. Please close the results.");
+        }
 
         // Turn Timeout Check
         const now = Date.now();
@@ -1580,16 +1622,24 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     }
 
                     // --- Validation (Security Audit Issues 23-27) ---
-                    const energyCost = (Number.isFinite(tech.energyCost) && tech.energyCost >= 0) ? tech.energyCost : 0;
+                    const cost = (Number.isFinite(tech.energyCost) && tech.energyCost >= 0) ? tech.energyCost : 0;
                     const techPower = (Number.isFinite(tech.power) && tech.power >= 0) ? tech.power : 0;
                     const techCooldown = (Number.isInteger(tech.cooldown) && tech.cooldown >= 0) ? Math.min(tech.cooldown, 100) : 0;
                     const accuracyBonus = (Number.isFinite(tech.accuracyBonus)) ? Math.max(-100, Math.min(tech.accuracyBonus, 100)) : 0;
                     const techEffects = Array.isArray(tech.effects) ? tech.effects.slice(0, 5) : []; // Issue 30: Limit effects
 
-                    if (playerEnergy < energyCost) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
-                    if ((combat.cooldowns || {})[techniqueId] > 0) throw new functions.https.HttpsError("failed-precondition", "Technique on cooldown.");
+                    if (character.mythicArt) {
+                        if ((character.mythicMana || 0) < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough Mythic Mana.");
+                        character.mythicMana = (character.mythicMana || 0) - cost;
+                        character.mythicManaUpdatedAt = Date.now();
+                    } else {
+                        if (playerEnergy < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
+                        playerEnergy -= cost;
+                        character.energy = playerEnergy;
+                        character.energyUpdatedAt = Date.now();
+                    }
 
-                    playerEnergy -= energyCost;
+                    if ((combat.cooldowns || {})[techniqueId] > 0) throw new functions.https.HttpsError("failed-precondition", "Technique on cooldown.");
 
                     // --- Issue 1: Cooldown starts even if we miss ---
                     const cooldowns = { ...(combat.cooldowns || {}) };
@@ -1604,8 +1654,19 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                         const techSkillVal = (pStats as any)[mappedTechSkill] || pStats.strength;
                         let techDamage = Math.floor(techSkillVal * techPower * 2);
 
-                        // --- Elemental & Weakness Logic ---
+                        // --- Mythic Art Scaling ---
                         const attackerMythicArt = character.mythicArt;
+                        if (attackerMythicArt) {
+                            // If the technique matches the Mythic Art's focus, it already gets the stat multiplier.
+                            // We can add an extra "Tier" based bonus here for extra scaling.
+                            const tierMultipliers: Record<string, number> = {
+                                "F": 1.05, "E": 1.1, "D": 1.2, "C": 1.4, "B": 2.0, "A": 5.0, "S": 10.0, "SS": 25.0, "SSS": 50.0, "Z": 250.0
+                            };
+                            const tierBonus = tierMultipliers[attackerMythicArt.tier] || 1.0;
+                            techDamage = Math.floor(techDamage * tierBonus);
+                        }
+
+                        // --- Elemental & Weakness Logic ---
                         const defenderMythicArt = combat.isPvP ? opponent.mythicArt : enemy.mythicArt;
 
                         // 1. Skill Type Weakness (e.g., Swordsmanship vs Spear)
@@ -1615,10 +1676,10 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                             }
                         }
 
-                        // 2. Elemental Weakness (Inherit element from Mythic Art)
-                        const techElement = attackerMythicArt?.element || tech.element;
-                        if (techElement && defenderMythicArt && defenderMythicArt.elementalWeaknesses) {
-                            if (defenderMythicArt.elementalWeaknesses.includes(techElement)) {
+                        // 2. Elemental Weakness (Inherit elements from Mythic Art)
+                        const techElements = attackerMythicArt?.elements || (tech.element ? [tech.element] : []);
+                        if (techElements.length > 0 && defenderMythicArt && defenderMythicArt.elementalWeaknesses) {
+                            if (techElements.some((e: string) => defenderMythicArt.elementalWeaknesses.includes(e))) {
                                 techDamage = Math.floor(techDamage * 1.5);
                             }
                         }
@@ -1667,7 +1728,15 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     // Healing logic
                     const healAmount = item.healAmount ?? 30;
                     playerHp = Math.min(character.maxHp, playerHp + healAmount);
-                    logs.push(`You used ${item.name} and recovered ${healAmount} HP.`);
+
+                    if (character.mythicArt) {
+                        const manaHeal = item.healAmount ?? 30;
+                        character.mythicMana = Math.min(character.maxMythicMana || 100, (character.mythicMana || 0) + manaHeal);
+                        character.mythicManaUpdatedAt = Date.now();
+                        logs.push(`You used ${item.name} and recovered ${healAmount} HP and ${manaHeal} MP.`);
+                    } else {
+                        logs.push(`You used ${item.name} and recovered ${healAmount} HP.`);
+                    }
 
                     // Remove item from inventory
                     character.inventory.splice(itemIndex, 1);
@@ -1788,7 +1857,13 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 const winnerUpdate: any = {
                     gold: winner.gold + totalGoldGained,
                     pvpWins: (winner.pvpWins || 0) + (isFarming ? 0 : 1),
-                    combatState: null,
+                    combatState: {
+                        ...combat,
+                        isFinished: true,
+                        playerWon: playerWon,
+                        goldEarned: playerWon ? totalGoldGained : 0,
+                        logs: [...logs, playerWon ? "Victory!" : "Defeat..."]
+                    },
                     hp: playerWon ? playerHp : winner.hp,
                     energy: playerWon ? playerEnergy : winner.energy,
                     [`recentPvP.${loser.id}`]: Date.now()
@@ -1817,7 +1892,13 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     gold: loser.gold - stealAmount,
                     bounty: Math.max(0, (loser.bounty || 0) - bountyReduction),
                     pvpLosses: (loser.pvpLosses || 0) + (isFarming ? 0 : 1),
-                    combatState: null,
+                    combatState: {
+                        ...(loser.combatState || {}),
+                        isFinished: true,
+                        playerWon: !playerWon,
+                        goldEarned: !playerWon ? -stealAmount : 0,
+                        logs: [...logs, !playerWon ? "Victory!" : "Defeat..."]
+                    },
                     hp: playerWon ? 0 : playerHp,
                     energy: playerWon ? loser.energy : playerEnergy,
                     currentLocation: "Fogi Tail Island" // Issue 21: Default Respawn
@@ -1837,8 +1918,9 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 return { success: true, isFinished: true, playerWon, bountyCollected: isFarming ? 0 : collectedBounty };
             } else {
                 // PvE Finish Logic
-                let updatedChar = { ...character, hp: playerHp, energy: playerEnergy, combatState: null };
+                let updatedChar = { ...character, hp: playerHp, energy: playerEnergy };
                 const loot = playerWon && enemy.dropTableId ? await processLoot(enemy.dropTableId) : [];
+                let finalLoot: any[] = [];
 
                 if (playerWon) {
                     updatedChar.gold += enemy.goldReward;
@@ -1848,6 +1930,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                         const maxCapacity = calculateMaxCapacity(updatedChar);
                         const freeSlots = maxCapacity - currentInv.length;
                         const lootToAdd = loot.slice(0, Math.max(0, freeSlots));
+                        finalLoot = lootToAdd;
 
                         updatedChar.inventory = [...currentInv, ...lootToAdd];
                         if (lootToAdd.length > 0) {
@@ -1894,6 +1977,17 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     updatedChar.energy = character.maxEnergy;
                     recordLog(transaction, userId, "CombatLoss", `Defeated by ${enemy.name}`, -goldLost, 0);
                 }
+
+                updatedChar.combatState = {
+                    ...combat,
+                    isFinished: true,
+                    playerWon,
+                    goldEarned: playerWon ? enemy.goldReward : 0,
+                    xpEarned: playerWon ? enemy.xpReward : 0,
+                    loot: finalLoot,
+                    logs
+                };
+
                 transaction.update(playerRef, updatedChar);
                 return { success: true, isFinished: true, playerWon, logs };
             }
@@ -2507,7 +2601,7 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
 
     const locations = [
         { name: "Fogi Tail Island", region: "East Blue", description: "A peaceful starting island with clear blue waters.", isSafe: true, weather: "Sunny", x: 0, y: 0, actions: [{ type: "Training", label: "Dojo", icon: "🥋" }, { type: "Kitchen", label: "Galley", icon: "🍳" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Medical Clinic", icon: "🏥" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: false, weather: "Foggy", x: 640, y: 160, actions: [{ type: "Forge", label: "Grand Forge", icon: "⚒" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: false, weather: "Foggy", x: 640, y: 160, actions: [{ type: "Forge", label: "Grand Forge", icon: "⚒" }, { type: "Market", label: "Sword Shop", icon: "⚔", parameter: "Sword" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Amber Reach", region: "East Blue", description: "A trade hub known for its amber deposits.", isSafe: false, weather: "Sunny", x: -320, y: 600, actions: [{ type: "Market", label: "Amber Market", icon: "💰" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 280, y: 360, actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Shadow Fen", region: "East Blue", description: "A murky swamp island filled with dangerous creatures.", isSafe: false, weather: "Overcast", x: -1200, y: -400, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
@@ -2515,11 +2609,11 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         { name: "Pirate's Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 1400, y: -1400, actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Kraken's Rest", region: "South Blue", description: "A desolate island graveyard of sunken ships and sea monsters.", isSafe: false, weather: "Stormy", x: -1600, y: -1600, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Navy Outpost Aqua", region: "South Blue", description: "A strictly regulated military base maintaining order.", isSafe: false, weather: "Clear", x: -640, y: -440, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Navy Hospital", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Navy Outpost Terra", region: "Grand Line", description: "A frontier navy post watching over the Grand Line entrance.", isSafe: false, weather: "Windy", x: -1200, y: 800, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Navy Outpost Terra", region: "Grand Line", description: "A frontier navy post watching over the Grand Line entrance.", isSafe: false, weather: "Windy", x: -1200, y: 800, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Market", label: "Pistol Shop", icon: "🔫", parameter: "Pistol" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Navy Outpost Ignis", region: "Grand Line", description: "A strategic outpost near the volcanic islands.", isSafe: false, weather: "Hot", x: 1600, y: 1200, actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Crystal Cove", region: "Grand Line", description: "An island made of glowing crystals and mysterious energy.", isSafe: false, weather: "Shimmering", x: 1120, y: 480, actions: [{ type: "BlackMarket", label: "Crystal Trader", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 1680, y: 960, actions: [{ type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -600, y: 720, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Observatory", label: "Star Gazing", icon: "🔭" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -600, y: 720, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Market", label: "Sniper Shop", icon: "🎯", parameter: "Sniper" }, { type: "Observatory", label: "Star Gazing", icon: "🔭" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Serpent's Maw", region: "Grand Line", description: "A terrifying island shaped like a giant serpent's head.", isSafe: false, weather: "Foggy", x: 2000, y: 2000, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Island of World Secrets", region: "Unknown", description: "A mystical island shrouded in secrets. Here, you can roll for Mythic Arts.", isSafe: true, weather: "Celestial", x: 4000, y: 4000, actions: [{ type: "MythicRoll", label: "Ancient Altar", icon: "✨" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
     ];
@@ -2554,7 +2648,13 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
     const items = [
         { id: "fish_scales", name: "Fish Scales", description: "Shiny scales from a sea creature.", type: "Miscellaneous", rarity: "Common", price: 5 },
         { id: "sea_shell", name: "Sea Shell", description: "A pretty shell from the ocean floor.", type: "Miscellaneous", rarity: "Common", price: 10 },
-        { id: "rusty_cutlass", name: "Rusty Cutlass", description: "An old, worn-out sword.", type: "Weapon", rarity: "Common", price: 50, levelRequirement: 1, statBonus: { strength: 2 } },
+        { id: "rusty_cutlass", name: "Rusty Cutlass", description: "An old, worn-out sword.", type: "Weapon", rarity: "Common", price: 50, levelRequirement: 1, statBonus: { strength: 2 }, weaponCategory: "Sword" },
+        { id: "steel_sabre", name: "Steel Sabre", description: "A sharp and reliable blade.", type: "Weapon", rarity: "Uncommon", price: 500, levelRequirement: 5, statBonus: { strength: 5, agility: 2 }, weaponCategory: "Sword" },
+        { id: "katana", name: "Refined Katana", description: "A masterpiece of craftsmanship.", type: "Weapon", rarity: "Rare", price: 5000, levelRequirement: 15, statBonus: { strength: 10, agility: 10 }, weaponCategory: "Sword" },
+        { id: "flintlock", name: "Old Flintlock", description: "A basic single-shot pistol.", type: "Weapon", rarity: "Common", price: 100, levelRequirement: 1, statBonus: { gunslinging: 2 }, weaponCategory: "Pistol" },
+        { id: "navy_revolver", name: "Navy Revolver", description: "A standard issue marine sidearm.", type: "Weapon", rarity: "Uncommon", price: 800, levelRequirement: 10, statBonus: { gunslinging: 8 }, weaponCategory: "Pistol" },
+        { id: "long_rifle", name: "Hunter's Long Rifle", description: "Accurate at long ranges.", type: "Weapon", rarity: "Uncommon", price: 1500, levelRequirement: 10, statBonus: { sniper: 12 }, weaponCategory: "Sniper" },
+        { id: "scoped_musket", name: "Scoped Musket", description: "Equipped with a primitive but effective lens.", type: "Weapon", rarity: "Rare", price: 10000, levelRequirement: 25, statBonus: { sniper: 30, perception: 5 }, weaponCategory: "Sniper" },
         { id: "old_boots", name: "Old Boots", description: "Waterlogged but still wearable.", type: "Armor", rarity: "Common", price: 40, levelRequirement: 1, statBonus: { endurance: 2 } },
         { id: "pearl", name: "Pearl", description: "A rare and valuable gem from a Giant Squid.", type: "Miscellaneous", rarity: "Rare", price: 200 },
         // Bags
@@ -3182,7 +3282,7 @@ export const useItem = functions.https.onCall(async (data, context) => {
                 travelTimeMultiplier: mythic.travelTimeMultiplier || 1.0,
                 canLearnNonCombatSkills: mythic.canLearnNonCombatSkills !== undefined ? mythic.canLearnNonCombatSkills : true,
                 restrictedSkillTypes: mythic.restrictedSkillTypes || [],
-                element: mythic.element || null,
+                elements: mythic.elements || [],
                 elementalWeaknesses: mythic.elementalWeaknesses || []
             };
 
@@ -3209,18 +3309,28 @@ export const useItem = functions.https.onCall(async (data, context) => {
         const healAmount = item.healAmount || 30;
         playerHp = Math.min(character.maxHp, playerHp + healAmount);
 
+        let mpMsg = "";
+        if (character.mythicArt) {
+            const manaHeal = item.healAmount || 30;
+            character.mythicMana = Math.min(character.maxMythicMana || 100, (character.mythicMana || 0) + manaHeal);
+            character.mythicManaUpdatedAt = Date.now();
+            mpMsg = ` and ${manaHeal} MP`;
+        }
+
         inventory.splice(itemIndex, 1);
 
         transaction.update(playerRef, {
             hp: playerHp,
             energy: character.energy,
             energyUpdatedAt: character.energyUpdatedAt,
+            mythicMana: character.mythicMana || 0,
+            mythicManaUpdatedAt: character.mythicManaUpdatedAt || Date.now(),
             healingState: character.healingState,
             inventory
         });
 
-        recordLog(transaction, userId, "UseItem", `Used ${item.name}`, 0, 0);
-        return { success: true, newHp: playerHp };
+        recordLog(transaction, userId, "UseItem", `Used ${item.name}${mpMsg}`, 0, 0);
+        return { success: true, newHp: playerHp, message: `Used ${item.name}${mpMsg}` };
     });
 });
 

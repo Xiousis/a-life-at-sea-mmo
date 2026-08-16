@@ -49,8 +49,16 @@ class EconomyViewModel @Inject constructor(
         else flowOf(null)
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
-    val marketItems: StateFlow<List<Item>> = gameRepository.getMarketItems()
+    private val _marketCategory = MutableStateFlow<String?>(null)
+    
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val marketItems: StateFlow<List<Item>> = _marketCategory
+        .flatMapLatest { gameRepository.getMarketItems(it) }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    fun setMarketCategory(category: String?) {
+        _marketCategory.value = category
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val mailMessages: StateFlow<List<MailMessage>> = currentUser
