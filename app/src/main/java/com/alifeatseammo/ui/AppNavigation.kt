@@ -43,18 +43,21 @@ fun AppNavigation(
     val economyActionState by economyViewModel.actionState.collectAsState()
     val auctionActionState by auctionViewModel.actionState.collectAsState()
 
-    // Global Error Handling inside Navigation
-    val errorMsg by viewModel.errorMessage.collectAsState()
-    val combatErrorMsg by combatViewModel.errorMessage.collectAsState()
-    val travelErrorMsg by travelViewModel.errorMessage.collectAsState()
-    val socialErrorMsg by socialViewModel.errorMessage.collectAsState()
-    val economyErrorMsg by economyViewModel.errorMessage.collectAsState()
-    val auctionErrorMsg by auctionViewModel.errorMessage.collectAsState()
+    // Consolidated Global Error Handling
+    val errorList = listOf(
+        viewModel.errorMessage.collectAsState(),
+        combatViewModel.errorMessage.collectAsState(),
+        travelViewModel.errorMessage.collectAsState(),
+        socialViewModel.errorMessage.collectAsState(),
+        economyViewModel.errorMessage.collectAsState(),
+        auctionViewModel.errorMessage.collectAsState()
+    )
 
-    LaunchedEffect(errorMsg, combatErrorMsg, travelErrorMsg, socialErrorMsg, economyErrorMsg, auctionErrorMsg) {
-        val message = errorMsg ?: combatErrorMsg ?: travelErrorMsg ?: socialErrorMsg ?: economyErrorMsg ?: auctionErrorMsg
-        message?.let {
+    LaunchedEffect(errorList.map { it.value }) {
+        val firstError = errorList.firstOrNull { it.value != null }?.value
+        firstError?.let {
             snackbarHostState.showSnackbar(it)
+            // Clear all to reset state
             viewModel.clearErrorMessage()
             combatViewModel.clearErrorMessage()
             travelViewModel.clearErrorMessage()
@@ -286,8 +289,10 @@ fun AppNavigation(
             )
         }
         composable(Screen.Skills.route) {
+            val allTechniques by viewModel.techniques.collectAsState()
             SkillsScreen(
                 character = currentChar,
+                allTechniques = allTechniques,
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -420,6 +425,7 @@ fun AppNavigation(
                 actionState = actionState,
                 onRollClick = { viewModel.rollMythicArt() },
                 onAdminGrantTestItems = { viewModel.adminGrantTestItems() },
+                onSeedWorldClick = { viewModel.seedWorld() },
                 onBackClick = { navController.popBackStack() }
             )
         }

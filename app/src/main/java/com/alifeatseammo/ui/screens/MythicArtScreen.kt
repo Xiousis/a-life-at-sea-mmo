@@ -4,7 +4,9 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -28,10 +30,21 @@ fun MythicArtScreen(
     actionState: com.alifeatseammo.ui.UIActionState,
     onRollClick: () -> Unit,
     onAdminGrantTestItems: () -> Unit,
+    onSeedWorldClick: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val isLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
     val isRolling = actionState is com.alifeatseammo.ui.UIActionState.Loading && actionState.label.contains("Rolling")
+    
+    var rollButtonEnabled by remember { mutableStateOf(true) }
+    
+    LaunchedEffect(isRolling) {
+        if (!isRolling) {
+            // Re-enable button after 1.2 seconds if it was just rolling
+            kotlinx.coroutines.delay(1200)
+            rollButtonEnabled = true
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -49,10 +62,11 @@ fun MythicArtScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ... (rest of the text remains same)
+            // ... (rest of the UI remains same)
             Text(
                 text = "Island of World Secrets",
                 style = MaterialTheme.typography.headlineMedium,
@@ -88,7 +102,7 @@ fun MythicArtScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(32.dp))
 
             // Roll Section
             Card(
@@ -101,13 +115,24 @@ fun MythicArtScreen(
                 ) {
                     val adminNames = listOf("sedna", "von")
                     if (adminNames.contains(character.name.lowercase())) {
-                        Button(
-                            onClick = onAdminGrantTestItems,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                            enabled = !isLoading,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                        ) {
-                            Text(if (isLoading && actionState.label.contains("Granting")) "GRANTING..." else "ADMIN: GRANT TEST ARTIFACTS")
+                        Column {
+                            Button(
+                                onClick = onAdminGrantTestItems,
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                enabled = !isLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                            ) {
+                                Text(if (isLoading && actionState.label.contains("Granting")) "GRANTING..." else "ADMIN: GRANT TEST ARTIFACTS")
+                            }
+                            
+                            Button(
+                                onClick = onSeedWorldClick,
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                enabled = !isLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                            ) {
+                                Text("ADMIN: RE-SEED WORLD DATA")
+                            }
                         }
                     }
 
@@ -132,9 +157,12 @@ fun MythicArtScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
-                        onClick = onRollClick,
+                        onClick = {
+                            rollButtonEnabled = false
+                            onRollClick()
+                        },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
-                        enabled = canAfford && character.inventory.size < character.inventoryCapacity,
+                        enabled = canAfford && character.inventory.size < character.inventoryCapacity && rollButtonEnabled,
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         if (isRolling) {

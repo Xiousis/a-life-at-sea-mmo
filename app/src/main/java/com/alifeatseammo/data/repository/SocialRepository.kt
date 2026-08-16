@@ -22,8 +22,8 @@ interface SocialRepository {
 }
 
 class FirestoreSocialRepository(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
+    private val db: FirebaseFirestore,
+    private val functions: FirebaseFunctions
 ) : SocialRepository {
 
     override fun getFriends(userId: String): Flow<List<Character>> = callbackFlow {

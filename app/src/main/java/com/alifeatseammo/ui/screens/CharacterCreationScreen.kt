@@ -69,8 +69,7 @@ fun CharacterCreationScreen(
             label = { Text("Character Name") },
             isError = localError != null || serverError != null,
             supportingText = { 
-                if (localError != null) Text(localError!!)
-                else if (serverError != null) Text(serverError)
+                localError?.let { Text(it) } ?: serverError?.let { Text(it) }
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading

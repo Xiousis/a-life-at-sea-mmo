@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Crew
 import com.alifeatseammo.data.model.getXpNeeded
+import com.alifeatseammo.data.model.ElementType
+import com.alifeatseammo.ui.components.getElementColor
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,6 +48,26 @@ fun ProfileScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(text = mythicArt.description, style = MaterialTheme.typography.bodyMedium)
                     
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    
+                    if (mythicArt.element != null) {
+                        Text(
+                            text = "Element: ${mythicArt.element}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = getElementColor(mythicArt.element)
+                        )
+                    }
+
+                    if (mythicArt.elementalWeaknesses.isNotEmpty()) {
+                        Text(
+                            text = "Weak Against: ${mythicArt.elementalWeaknesses.joinToString(", ")}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     
                     Text(text = "BUFFS:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = Color(0xFF4CAF50))
@@ -192,6 +214,15 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 ProfileStatRow("PvP:", "${character.pvpWins}W / ${character.pvpLosses}L")
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "EQUIPMENT:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                val equippedNames = character.equipment.values.filterNotNull().joinToString { it.name }
+                Text(
+                    text = if (equippedNames.isNotEmpty()) equippedNames else "No items equipped",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             
             Spacer(modifier = Modifier.height(48.dp))

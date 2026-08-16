@@ -109,38 +109,11 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             is CharacterState.Loaded -> {
-                                val currentChar = state.character
-                                if (currentChar.combatState != null) {
-                                    Scaffold(
-                                        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
-                                        snackbarHost = { SnackbarHost(snackbarHostState) }
-                                    ) { p ->
-                                        Box(Modifier.padding(p)) {
-                                            CombatScreen(
-                                                character = currentChar,
-                                                onActionClick = { action, techId, itemId -> combatViewModel.combatAction(action, techId, itemId) }
-                                            )
-                                        }
-                                    }
-                                } else if (currentChar.travelState != null) {
-                                    Scaffold(
-                                        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
-                                        snackbarHost = { SnackbarHost(snackbarHostState) }
-                                    ) { p ->
-                                        Box(Modifier.padding(p)) {
-                                            TravelingScreen(
-                                                character = currentChar,
-                                                onCompleteClick = { viewModel.finishTravel() }
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    MainScaffold(
-                                        navController = navController,
-                                        currentChar = currentChar,
-                                        snackbarHostState = snackbarHostState
-                                    )
-                                }
+                                MainScaffold(
+                                    navController = navController,
+                                    currentChar = state.character,
+                                    snackbarHostState = snackbarHostState
+                                )
                             }
                             is CharacterState.Error -> {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

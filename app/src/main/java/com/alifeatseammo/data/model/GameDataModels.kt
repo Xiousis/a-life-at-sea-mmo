@@ -1,11 +1,14 @@
 package com.alifeatseammo.data.model
 
+import com.google.firebase.firestore.PropertyName
+
 data class LocationDef(
     val id: String = "",
     val name: String = "",
     val region: String = "",
     val description: String = "",
-    val isSafe: Boolean = true,
+    @get:PropertyName("isSafe")
+    val isSafe: Boolean = false,
     val recommendedLevel: Int = 1,
     val weather: String = "Clear",
     val actions: List<ActionDef> = emptyList(),
@@ -29,6 +32,18 @@ data class EnemyDef(
     val goldRewardMax: Int = 0,
     val xpReward: Int = 0,
     val dropTableId: String? = null
+)
+
+data class Technique(
+    val id: String = "",
+    val name: String = "",
+    val description: String = "",
+    val type: StatType = StatType.Swordsmanship,
+    val power: Float = 1.0f,
+    val energyCost: Int = 10,
+    val cooldown: Int = 0,
+    val element: ElementType? = null,
+    val effects: List<StatusEffect> = emptyList()
 )
 
 data class LootTable(

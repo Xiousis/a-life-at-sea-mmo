@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.*
+import com.alifeatseammo.ui.components.StatusBar
 
 @Composable
 fun CombatScreen(
@@ -302,20 +303,12 @@ fun CombatantStatus(name: String, hp: Int, maxHp: Int, barColor: Color, effects:
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "HP ", style = MaterialTheme.typography.bodySmall)
-            LinearProgressIndicator(
-                progress = { hp.toFloat() / maxHp.toFloat() },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(12.dp),
+            StatusBar(
+                label = "HP",
+                current = hp,
+                max = maxHp,
                 color = barColor,
-                trackColor = barColor.copy(alpha = 0.2f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "$percentage%",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
+                labelOverride = "$percentage%"
             )
         }
     }

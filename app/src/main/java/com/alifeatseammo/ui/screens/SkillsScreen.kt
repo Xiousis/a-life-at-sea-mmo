@@ -6,19 +6,25 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
+import com.alifeatseammo.data.model.Technique
+import com.alifeatseammo.data.model.ElementType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkillsScreen(
     character: Character,
+    allTechniques: List<Technique>,
     onBackClick: () -> Unit
 ) {
+    var selectedTechnique by remember { mutableStateOf<Technique?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -53,16 +59,60 @@ fun SkillsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(character.learnedTechniques) { techniqueId ->
-                    TechniqueItem(techniqueId)
+                    val baseTech = allTechniques.find { it.id == techniqueId } ?: Technique(id = techniqueId, name = techniqueId.replace("_", " ").uppercase())
+                    // Override element with Mythic Art element if present
+                    val techInfo = if (character.mythicArt != null) {
+                        baseTech.copy(element = character.mythicArt.element)
+                    } else {
+                        baseTech
+                    }
+                    TechniqueItem(techInfo, onClick = { selectedTechnique = techInfo })
                 }
             }
+        }
+
+        selectedTechnique?.let { tech ->
+            AlertDialog(
+                onDismissRequest = { selectedTechnique = null },
+                title = { Text(tech.name.uppercase(), fontWeight = FontWeight.Black) },
+                text = {
+                    Column {
+                        if (tech.description.isNotEmpty()) {
+                            Text(text = tech.description, style = MaterialTheme.typography.bodyMedium)
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                        
+                        Text(text = "Stat Type: ${tech.type}", style = MaterialTheme.typography.labelMedium)
+                        Text(text = "Energy Cost: ${tech.energyCost}", style = MaterialTheme.typography.labelMedium)
+                        if (tech.cooldown > 0) {
+                            Text(text = "Cooldown: ${tech.cooldown} turns", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        val elementColor = getElementColor(tech.element)
+                        Text(
+                            text = "Element: ${tech.element ?: "Physical"}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = elementColor
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { selectedTechnique = null }) {
+                        Text("Close")
+                    }
+                }
+            )
         }
     }
 }
 
 @Composable
-fun TechniqueItem(techniqueId: String) {
+fun TechniqueItem(technique: Technique, onClick: () -> Unit) {
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium
     ) {
@@ -73,18 +123,45 @@ fun TechniqueItem(techniqueId: String) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(text = "📜", modifier = Modifier.padding(end = 16.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = techniqueId.replace("_", " ").uppercase(),
+                    text = technique.name.uppercase(),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Mastered",
+                    text = technique.element?.let { "$it DMG" } ?: "Physical DMG",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = getElementColor(technique.element)
                 )
             }
+            Text(
+                text = "INFO",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary
+            )
         }
+    }
+}
+
+@Composable
+fun getElementColor(element: ElementType?): Color {
+    return when (element) {
+        ElementType.Fire -> Color(0xFFFF4500)
+        ElementType.Water -> Color(0xFF1E90FF)
+        ElementType.Earth -> Color(0xFF8B4513)
+        ElementType.Air -> Color(0xFF87CEEB)
+        ElementType.Lightning -> Color(0xFFFFD700)
+        ElementType.Ice -> Color(0xFFAFEEEE)
+        ElementType.Light -> Color(0xFFFFEB3B)
+        ElementType.Dark -> Color(0xFF4B0082)
+        ElementType.Void -> Color(0xFF000000)
+        ElementType.Chaos -> Color(0xFFDC143C)
+        ElementType.Celestial -> Color(0xFFE6E6FA)
+        ElementType.Genesis -> Color(0xFF00FF7F)
+        ElementType.Divine -> Color(0xFFFFD700)
+        ElementType.Annihilation -> Color(0xFF8B0000)
+        ElementType.Creation -> Color(0xFFF5F5F5)
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 }

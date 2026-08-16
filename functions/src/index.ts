@@ -14,6 +14,7 @@ const HEALING_DURATION_MS = 2 * 60 * 1000; // 2 minutes
 const TRAINING_DURATION_MS = 20 * 1000; // 20 seconds
 const TRAINING_GOLD_COST = 50;
 const MYTHIC_ROLL_GOLD_COST = 1000000;
+const ROLL_COOLDOWN_MS = 1000;
 
 const MYTHIC_ARTS: Record<string, Array<{
     name: string,
@@ -230,14 +231,17 @@ function calculateMaxCapacity(character: any): number {
 
 export function calculateCurrentEnergy(character: any): { energy: number, energyUpdatedAt: number } {
     const now = Date.now();
+    const regenMultiplier = (character.mythicArt?.energyRegainMultiplier || 1.0);
+    const regenRateMs = Math.max(1000, ENERGY_REGEN_RATE_MS / regenMultiplier);
+
     const elapsed = now - character.energyUpdatedAt;
-    const regenerated = Math.floor(elapsed / ENERGY_REGEN_RATE_MS);
+    const regenerated = Math.floor(elapsed / regenRateMs);
 
     const currentMaxEnergy = character.maxEnergy ?? MAX_ENERGY;
     if (regenerated <= 0) return { energy: character.energy, energyUpdatedAt: character.energyUpdatedAt };
 
     const newEnergy = Math.min(currentMaxEnergy, character.energy + regenerated);
-    const newTimestamp = (character.energy + regenerated >= currentMaxEnergy) ? now : character.energyUpdatedAt + (regenerated * ENERGY_REGEN_RATE_MS);
+    const newTimestamp = (character.energy + regenerated >= currentMaxEnergy) ? now : character.energyUpdatedAt + Math.floor(regenerated * regenRateMs);
 
     return { energy: newEnergy, energyUpdatedAt: newTimestamp };
 }
@@ -329,7 +333,12 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
+
+        const now = Date.now();
+        if (character.lastRollAt && (now - character.lastRollAt < ROLL_COOLDOWN_MS)) {
+            throw new functions.https.HttpsError("failed-precondition", "Slow down! You are rolling too fast.");
+        }
 
         assertCanPerformAction(character, "roll for Mythic Arts", { blockBusy: true, blockHealing: true });
 
@@ -391,8 +400,11 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
 
         const updates: any = {
             hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
-            inventory: admin.firestore.FieldValue.arrayUnion(artifactItem)
+            inventory: [...inventory, artifactItem],
+            lastRollAt: now
         };
 
         if (freeRolls > 0) {
@@ -446,15 +458,21 @@ function getPriceForTier(tier: string): number {
     }
 }
 
-function processHealing(character: any): any {
-    if (character.healingState && character.healingState.endTime <= Date.now()) {
-        return {
-            ...character,
-            hp: character.maxHp,
-            healingState: null
-        };
+function processCharacterUpdates(character: any): any {
+    let updated = { ...character };
+
+    // 1. Process Healing
+    if (updated.healingState && updated.healingState.endTime <= Date.now()) {
+        updated.hp = updated.maxHp;
+        updated.healingState = null;
     }
-    return character;
+
+    // 2. Process Energy Regeneration
+    const energyResult = calculateCurrentEnergy(updated);
+    updated.energy = energyResult.energy;
+    updated.energyUpdatedAt = energyResult.energyUpdatedAt;
+
+    return updated;
 }
 
 // --- Player Management ---
@@ -625,7 +643,7 @@ export const train = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "train", { blockBusy: true, blockHealing: true });
 
@@ -727,7 +745,7 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "travel", { blockBusy: true, blockHealing: true });
 
@@ -772,6 +790,8 @@ export const startTravel = functions.https.onCall(async (data, context) => {
 
         transaction.update(playerRef, {
             hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
             travelState: { destination, arrivalTime, startTime: Date.now() }
         });
@@ -854,7 +874,7 @@ export const purchaseShip = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "purchase a ship", { blockBusy: true, blockHealing: true });
 
@@ -871,6 +891,10 @@ export const purchaseShip = functions.https.onCall(async (data, context) => {
         if (character.ship?.id === shipId) throw new functions.https.HttpsError("failed-precondition", "You already own this ship.");
 
         transaction.update(playerRef, {
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
             gold: character.gold - ship.price,
             ship: { id: shipId, ...ship }
         });
@@ -1168,6 +1192,8 @@ export const combatAction = functions.https.onCall(async (data, context) => {
         let character = snapshot.data() as any;
         if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
 
+        character = processCharacterUpdates(character);
+
         let combat = character.combatState;
         if (!combat || combat.isFinished) throw new functions.https.HttpsError("failed-precondition", "No active combat.");
 
@@ -1262,15 +1288,27 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     const techSkillVal = (pStats as any)[mappedTechSkill] || pStats.strength;
                     let techDamage = Math.floor(techSkillVal * tech.power * 2);
 
-                    // Apply weakness to technique damage
+                    // --- Elemental & Weakness Logic ---
+                    const attackerMythicArt = character.mythicArt;
                     const defenderMythicArt = combat.isPvP ? opponent.mythicArt : enemy.mythicArt;
+
+                    // 1. Skill Type Weakness (e.g., Swordsmanship vs Spear)
                     if (defenderMythicArt && defenderMythicArt.weakAgainst && tech.type) {
                         if (defenderMythicArt.weakAgainst.includes(tech.type)) {
                             techDamage = Math.floor(techDamage * 1.5);
                         }
                     }
 
+                    // 2. Elemental Weakness (Inherit element from Mythic Art)
+                    const techElement = attackerMythicArt?.element || tech.element;
+                    if (techElement && defenderMythicArt && defenderMythicArt.elementalWeaknesses) {
+                        if (defenderMythicArt.elementalWeaknesses.includes(techElement)) {
+                            techDamage = Math.floor(techDamage * 1.5);
+                        }
+                    }
+
                     techDamage = Math.max(1, Math.floor(techDamage - targetStats.defense * 0.3));
+                    techDamage = Math.floor(techDamage * (0.9 + Math.random() * 0.2)); // Add some variance
 
                     if (combat.isPvP) {
                         opponent.hp = Math.max(0, opponent.hp - techDamage);
@@ -1505,6 +1543,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 transaction.update(playerRef, {
                     hp: playerHp,
                     energy: playerEnergy,
+                    energyUpdatedAt: character.energyUpdatedAt,
                     inventory: character.inventory,
                     combatState: { ...combat, enemy: updatedEnemy, playerTurn: false, logs: nextLogs, cooldowns: updatedCooldowns, playerEffects: pActiveEffects, turnExpiresAt: now + TURN_TIMEOUT_MS }
                 });
@@ -1524,6 +1563,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 transaction.update(playerRef, {
                     hp: playerHp,
                     energy: playerEnergy,
+                    energyUpdatedAt: character.energyUpdatedAt,
                     inventory: character.inventory,
                     combatState: { ...combat, enemy, logs, turnCount: (combat.turnCount || 0) + 1, cooldowns: updatedCooldowns, playerEffects: pActiveEffects }
                 });
@@ -1552,12 +1592,12 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
         }
 
         let attacker = attackerSnap.data() as any;
-        attacker = processHealing(attacker);
+        attacker = processCharacterUpdates(attacker);
 
         assertCanPerformAction(attacker, "fight", { blockBusy: true, blockHealing: true });
 
         const defender = defenderSnap.data() as any;
-        const defenderWithHealing = processHealing(defender);
+        const defenderWithHealing = processCharacterUpdates(defender);
         const defenderFinal = defenderWithHealing;
 
         if (userId === defenderId) throw new functions.https.HttpsError("invalid-argument", "You cannot attack yourself.");
@@ -1657,14 +1697,14 @@ export const attackPlayer = functions.https.onCall(async (data, context) => {
             turnExpiresAt: Date.now() + TURN_TIMEOUT_MS
         };
 
-        transaction.update(attackerRef, attacker); // Apply processHealing, infamy and faction changes
         transaction.update(attackerRef, {
-            hp: attacker.hp,
-            healingState: attacker.healingState,
+            ...attacker,
             combatState: attackerCombat
         });
         transaction.update(defenderRef, {
             hp: defenderFinal.hp,
+            energy: defenderFinal.energy,
+            energyUpdatedAt: defenderFinal.energyUpdatedAt,
             healingState: defenderFinal.healingState,
             combatState: defenderCombat
         });
@@ -1681,7 +1721,9 @@ export const startHealing = functions.https.onCall(async (data, context) => {
     return db.runTransaction(async (transaction) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        character = processCharacterUpdates(character);
+
         assertCanPerformAction(character, "heal", { requireHp: false, blockBusy: true });
 
         if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
@@ -1707,7 +1749,9 @@ export const instantHeal = functions.https.onCall(async (data, context) => {
     return db.runTransaction(async (transaction) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
-        const character = snapshot.data() as any;
+        let character = snapshot.data() as any;
+        character = processCharacterUpdates(character);
+
         assertCanPerformAction(character, "heal", { requireHp: false, blockBusy: true });
 
         if (character.hp >= character.maxHp) throw new functions.https.HttpsError("failed-precondition", "You are already at full health.");
@@ -1720,9 +1764,11 @@ export const instantHeal = functions.https.onCall(async (data, context) => {
         if (!hasHealingAction) throw new functions.https.HttpsError("failed-precondition", "There is no infirmary or camp at your current location.");
 
         transaction.update(playerRef, {
-            hp: character.maxHp,
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
             gold: admin.firestore.FieldValue.increment(-50),
-            healingState: null
         });
         recordLog(transaction, userId, "InstantHeal", "Paid for immediate treatment", -50, 0);
         return { success: true };
@@ -1738,7 +1784,7 @@ export const purchaseMedicalLicense = functions.https.onCall(async (data, contex
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "purchase a license", { blockBusy: true, blockHealing: true });
 
@@ -1750,6 +1796,10 @@ export const purchaseMedicalLicense = functions.https.onCall(async (data, contex
         }
 
         transaction.update(playerRef, {
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
             gold: admin.firestore.FieldValue.increment(-15000),
             hasMedicalLicense: true
         });
@@ -1775,8 +1825,8 @@ export const healPlayer = functions.https.onCall(async (data, context) => {
         let healer = healerSnap.data() as any;
         let target = targetSnap.data() as any;
 
-        healer = processHealing(healer);
-        target = processHealing(target);
+        healer = processCharacterUpdates(healer);
+        target = processCharacterUpdates(target);
 
         assertCanPerformAction(healer, "heal others", { blockBusy: true, blockHealing: true });
 
@@ -1802,13 +1852,17 @@ export const healPlayer = functions.https.onCall(async (data, context) => {
         const healAmount = 10 + (medicalSkill * 2);
         const newHp = Math.min(target.maxHp, target.hp + healAmount);
 
-        const targetUpdate: any = { hp: newHp };
-        if (newHp >= target.maxHp) {
-            targetUpdate.healingState = null;
-        }
+        const targetUpdate: any = {
+            hp: newHp,
+            energy: target.energy,
+            energyUpdatedAt: target.energyUpdatedAt,
+            healingState: (newHp >= target.maxHp) ? null : target.healingState
+        };
 
         const healerUpdate: any = {
             hp: healer.hp,
+            energy: healer.energy,
+            energyUpdatedAt: healer.energyUpdatedAt,
             healingState: healer.healingState,
             xp: admin.firestore.FieldValue.increment(10),
             "professionStats.medical": admin.firestore.FieldValue.increment(1)
@@ -1833,7 +1887,7 @@ export const startMonsterHunt = functions.https.onCall(async (data, context) => 
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "hunt monsters", { blockBusy: true, blockHealing: true });
 
@@ -1893,7 +1947,7 @@ export const completeMission = functions.https.onCall(async (data, context) => {
         let character = playerSnap.data() as any;
         if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
 
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         if (character.hp <= 0) {
             throw new functions.https.HttpsError("failed-precondition", "You are too injured to go on missions. Visit an infirmary.");
@@ -2021,13 +2075,15 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
         let character = snapshot.data() as any;
         if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
 
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         const updates: any = {
             lastOnline: Date.now(),
             isOnline: true,
             hp: character.hp,
-            healingState: character.healingState
+            healingState: character.healingState,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt
         };
 
         // ADMIN GOLD BOOST
@@ -2127,6 +2183,7 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
     });
 
     for (const loc of locations) {
+        console.log(`Seeding location: ${loc.name}, Safe: ${loc.isSafe}`);
         const ref = db.collection("gameData").doc("world").collection("locations").doc(loc.name);
         batch.set(ref, { ...loc, id: loc.name });
     }
@@ -2185,8 +2242,28 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         batch.set(ref, table);
     }
 
+    const techniques = [
+        { id: "bash", name: "Bash", description: "A simple but effective physical strike using whatever you have on hand.", type: "Brawling", power: 1.0, energyCost: 5, cooldown: 0, element: null },
+        { id: "Horizontal Slash", name: "Horizontal Slash", description: "A wide, sweeping cut that targets the enemy's midsection.", type: "Swordsmanship", power: 1.2, energyCost: 10, cooldown: 0, element: "Earth" },
+        { id: "Dash", name: "Dash", description: "A sudden burst of speed used to close the gap or evade an attack.", type: "Agility", power: 0.8, energyCost: 8, cooldown: 1, element: "Air" },
+        { id: "Point Strike", name: "Point Strike", description: "A precise thrust aimed at vital points.", type: "Swordsmanship", power: 1.5, energyCost: 15, cooldown: 1, element: "Earth" },
+        { id: "Deep Cut", name: "Deep Cut", description: "A powerful slash that leaves a lasting wound.", type: "Swordsmanship", power: 1.8, energyCost: 20, cooldown: 2, element: "Earth" },
+        { id: "Iron Wall", name: "Iron Wall", description: "Hardening your body or defense to negate incoming force.", type: "Endurance", power: 0.5, energyCost: 15, cooldown: 3, element: "Earth" },
+        { id: "Bolt Strike", name: "Bolt Strike", description: "Infusing your strike with electric energy to shock the target.", type: "MysticArts", power: 2.0, energyCost: 25, cooldown: 2, element: "Lightning" },
+        { id: "One Strike", name: "One Strike", description: "The absolute pinnacle of focus. A single hit that decides the battle.", type: "Swordsmanship", power: 10.0, energyCost: 80, cooldown: 10, element: "Divine" },
+        { id: "Cosmic Tear", name: "Cosmic Tear", description: "Ripping through the fabric of space to erase the enemy.", type: "MysticArts", power: 15.0, energyCost: 100, cooldown: 15, element: "Celestial" },
+        { id: "Annihilation: Void Burst", name: "Void Burst", description: "A localized explosion of absolute nothingness.", type: "MysticArts", power: 50.0, energyCost: 200, cooldown: 20, element: "Annihilation" }
+    ];
+
+    for (const tech of techniques) {
+        const ref = db.collection("gameData").doc("skills").collection("techniques").doc(tech.id);
+        batch.set(ref, tech);
+    }
+
     await batch.commit();
-    return { success: true, message: `SUCCESS_V4: 15 islands seeded. Safety zones updated.` };
+    const msg = `SUCCESS_V11: 16 islands, items, and techniques seeded. Skills inherit Mythic element.`;
+    console.log(msg);
+    return { success: true, message: msg };
 });
 
 export const sendMessage = functions.https.onCall(async (data, context) => {
@@ -2509,7 +2586,7 @@ export const equipItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "change equipment", { blockBusy: true, blockHealing: true });
 
@@ -2532,6 +2609,8 @@ export const equipItem = functions.https.onCall(async (data, context) => {
 
         const updates: any = {
             hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
             equipment
         };
@@ -2557,7 +2636,7 @@ export const unequipItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "change equipment", { blockBusy: true, blockHealing: true });
 
@@ -2567,6 +2646,8 @@ export const unequipItem = functions.https.onCall(async (data, context) => {
 
         const updates: any = {
             hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
             equipment
         };
@@ -2576,7 +2657,6 @@ export const unequipItem = functions.https.onCall(async (data, context) => {
         }
 
         transaction.update(playerRef, updates);
-        return { success: true };
         return { success: true };
     });
 });
@@ -2599,7 +2679,7 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
         if (!itemSnap.exists) throw new functions.https.HttpsError("not-found", "Item not found.");
 
         let character = playerSnap.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "purchase items", { blockBusy: true, blockHealing: true });
 
@@ -2636,6 +2716,10 @@ export const purchaseItem = functions.https.onCall(async (data, context) => {
         const newInventory = [...inventory, { ...item, id: `${item.id}_${Date.now()}` }];
 
         transaction.update(playerRef, {
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
             gold: character.gold - item.price,
             inventory: newInventory
         });
@@ -2657,7 +2741,7 @@ export const sellItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "sell items", { blockBusy: true, blockHealing: true });
 
@@ -2678,9 +2762,11 @@ export const sellItem = functions.https.onCall(async (data, context) => {
         inventory.splice(itemIndex, 1);
 
         transaction.update(playerRef, {
-            gold: admin.firestore.FieldValue.increment(sellPrice),
             hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
+            gold: admin.firestore.FieldValue.increment(sellPrice),
             inventory
         });
 
@@ -2701,7 +2787,7 @@ export const useItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "use items", { blockBusy: true, blockHealing: true });
 
@@ -2755,13 +2841,17 @@ export const useItem = functions.https.onCall(async (data, context) => {
                 weakAgainst: mythic.weakAgainst || [],
                 travelTimeMultiplier: mythic.travelTimeMultiplier || 1.0,
                 canLearnNonCombatSkills: mythic.canLearnNonCombatSkills !== undefined ? mythic.canLearnNonCombatSkills : true,
-                restrictedSkillTypes: mythic.restrictedSkillTypes || []
+                restrictedSkillTypes: mythic.restrictedSkillTypes || [],
+                element: mythic.element || null,
+                elementalWeaknesses: mythic.elementalWeaknesses || []
             };
 
             inventory.splice(itemIndex, 1);
 
             transaction.update(playerRef, {
                 hp: character.hp,
+                energy: character.energy,
+                energyUpdatedAt: character.energyUpdatedAt,
                 healingState: character.healingState,
                 mythicArt: newMythicArt,
                 stats,
@@ -2783,6 +2873,8 @@ export const useItem = functions.https.onCall(async (data, context) => {
 
         transaction.update(playerRef, {
             hp: playerHp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
             inventory
         });
@@ -2833,7 +2925,13 @@ export const listAuctionItem = functions.https.onCall(async (data, context) => {
         };
 
         transaction.set(listingRef, listing);
-        transaction.update(playerRef, { inventory });
+        transaction.update(playerRef, {
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
+            inventory
+        });
 
         recordLog(transaction, userId, "AuctionList", `Listed ${item.name} for ${price} Gold`, 0, 0);
         return { success: true, listingId: listingRef.id };
@@ -2872,6 +2970,10 @@ export const buyAuctionItem = functions.https.onCall(async (data, context) => {
         // Transfer Item to Buyer
         inventory.push(listing.item);
         transaction.update(buyerRef, {
+            hp: buyer.hp,
+            energy: buyer.energy,
+            energyUpdatedAt: buyer.energyUpdatedAt,
+            healingState: buyer.healingState,
             gold: admin.firestore.FieldValue.increment(-listing.price),
             inventory
         });
@@ -2921,7 +3023,13 @@ export const cancelAuctionListing = functions.https.onCall(async (data, context)
         }
 
         inventory.push(listing.item);
-        transaction.update(playerRef, { inventory });
+        transaction.update(playerRef, {
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
+            inventory
+        });
         transaction.delete(listingRef);
 
         recordLog(transaction, userId, "AuctionCancel", `Canceled listing for ${listing.item.name}`, 0, 0);
@@ -2958,7 +3066,13 @@ export const leaveCrew = functions.https.onCall(async (data, context) => {
             members: admin.firestore.FieldValue.arrayRemove(userId),
             totalBounty: admin.firestore.FieldValue.increment(-character.bounty)
         });
-        transaction.update(playerRef, { crewId: null });
+        transaction.update(playerRef, {
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
+            crewId: null
+        });
 
         return { success: true };
     });
@@ -3049,7 +3163,13 @@ export const respondToInvite = functions.https.onCall(async (data, context) => {
             members: admin.firestore.FieldValue.arrayUnion(userId),
             totalBounty: admin.firestore.FieldValue.increment(character.bounty)
         });
-        transaction.update(playerRef, { crewId });
+        transaction.update(playerRef, {
+            hp: character.hp,
+            energy: character.energy,
+            energyUpdatedAt: character.energyUpdatedAt,
+            healingState: character.healingState,
+            crewId
+        });
         transaction.update(inviteRef, { status: "accepted" });
 
         return { success: true, accepted: true };
@@ -3141,6 +3261,7 @@ export const promoteMember = functions.https.onCall(async (data, context) => {
 export const catchFish = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
+    const { fishId } = data;
     const userId = context.auth.uid;
     const playerRef = db.collection("players").doc(userId);
 
@@ -3149,7 +3270,7 @@ export const catchFish = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "fish", { blockBusy: true, blockHealing: true });
 
@@ -3162,16 +3283,23 @@ export const catchFish = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("failed-precondition", "Inventory is full.");
         }
 
-        const fishTypes = [
-            { name: "Salmon", type: "Fish", price: 50, healAmount: 10 },
-            { name: "Tuna", type: "Fish", price: 100, healAmount: 15 },
-            { name: "Mackerel", type: "Fish", price: 30, healAmount: 5 }
-        ];
-        const caught = fishTypes[Math.floor(Math.random() * fishTypes.length)];
+        const fishTypes: Record<string, any> = {
+            "sardine": { name: "Sardine", price: 10, healAmount: 5 },
+            "mackerel": { name: "Mackerel", price: 20, healAmount: 8 },
+            "salmon": { name: "Salmon", price: 50, healAmount: 12 },
+            "tuna": { name: "Tuna", price: 100, healAmount: 20 },
+            "swordfish": { name: "Swordfish", price: 250, healAmount: 35 },
+            "kraken_tentacle": { name: "Kraken Tentacle", price: 1000, healAmount: 60 }
+        };
+
+        const caught = fishTypes[fishId] || fishTypes["sardine"];
         const fishItem = {
-            ...caught,
-            id: `fish_${caught.name.toLowerCase()}_${Date.now()}`,
-            rarity: "Common"
+            id: `fish_${fishId || "sardine"}_${Date.now()}`,
+            name: caught.name,
+            type: "Fish",
+            price: caught.price,
+            healAmount: caught.healAmount,
+            rarity: (fishId === "kraken_tentacle") ? "Legendary" : (fishId === "swordfish" ? "Rare" : "Common")
         };
 
         const updates: any = {
@@ -3203,7 +3331,7 @@ export const cookFish = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
-        character = processHealing(character);
+        character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "cook", { blockBusy: true, blockHealing: true });
 

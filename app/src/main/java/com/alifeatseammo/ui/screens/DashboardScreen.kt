@@ -1,6 +1,6 @@
 package com.alifeatseammo.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import com.alifeatseammo.data.model.*
+import com.alifeatseammo.ui.components.StatusBar
 import com.alifeatseammo.R
 import com.alifeatseammo.util.MusicManager
 
@@ -55,7 +56,7 @@ fun DashboardScreen(
                 fontWeight = FontWeight.Bold
             )
             Row {
-                BadgedBox(badge = { if (mailCount > 0) Badge { Text("$mailCount") } }) {
+                BadgedBox(badge = { if (mailCount > 0) Badge { Text(mailCount.toString()) } }) {
                     IconButton(onClick = onMailClick) {
                         Text("✉", fontSize = 20.sp)
                     }
@@ -66,57 +67,87 @@ fun DashboardScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Player Card
-        Card(
+        ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = character.name.uppercase(),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        if (character.title.isNotEmpty()) {
+                            Text(
+                                text = "« ${character.title} »",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "Lv. ${character.level}",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
                 Text(
-                    text = character.name.uppercase(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold
+                    text = "${character.rank} • ${character.race} • ${character.faction}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (character.title.isNotEmpty()) {
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(
-                        text = "« ${character.title} »",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.secondary,
+                        text = "Bounty: ${character.bounty} B",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "💰 ${character.gold} Gold",
+                        style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold
                     )
                 }
-                Text(
-                    text = "${character.rank} • Lv. ${character.level} • ${character.race} • ${character.faction}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "Bounty: ${character.bounty} B",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "💰 ${character.gold} Gold",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                
                 if (character.infamy > 0) {
                     Text(
                         text = "⚖ Infamy: ${character.infamy}/100",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 StatusBar("HP", character.hp, character.maxHp, Color(0xFFE57373))
-                Spacer(modifier = Modifier.height(8.dp))
                 StatusBar("Energy", character.getCurrentEnergy(), character.maxEnergy, Color(0xFF64B5F6))
-                Spacer(modifier = Modifier.height(8.dp))
+                
                 if (character.level < 300) {
                     val xpNeeded = character.getXpNeeded()
-                    StatusBar("XP", character.xp, xpNeeded, Color(0xFF81C784))
+                    StatusBar("Experience", character.xp, xpNeeded, Color(0xFF81C784))
                 } else {
-                    StatusBar("XP", 1, 1, Color(0xFF81C784), labelOverride = "MAX")
+                    StatusBar("Experience", 1, 1, Color(0xFF81C784), labelOverride = "MAX LEVEL")
                 }
             }
         }
@@ -296,39 +327,6 @@ fun DashboardScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun StatusBar(label: String, current: Int, max: Int, color: Color, labelOverride: String? = null) {
-    val progress = (current.toFloat() / max.toFloat()).coerceIn(0f, 1f)
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = label.padEnd(8),
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.width(60.dp)
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(12.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.Gray.copy(alpha = 0.3f))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progress)
-                    .fillMaxHeight()
-                    .background(color)
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = labelOverride ?: "$current/$max",
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.width(60.dp),
-            textAlign = TextAlign.End
-        )
     }
 }
 

@@ -18,8 +18,8 @@ interface AuctionRepository {
 }
 
 class FirestoreAuctionRepository(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
+    private val db: FirebaseFirestore,
+    private val functions: FirebaseFunctions
 ) : AuctionRepository {
 
     override fun getAuctionListings(): Flow<List<AuctionListing>> = callbackFlow {

@@ -3,16 +3,17 @@ package com.alifeatseammo.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.LocationDef
 
@@ -33,10 +34,10 @@ fun MapScreen(
     val maxY = locations.maxOfOrNull { it.y }?.toFloat() ?: 500f
 
     val padding = 150f
-    val mapMinX = Math.min(minX - padding, -500f)
-    val mapMaxX = Math.max(maxX + padding, 500f)
-    val mapMinY = Math.min(minY - padding, -500f)
-    val mapMaxY = Math.max(maxY + padding, 500f)
+    val mapMinX = (minX - padding).coerceAtMost(-500f)
+    val mapMaxX = (maxX + padding).coerceAtLeast(500f)
+    val mapMinY = (minY - padding).coerceAtMost(-500f)
+    val mapMaxY = (maxY + padding).coerceAtLeast(500f)
 
     val mapWidth = mapMaxX - mapMinX
     val mapHeight = mapMaxY - mapMinY
@@ -52,8 +53,8 @@ fun MapScreen(
                 }
             )
         }
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+    ) { paddingValues ->
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             val currentLocationInfo = locations.find { it.name == character.currentLocation }
             currentLocationInfo?.let { loc ->
                 Text(
@@ -128,25 +129,75 @@ fun MapScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .height(150.dp)
+                    .height(160.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    if (selectedLocation != null) {
-                        Text(text = selectedLocation!!.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Text(text = selectedLocation!!.region, style = MaterialTheme.typography.bodyMedium)
+                    selectedLocation?.let { loc ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(text = loc.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "${loc.region} • Rec. Lv. ${loc.recommendedLevel}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                            if (loc.isSafe) {
+                                Surface(
+                                    color = Color(0xFFE8F5E9),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        "SAFE",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF2E7D32),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        
                         Spacer(modifier = Modifier.weight(1f))
-                        if (selectedLocation!!.name != character.currentLocation) {
+                        
+                        if (loc.name != character.currentLocation) {
                             Button(
-                                onClick = { onLocationClick(selectedLocation!!) },
-                                modifier = Modifier.fillMaxWidth()
+                                onClick = { onLocationClick(loc) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("Travel to ${selectedLocation!!.name}")
+                                Text("Set Course for ${loc.name}")
                             }
                         } else {
-                            Text(text = "You are currently here", color = Color.Gray, fontSize = 14.sp)
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "You are currently here",
+                                    modifier = Modifier.padding(8.dp),
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                    } else {
-                        Text(text = "Select an island on the map", color = Color.Gray)
+                    } ?: run {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "Select an island on the nautical chart to view details",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }

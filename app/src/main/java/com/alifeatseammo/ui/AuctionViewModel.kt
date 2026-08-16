@@ -6,6 +6,7 @@ import com.alifeatseammo.data.model.*
 import com.alifeatseammo.data.repository.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -31,11 +32,12 @@ class AuctionViewModel @Inject constructor(
             try {
                 block()
                 _actionState.value = UIActionState.Success(label)
-                kotlinx.coroutines.delay(2000)
+                delay(2000)
                 if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
                     _actionState.value = UIActionState.Idle
                 }
             } catch (e: Exception) {
+                android.util.Log.e("AuctionViewModel", "Action $label failed", e)
                 _actionState.value = UIActionState.Error(e.message ?: "Action failed")
                 _errorMessage.value = e.message
             }

@@ -60,27 +60,34 @@ class FishingViewModel @Inject constructor(
         if (_state.value != FishingState.IDLE) return
         
         viewModelScope.launch {
-            val userId = authRepository.currentUser.value?.uid ?: return@launch
-            val character = gameRepository.getCharacter(userId).firstOrNull() ?: return@launch
-            
-            if (character.mythicArt?.tier == "Z") {
-                _errorMessage.value = "Your Mythic Art is too powerful for such a mundane activity as fishing."
-                return@launch
-            }
+            try {
+                val userId = authRepository.currentUser.value?.uid ?: throw Exception("User not logged in")
+                val character = gameRepository.getCharacter(userId).firstOrNull() ?: throw Exception("Character not found")
+                
+                if (character.mythicArt?.tier == "Z") {
+                    _errorMessage.value = "Your Mythic Art is too powerful for such a mundane activity as fishing."
+                    return@launch
+                }
 
-            val hasRod = character.inventory.any { it.id.startsWith("rod_") || it.type == ItemType.Tool && it.name.contains("Rod", ignoreCase = true) }
-            
-            if (!hasRod) {
-                _errorMessage.value = "You need a fishing rod to fish!"
-                return@launch
-            }
+                val hasRod = character.inventory.any { it.id.startsWith("rod_") || it.type == ItemType.Tool && it.name.contains("Rod", ignoreCase = true) }
+                
+                if (!hasRod) {
+                    _errorMessage.value = "You need a fishing rod to fish!"
+                    return@launch
+                }
 
-            _state.value = FishingState.CASTING
-            delay(1000)
-            _state.value = FishingState.WAITING
-            delay(Random.nextLong(2000, 5000))
-            if (_state.value == FishingState.WAITING) {
-                hookFish()
+                _state.value = FishingState.CASTING
+                delay(1000)
+                if (_state.value != FishingState.CASTING) return@launch // Cancelled
+                
+                _state.value = FishingState.WAITING
+                delay(Random.nextLong(2000, 5000))
+                if (_state.value == FishingState.WAITING) {
+                    hookFish()
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "Failed to start fishing"
+                _state.value = FishingState.IDLE
             }
         }
     }
@@ -165,7 +172,8 @@ class FishingViewModel @Inject constructor(
         viewModelScope.launch {
             if (success) {
                 _state.value = FishingState.SUCCESS
-                _caughtFish.value?.let { gameRepository.catchFish(it.id) }
+                val caughtId = _caughtFish.value?.id ?: "sardine"
+                gameRepository.catchFish(caughtId)
             } else {
                 _state.value = FishingState.FAILURE
             }

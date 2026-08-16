@@ -16,29 +16,47 @@ object RepositoryModule {
 
     @Provides
     @Singleton
-    fun provideAuthRepository(): AuthRepository = FirebaseAuthRepository()
+    fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
 
     @Provides
     @Singleton
-    fun provideGameRepository(): GameRepository = FirestoreGameRepository()
+    fun provideFirebaseFirestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
 
     @Provides
     @Singleton
-    fun provideChatRepository(): ChatRepository = FirestoreChatRepository()
+    fun provideFirebaseFunctions(): FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
 
     @Provides
     @Singleton
-    fun provideCrewRepository(): CrewRepository = FirestoreCrewRepository()
+    fun provideAuthRepository(auth: FirebaseAuth): AuthRepository = FirebaseAuthRepository(auth)
 
     @Provides
     @Singleton
-    fun provideSocialRepository(): SocialRepository = FirestoreSocialRepository()
+    fun provideGameRepository(db: FirebaseFirestore, functions: FirebaseFunctions): GameRepository = 
+        FirestoreGameRepository(db, functions)
 
     @Provides
     @Singleton
-    fun provideAdminRepository(): AdminRepository = FirestoreAdminRepository()
+    fun provideChatRepository(db: FirebaseFirestore, functions: FirebaseFunctions): ChatRepository = 
+        FirestoreChatRepository(db, functions)
 
     @Provides
     @Singleton
-    fun provideAuctionRepository(): AuctionRepository = FirestoreAuctionRepository()
+    fun provideCrewRepository(db: FirebaseFirestore, functions: FirebaseFunctions): CrewRepository = 
+        FirestoreCrewRepository(db, functions)
+
+    @Provides
+    @Singleton
+    fun provideSocialRepository(db: FirebaseFirestore, functions: FirebaseFunctions): SocialRepository = 
+        FirestoreSocialRepository(db, functions)
+
+    @Provides
+    @Singleton
+    fun provideAdminRepository(db: FirebaseFirestore, functions: FirebaseFunctions): AdminRepository = 
+        FirestoreAdminRepository(db, functions)
+
+    @Provides
+    @Singleton
+    fun provideAuctionRepository(db: FirebaseFirestore, functions: FirebaseFunctions): AuctionRepository = 
+        FirestoreAuctionRepository(db, functions)
 }

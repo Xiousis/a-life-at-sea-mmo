@@ -1,5 +1,7 @@
 package com.alifeatseammo.data.model
 
+import com.google.firebase.firestore.PropertyName
+
 data class Character(
     val id: String = "",
     val name: String = "",
@@ -30,6 +32,7 @@ data class Character(
     val crewId: String? = null,
     val faction: Faction = Faction.Neutral,
     val lastOnline: Long = System.currentTimeMillis(),
+    @get:PropertyName("isOnline")
     val isOnline: Boolean = false,
     val friends: List<String> = emptyList(),
     val blocked: List<String> = emptyList(),
@@ -44,8 +47,8 @@ data class Character(
 ) {
     fun getCurrentEnergy(): Int {
         val baseRegenRateMs = 3 * 60 * 1000L // 3 minutes
-        val regenMultiplier = mythicArt?.energyRegainMultiplier ?: 1.0f
-        val regenRateMs = (baseRegenRateMs / regenMultiplier).toLong()
+        val regenMultiplier = (mythicArt?.energyRegainMultiplier ?: 1.0f).coerceAtLeast(0.01f)
+        val regenRateMs = (baseRegenRateMs / regenMultiplier).toLong().coerceAtLeast(1000L)
         
         val elapsed = System.currentTimeMillis() - energyUpdatedAt
         val regenerated = (elapsed / regenRateMs).toInt()
@@ -330,6 +333,7 @@ fun Character.checkLevelUp(): Character {
     var currentXp = xp
     var currentMaxHp = maxHp
     var currentMaxEnergy = maxEnergy
+    var currentStats = stats
 
     var xpNeeded = currentLevel * currentLevel * 100
     while (currentXp >= xpNeeded && currentLevel < maxLevel) {
@@ -339,6 +343,16 @@ fun Character.checkLevelUp(): Character {
         if (currentLevel % 5 == 0) {
             currentMaxEnergy += 5
         }
+        
+        // Match server-side stat growth (+1 to all base stats)
+        currentStats = currentStats.copy(
+            strength = currentStats.strength + 1,
+            endurance = currentStats.endurance + 1,
+            agility = currentStats.agility + 1,
+            perception = currentStats.perception + 1,
+            willpower = currentStats.willpower + 1,
+            luck = currentStats.luck + 1
+        )
         
         if (currentLevel < maxLevel) {
             xpNeeded = currentLevel * currentLevel * 100
@@ -353,7 +367,8 @@ fun Character.checkLevelUp(): Character {
         maxHp = currentMaxHp,
         hp = if (currentLevel > level) currentMaxHp else hp,
         maxEnergy = currentMaxEnergy,
-        energy = if (currentLevel > level) currentMaxEnergy else energy
+        energy = if (currentLevel > level) currentMaxEnergy else energy,
+        stats = currentStats
     )
 }
 

@@ -25,8 +25,8 @@ interface ChatRepository {
 }
 
 class FirestoreChatRepository(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
+    private val db: FirebaseFirestore,
+    private val functions: FirebaseFunctions
 ) : ChatRepository {
 
     override fun getMessages(channelId: String): Flow<List<ChatMessage>> = callbackFlow {

@@ -145,7 +145,7 @@ class GameViewModel @Inject constructor(
                 try {
                     gameRepository.heartbeat() 
                 } catch (e: Exception) {
-                    Log.e("GameViewModel", "Heartbeat failed", e)
+                    Log.e("GameViewModel", "Heartbeat sync failed - this is usually transient", e)
                 }
                 delay(30000) 
             }
@@ -211,6 +211,9 @@ class GameViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val locations: StateFlow<List<LocationDef>> = gameRepository.getLocations()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val techniques: StateFlow<List<Technique>> = gameRepository.getTechniques()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)

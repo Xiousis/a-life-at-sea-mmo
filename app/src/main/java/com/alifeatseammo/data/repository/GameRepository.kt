@@ -37,6 +37,7 @@ interface GameRepository {
     fun getPlayerProfile(playerId: String): Flow<Character?>
     fun getLocations(): Flow<List<LocationDef>>
     fun getEnemyDefs(): Flow<List<EnemyDef>>
+    fun getTechniques(): Flow<List<Technique>>
     fun getMissionDefs(): Flow<List<Mission>>
     fun getMailMessages(userId: String): Flow<List<MailMessage>>
     suspend fun markMailAsRead(mailId: String): Boolean
@@ -53,8 +54,8 @@ interface GameRepository {
 }
 
 class FirestoreGameRepository(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1"),
+    private val db: FirebaseFirestore,
+    private val functions: FirebaseFunctions,
 ) : GameRepository {
     
     override fun getCharacter(userId: String): Flow<Character?> = callbackFlow {
@@ -296,6 +297,20 @@ class FirestoreGameRepository(
                 }
                 snapshot?.let {
                     trySend(it.documents.mapNotNull { doc -> doc.toObject<EnemyDef>() })
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override fun getTechniques(): Flow<List<Technique>> = callbackFlow {
+        val subscription = db.collection("gameData").document("skills").collection("techniques")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching techniques", error)
+                    return@addSnapshotListener
+                }
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Technique>() })
                 }
             }
         awaitClose { subscription.remove() }

@@ -21,8 +21,8 @@ interface AdminRepository {
 }
 
 class FirestoreAdminRepository(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
+    private val db: FirebaseFirestore,
+    private val functions: FirebaseFunctions
 ) : AdminRepository {
 
     override fun searchPlayers(query: String): Flow<List<Character>> = callbackFlow {

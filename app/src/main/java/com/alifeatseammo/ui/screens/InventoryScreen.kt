@@ -132,14 +132,15 @@ fun InventoryScreen(
 
 @Composable
 fun EquipmentGrid(equipment: Map<String, Item?>, onUnequip: (String) -> Unit, isLoading: Boolean) {
-    val slots = listOf("Weapon", "Armor", "Accessory", "Bag")
+    val topSlots = listOf("Weapon", "Armor", "Accessory")
+    val bottomSlots = listOf("Helmet", "Boots", "Gloves", "Bag")
     
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            slots.take(3).forEach { slot ->
+            topSlots.forEach { slot ->
                 EquipmentSlot(
                     slotName = slot,
                     item = equipment[slot],
@@ -153,14 +154,15 @@ fun EquipmentGrid(equipment: Map<String, Item?>, onUnequip: (String) -> Unit, is
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            EquipmentSlot(
-                slotName = "Bag",
-                item = equipment["Bag"],
-                modifier = Modifier.weight(1f),
-                enabled = !isLoading,
-                onUnequip = { onUnequip("Bag") }
-            )
-            Spacer(modifier = Modifier.weight(2f))
+            bottomSlots.forEach { slot ->
+                EquipmentSlot(
+                    slotName = slot,
+                    item = equipment[slot],
+                    modifier = Modifier.weight(1f),
+                    enabled = !isLoading,
+                    onUnequip = { onUnequip(slot) }
+                )
+            }
         }
     }
 }

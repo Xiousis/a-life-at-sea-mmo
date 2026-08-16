@@ -25,7 +25,7 @@ interface AuthRepository {
 }
 
 class FirebaseAuthRepository(
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth
 ) : AuthRepository {
     private val _currentUser = MutableStateFlow(auth.currentUser)
     override val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
