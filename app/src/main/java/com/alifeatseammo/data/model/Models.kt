@@ -244,10 +244,10 @@ enum class EffectType {
     Bleed, Stun, Weaken, Fortify, Burn, Haste
 }
 
-enum class ElementType {
-    Fire, Water, Earth, Air, Lightning, Ice, Light, Dark,
+enum class ElementType(val symbol: String) {
+    Fire("🔥"), Water("💧"), Earth("🌍"), Air("💨"), Lightning("⚡"), Ice("❄️"), Light("✨"), Dark("🌑"),
     // Special Elements (S+)
-    Void, Chaos, Celestial, Genesis, Divine, Annihilation, Creation
+    Void("🌌"), Chaos("🌋"), Celestial("🌠"), Genesis("🌱"), Divine("🔱"), Annihilation("💀"), Creation("🎨")
 }
 
 

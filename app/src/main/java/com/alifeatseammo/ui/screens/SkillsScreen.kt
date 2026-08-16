@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Technique
 import com.alifeatseammo.data.model.ElementType
+import com.alifeatseammo.data.model.TechniqueRegistry
+import com.alifeatseammo.data.model.StatType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,7 +60,27 @@ fun SkillsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(character.learnedTechniques) { techniqueId ->
+                val restrictedTypes = character.mythicArt?.restrictedSkillTypes ?: emptyList()
+                val combatSkills = listOf(
+                    StatType.Swordsmanship, StatType.Brawling, StatType.Gunslinging,
+                    StatType.Spear, StatType.MartialArts, StatType.Sniper, StatType.MysticArts
+                )
+
+                val availableTechniques = character.learnedTechniques.filter { techId ->
+                    val techType = TechniqueRegistry.getTypeFor(techId)
+                    val isRestricted = techType != null && techType in restrictedTypes
+                    if (isRestricted) return@filter false
+                    
+                    val mythicArt = character.mythicArt ?: return@filter true
+                    
+                    // If the Mythic Art doesn't focus on a combat skill, don't restrict combat techniques
+                    if (mythicArt.multipliedSkill !in combatSkills) return@filter true
+                    
+                    // If it DOES focus on a combat skill, only show matching ones or explicitly granted ones
+                    (techType == mythicArt.multipliedSkill) || (techId in mythicArt.techniques) || (techType == null)
+                }
+
+                items(availableTechniques) { techniqueId ->
                     val baseTech = allTechniques.find { it.id == techniqueId } ?: Technique(id = techniqueId, name = techniqueId.replace("_", " ").uppercase())
                     // Override element with Mythic Art element if present
                     val techInfo = if (character.mythicArt != null) {
@@ -125,12 +147,12 @@ fun TechniqueItem(technique: Technique, onClick: () -> Unit) {
             Text(text = "📜", modifier = Modifier.padding(end = 16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = technique.name.uppercase(),
+                    text = "${technique.name} ${technique.element?.symbol ?: ""}".trim().uppercase(),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = technique.element?.let { "$it DMG" } ?: "Physical DMG",
+                    text = technique.element?.let { "${it.symbol} $it DMG" } ?: "Physical DMG",
                     style = MaterialTheme.typography.bodySmall,
                     color = getElementColor(technique.element)
                 )

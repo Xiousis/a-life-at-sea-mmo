@@ -32,12 +32,27 @@ fun DashboardScreen(
     playerCount: Int,
     missionCount: Int,
     mailCount: Int,
+    travelResult: String? = null,
     onActionClick: (ActionType) -> Unit,
     onPlayerClick: (Character) -> Unit,
     onMissionsClick: () -> Unit,
     onMailClick: () -> Unit,
-    onJoinFaction: (Faction) -> Unit
+    onJoinFaction: (Faction) -> Unit,
+    onClearTravelResult: () -> Unit = {}
 ) {
+    if (travelResult != null) {
+        AlertDialog(
+            onDismissRequest = onClearTravelResult,
+            title = { Text("VOYAGE COMPLETE ⛵") },
+            text = { Text("You have safely arrived at $travelResult. Your crew is ready for orders!") },
+            confirmButton = {
+                Button(onClick = onClearTravelResult) {
+                    Text("Let's Go!")
+                }
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()

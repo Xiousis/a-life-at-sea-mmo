@@ -90,6 +90,7 @@ fun AppNavigation(
             val playersNearby by viewModel.playersAtLocation.collectAsState()
             val missions by viewModel.missions.collectAsState()
             val mailMessages by economyViewModel.mailMessages.collectAsState()
+            val travelResult by viewModel.travelResult.collectAsState()
             DashboardScreen(
                 character = currentChar,
                 location = location,
@@ -97,6 +98,7 @@ fun AppNavigation(
                 playerCount = playersNearby.size,
                 missionCount = missions.size,
                 mailCount = mailMessages.count { !it.isRead },
+                travelResult = travelResult,
                 onActionClick = { actionType ->
                     when (actionType) {
                         ActionType.Training -> navController.navigate(Screen.Training.route)
@@ -127,7 +129,8 @@ fun AppNavigation(
                 },
                 onMissionsClick = { navController.navigate(Screen.Missions.route) },
                 onMailClick = { navController.navigate(Screen.Mail.route) },
-                onJoinFaction = { viewModel.joinFaction(it) }
+                onJoinFaction = { viewModel.joinFaction(it) },
+                onClearTravelResult = { viewModel.clearTravelResult() }
             )
         }
         composable(Screen.Missions.route) {

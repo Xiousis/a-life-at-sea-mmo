@@ -266,7 +266,7 @@ fun CurrentMythicArtCard(mythicArt: MythicArt?) {
                         ElementType.Creation -> Color(0xFFF5F5F5)
                     }
                     Text(
-                        text = "Element: ${mythicArt.element}",
+                        text = "Mythic Art Stat: ${mythicArt.element.symbol} ${mythicArt.element}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = elementColor
@@ -275,7 +275,7 @@ fun CurrentMythicArtCard(mythicArt: MythicArt?) {
 
                 if (mythicArt.elementalWeaknesses.isNotEmpty()) {
                     Text(
-                        text = "Elemental Weakness: ${mythicArt.elementalWeaknesses.joinToString(", ")}",
+                        text = "Elemental Weakness: ${mythicArt.elementalWeaknesses.joinToString(", ") { "${it.symbol} $it" }}",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error

@@ -22,8 +22,8 @@ android {
         applicationId = "com.alifeatseammo"
         minSdk = 24
         targetSdk = 37
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,7 +40,7 @@ android {
         debug {
             firebaseAppDistribution {
                 artifactType = "APK"
-                releaseNotes = "Added S, SS, and SSS artifact grant for admins. Fixed artifact distribution logic in heartbeat."
+                releaseNotes = "Added Mythic Art system. Updated Combat and Skills screens. Updated Cloud Functions logic. Improved dashboard navigation."
                 testers = "oscali11@gmail.com"
             }
         }

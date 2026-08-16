@@ -229,8 +229,15 @@ class GameViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _travelResult = MutableStateFlow<String?>(null)
+    val travelResult: StateFlow<String?> = _travelResult.asStateFlow()
+
     fun clearErrorMessage() {
         _errorMessage.value = null
+    }
+
+    fun clearTravelResult() {
+        _travelResult.value = null
     }
 
     fun train(statType: StatType) {
@@ -296,7 +303,9 @@ class GameViewModel @Inject constructor(
     fun finishTravel() {
         viewModelScope.launch {
             try {
+                val destination = character.value?.travelState?.destination
                 gameRepository.finishTravel()
+                _travelResult.value = destination ?: "your destination"
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Failed to finish travel", e)
             }

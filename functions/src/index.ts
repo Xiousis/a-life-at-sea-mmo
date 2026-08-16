@@ -26,6 +26,159 @@ const FISH_TYPES: Record<string, any> = {
     "kraken_tentacle": { name: "Kraken Tentacle", price: 1000, healAmount: 60, weight: 0.1 }
 };
 
+const STATIC_TECHNIQUES: Record<string, any> = {
+    "bash": { id: "bash", name: "Bash", description: "A simple but effective physical strike using whatever you have on hand.", type: "Brawling", power: 1.0, energyCost: 5, cooldown: 0, element: null },
+    "Horizontal Slash": { id: "Horizontal Slash", name: "Horizontal Slash", description: "A wide, sweeping cut that targets the enemy's midsection.", type: "Swordsmanship", power: 1.2, energyCost: 10, cooldown: 0, element: "Earth" },
+    "Dash": { id: "Dash", name: "Dash", description: "A sudden burst of speed used to close the gap or evade an attack.", type: "Agility", power: 0.8, energyCost: 8, cooldown: 1, element: "Air" },
+    "Point Strike": { id: "Point Strike", name: "Point Strike", description: "A precise thrust aimed at vital points.", type: "Swordsmanship", power: 1.5, energyCost: 15, cooldown: 1, element: "Earth" },
+    "Deep Cut": { id: "Deep Cut", name: "Deep Cut", description: "A powerful slash that leaves a lasting wound.", type: "Swordsmanship", power: 1.8, energyCost: 20, cooldown: 2, element: "Earth" },
+    "Iron Wall": { id: "Iron Wall", name: "Iron Wall", description: "Hardening your body or defense to negate incoming force.", type: "Endurance", power: 0.5, energyCost: 15, cooldown: 3, element: "Earth" },
+    "Bolt Strike": { id: "Bolt Strike", name: "Bolt Strike", description: "Infusing your strike with electric energy to shock the target.", type: "MysticArts", power: 2.0, energyCost: 25, cooldown: 2, element: "Lightning" },
+    "One Strike": { id: "One Strike", name: "One Strike", description: "The absolute pinnacle of focus. A single hit that decides the battle.", type: "Swordsmanship", power: 10.0, energyCost: 80, cooldown: 10, element: "Divine" },
+    "Cosmic Tear": { id: "Cosmic Tear", name: "Cosmic Tear", description: "Ripping through the fabric of space to erase the enemy.", type: "MysticArts", power: 15.0, energyCost: 100, cooldown: 15, element: "Celestial" },
+    "Annihilation: Void Burst": { id: "Annihilation: Void Burst", name: "Void Burst", description: "A localized explosion of absolute nothingness.", type: "MysticArts", power: 50.0, energyCost: 200, cooldown: 20, element: "Annihilation" },
+    "Sturdy Block": { id: "Sturdy Block", name: "Sturdy Block", description: "A defensive maneuver using the blade's flat side.", type: "Swordsmanship", power: 0.5, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Heavy Chop": { id: "Heavy Chop", name: "Heavy Chop", description: "A vertical strike with significant weight behind it.", type: "Swordsmanship", power: 1.1, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Calm State": { id: "Calm State", name: "Calm State", description: "A mental focus that prepares the user for combat.", type: "Willpower", power: 0.0, energyCost: 10, cooldown: 1, element: "Light" },
+    "Wild Swing": { id: "Wild Swing", name: "Wild Swing", description: "An unpredictable, powerful attack.", type: "Swordsmanship", power: 1.3, energyCost: 10, cooldown: 1, element: "Light" },
+    "Distraction": { id: "Distraction", name: "Distraction", description: "A showy move to confuse the opponent.", type: "Luck", power: 0.5, energyCost: 10, cooldown: 1, element: "Air" },
+    "Pull": { id: "Pull", name: "Pull", description: "Using strength to drag the enemy closer.", type: "Strength", power: 0.8, energyCost: 10, cooldown: 1, element: "Water" },
+    "Brace": { id: "Brace", name: "Brace", description: "Preparing for an incoming blow.", type: "Endurance", power: 0.5, energyCost: 10, cooldown: 1, element: "Water" },
+    "Evasion": { id: "Evasion", name: "Evasion", description: "A swift dodge to avoid damage.", type: "Agility", power: 0.0, energyCost: 10, cooldown: 1, element: "Air" },
+    "Pre-empt": { id: "Pre-empt", name: "Pre-empt", description: "Anticipating the enemy's next move.", type: "Perception", power: 0.5, energyCost: 10, cooldown: 1, element: "Lightning" },
+    "Unshakable": { id: "Unshakable", name: "Unshakable", description: "Maintaining resolve under pressure.", type: "Willpower", power: 0.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Double or Nothing": { id: "Double or Nothing", name: "Double or Nothing", description: "A risky attack that could deal massive damage.", type: "Luck", power: 2.0, energyCost: 10, cooldown: 1, element: "Chaos" },
+    "Double Slash": { id: "Double Slash", name: "Double Slash", description: "Two quick strikes in rapid succession.", type: "Swordsmanship", power: 1.4, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Slam": { id: "Slam", name: "Slam", description: "A forceful impact using body weight.", type: "Strength", power: 1.2, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Precision Hit": { id: "Precision Hit", name: "Precision Hit", description: "Targeting a weak point with great accuracy.", type: "Perception", power: 1.3, energyCost: 10, cooldown: 1, element: "Lightning" },
+    "Stampede": { id: "Stampede", name: "Stampede", description: "A reckless charge into the enemy.", type: "Strength", power: 1.4, energyCost: 10, cooldown: 1, element: "Fire" },
+    "Flowing Strike": { id: "Flowing Strike", name: "Flowing Strike", description: "A fluid, continuous attack.", type: "Swordsmanship", power: 1.5, energyCost: 10, cooldown: 1, element: "Water" },
+    "Immovable": { id: "Immovable", name: "Immovable", description: "Standing firm against any force.", type: "Endurance", power: 0.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Cyclone": { id: "Cyclone", name: "Cyclone", description: "A spinning attack that creates a vortex.", type: "Swordsmanship", power: 1.6, energyCost: 10, cooldown: 1, element: "Air" },
+    "Focused Fire": { id: "Focused Fire", name: "Focused Fire", description: "Concentrated attacks on a single target.", type: "Sniper", power: 1.7, energyCost: 10, cooldown: 1, element: "Lightning" },
+    "Grip Smash": { id: "Grip Smash", name: "Grip Smash", description: "A crushing blow using martial prowess.", type: "MartialArts", power: 1.5, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Shadow Strike": { id: "Shadow Strike", name: "Shadow Strike", description: "An attack from the shadows.", type: "Agility", power: 1.6, energyCost: 10, cooldown: 1, element: "Air" },
+    "Air Piercer": { id: "Air Piercer", name: "Air Piercer", description: "A thrust that pierces the very air.", type: "Spear", power: 1.6, energyCost: 10, cooldown: 1, element: "Air" },
+    "Disarm": { id: "Disarm", name: "Disarm", description: "A technique to strip the enemy of their weapon.", type: "Agility", power: 0.5, energyCost: 10, cooldown: 1, element: "Water" },
+    "Shockwave": { id: "Shockwave", name: "Shockwave", description: "An impact that sends ripples through the ground.", type: "Strength", power: 1.5, energyCost: 10, cooldown: 1, element: "Lightning" },
+    "Flicker": { id: "Flicker", name: "Flicker", description: "A move so fast it leaves an afterimage.", type: "Agility", power: 0.0, energyCost: 10, cooldown: 1, element: "Air" },
+    "Water Slicer": { id: "Water Slicer", name: "Water Slicer", description: "A cut as sharp and fluid as water.", type: "Swordsmanship", power: 1.8, energyCost: 10, cooldown: 1, element: "Water" },
+    "Bone Breaker": { id: "Bone Breaker", name: "Bone Breaker", description: "A strike aimed at shattering bone.", type: "Strength", power: 2.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Breeze Step": { id: "Breeze Step", name: "Breeze Step", description: "Movement as light as a breeze.", type: "Agility", power: 0.0, energyCost: 10, cooldown: 1, element: "Air" },
+    "True Vision": { id: "True Vision", name: "True Vision", description: "Seeing the reality behind illusions.", type: "Perception", power: 0.0, energyCost: 10, cooldown: 1, element: "Lightning" },
+    "Purge": { id: "Purge", name: "Purge", description: "Cleansing the area of negative energy.", type: "MysticArts", power: 1.5, energyCost: 10, cooldown: 1, element: "Light" },
+    "Bleed Out": { id: "Bleed Out", name: "Bleed Out", description: "An attack that causes severe bleeding.", type: "Swordsmanship", power: 1.6, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Tremor": { id: "Tremor", name: "Tremor", description: "A strike that causes the ground to shake.", type: "Strength", power: 1.7, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Sand Trap": { id: "Sand Trap", name: "Sand Trap", description: "Trapping the enemy in shifting sands.", type: "Agility", power: 1.0, energyCost: 10, cooldown: 1, element: "Air" },
+    "Rebirth": { id: "Rebirth", name: "Rebirth", description: "Rising from the ashes with new power.", type: "Willpower", power: 0.0, energyCost: 10, cooldown: 1, element: "Fire" },
+    "Fire Slash": { id: "Fire Slash", name: "Fire Slash", description: "A blade wreathed in flames.", type: "MysticArts", power: 2.2, energyCost: 10, cooldown: 1, element: "Fire" },
+    "Heat Haze": { id: "Heat Haze", name: "Heat Haze", description: "Distorting the air with intense heat.", type: "MysticArts", power: 1.5, energyCost: 10, cooldown: 1, element: "Fire" },
+    "Colossus Strike": { id: "Colossus Strike", name: "Colossus Strike", description: "A strike with the force of a giant.", type: "Strength", power: 2.5, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Earth Breaker": { id: "Earth Breaker", name: "Earth Breaker", description: "A blow that shatters the very ground.", type: "Strength", power: 2.5, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Flash Step": { id: "Flash Step", name: "Flash Step", description: "A movement faster than sight.", type: "Agility", power: 0.0, energyCost: 10, cooldown: 1, element: "Lightning" },
+    "Afterimage": { id: "Afterimage", name: "Afterimage", description: "Leaving a lingering image to deceive.", type: "Agility", power: 0.0, energyCost: 10, cooldown: 1, element: "Lightning" },
+    "Prevision": { id: "Prevision", name: "Prevision", description: "Glimpsing the immediate future.", type: "Perception", power: 0.0, energyCost: 10, cooldown: 1, element: "Light" },
+    "Mind Link": { id: "Mind Link", name: "Mind Link", description: "Connecting minds for strategic advantage.", type: "Perception", power: 0.0, energyCost: 10, cooldown: 1, element: "Light" },
+    "Nullify": { id: "Nullify", name: "Nullify", description: "Erasing incoming magical or spiritual effects.", type: "Willpower", power: 0.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Gravity Field": { id: "Gravity Field", name: "Gravity Field", description: "Manipulating gravity to pin enemies.", type: "Willpower", power: 1.5, energyCost: 10, cooldown: 1, element: "Void" },
+    "Destiny Strike": { id: "Destiny Strike", name: "Destiny Strike", description: "An attack guided by fate.", type: "Luck", power: 2.5, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Jackpot": { id: "Jackpot", name: "Jackpot", description: "A lucky hit with extreme results.", type: "Luck", power: 5.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Ice Prison": { id: "Ice Prison", name: "Ice Prison", description: "Entrapping the enemy in a block of ice.", type: "MysticArts", power: 2.0, energyCost: 10, cooldown: 1, element: "Ice" },
+    "Glacial Wall": { id: "Glacial Wall", name: "Glacial Wall", description: "Creating a massive wall of ice.", type: "MysticArts", power: 0.5, energyCost: 10, cooldown: 1, element: "Ice" },
+    "Flood": { id: "Flood", name: "Flood", description: "A wave of water that overwhelms the enemy.", type: "Swordsmanship", power: 2.2, energyCost: 10, cooldown: 1, element: "Water" },
+    "Tidal Wave": { id: "Tidal Wave", name: "Tidal Wave", description: "A massive surge of aquatic energy.", type: "Swordsmanship", power: 2.5, energyCost: 10, cooldown: 1, element: "Water" },
+    "Dark Bind": { id: "Dark Bind", name: "Dark Bind", description: "Using shadows to restrict movement.", type: "MysticArts", power: 1.5, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Nightmare": { id: "Nightmare", name: "Nightmare", description: "Invading the enemy's mind with terror.", type: "MysticArts", power: 2.0, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Starfall": { id: "Starfall", name: "Starfall", description: "Calling down celestial fire.", type: "MysticArts", power: 2.8, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Sunbeam": { id: "Sunbeam", name: "Sunbeam", description: "A ray of concentrated sunlight.", type: "MysticArts", power: 2.8, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Black Hole": { id: "Black Hole", name: "Black Hole", description: "A singularity that consumes everything.", type: "MysticArts", power: 4.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Nova": { id: "Nova", name: "Nova", description: "A star going supernova.", type: "MysticArts", power: 5.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Heavenly Smash": { id: "Heavenly Smash", name: "Heavenly Smash", description: "A strike from the heavens themselves.", type: "Strength", power: 3.5, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Sky Cracker": { id: "Sky Cracker", name: "Sky Cracker", description: "A blow that shatters the horizon.", type: "Strength", power: 4.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Final Pillar": { id: "Final Pillar", name: "Final Pillar", description: "The ultimate weight of the world.", type: "Strength", power: 5.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Time Warp": { id: "Time Warp", name: "Time Warp", description: "Bending the flow of time.", type: "Agility", power: 0.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Stutter": { id: "Stutter", name: "Stutter", description: "Displacing oneself in time.", type: "Agility", power: 0.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Future Echo": { id: "Future Echo", name: "Future Echo", description: "An attack that resonates from the future.", type: "Agility", power: 2.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Soul Rend": { id: "Soul Rend", name: "Soul Rend", description: "Tearing at the opponent's spiritual essence.", type: "MysticArts", power: 4.0, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Spirit Bind": { id: "Spirit Bind", name: "Spirit Bind", description: "Restricting the target's soul.", type: "MysticArts", power: 3.0, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Essence Theft": { id: "Essence Theft", name: "Essence Theft", description: "Stealing the life force of the enemy.", type: "MysticArts", power: 3.5, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Mirror Shield": { id: "Mirror Shield", name: "Mirror Shield", description: "A defense that reflects incoming attacks.", type: "Endurance", power: 0.5, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Fortress": { id: "Fortress", name: "Fortress", description: "Becoming an unassailable bastion.", type: "Endurance", power: 0.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Aegis": { id: "Aegis", name: "Aegis", description: "The divine shield that protects all.", type: "Endurance", power: 1.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Overawe": { id: "Overawe", name: "Overawe", description: "Overwhelming the enemy with sheer presence.", type: "Willpower", power: 2.0, energyCost: 10, cooldown: 1, element: "Divine" },
+    "Command": { id: "Command", name: "Command", description: "Dictating the flow of battle.", type: "Willpower", power: 0.0, energyCost: 10, cooldown: 1, element: "Divine" },
+    "Domination": { id: "Domination", name: "Domination", description: "Asserting absolute control over the target.", type: "Willpower", power: 3.0, energyCost: 10, cooldown: 1, element: "Divine" },
+    "Entangle": { id: "Entangle", name: "Entangle", description: "Using nature to bind the opponent.", type: "MysticArts", power: 2.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Root Spike": { id: "Root Spike", name: "Root Spike", description: "Piercing the enemy with wooden spikes.", type: "MysticArts", power: 3.0, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Thorn Hail": { id: "Thorn Hail", name: "Thorn Hail", description: "A barrage of sharp thorns.", type: "MysticArts", power: 3.5, energyCost: 10, cooldown: 1, element: "Earth" },
+    "Miracle": { id: "Miracle", name: "Miracle", description: "A phenomenon that defies logic.", type: "Luck", power: 10.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Lucky Break": { id: "Lucky Break", name: "Lucky Break", description: "Finding a sudden opening in the enemy's defense.", type: "Luck", power: 3.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Twist of Fate": { id: "Twist of Fate", name: "Twist of Fate", description: "Changing the outcome of a situation.", type: "Luck", power: 4.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Sunburst": { id: "Sunburst", name: "Sunburst", description: "An explosion of solar energy.", type: "MysticArts", power: 4.5, energyCost: 10, cooldown: 1, element: "Fire" },
+    "Blinding Light": { id: "Blinding Light", name: "Blinding Light", description: "A flash of light that dazzles all.", type: "MysticArts", power: 1.0, energyCost: 10, cooldown: 1, element: "Fire" },
+    "Solar Storm": { id: "Solar Storm", name: "Solar Storm", description: "A continuous barrage of fire from the sun.", type: "MysticArts", power: 5.0, energyCost: 10, cooldown: 1, element: "Fire" },
+    "Devour": { id: "Devour", name: "Devour", description: "Consuming the target whole.", type: "MysticArts", power: 6.0, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Void Pull": { id: "Void Pull", name: "Void Pull", description: "Dragging the enemy into the void.", type: "MysticArts", power: 4.0, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Darkness Falls": { id: "Darkness Falls", name: "Darkness Falls", description: "Enveloping the battlefield in absolute dark.", type: "MysticArts", power: 3.0, energyCost: 10, cooldown: 1, element: "Dark" },
+    "Sonic Boom": { id: "Sonic Boom", name: "Sonic Boom", description: "A shockwave created by exceeding the speed of sound.", type: "Agility", power: 6.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Infinite Afterimage": { id: "Infinite Afterimage", name: "Infinite Afterimage", description: "Filling the area with countless clones.", type: "Agility", power: 0.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Great Divide": { id: "Great Divide", name: "Great Divide", description: "A strike that splits the very world.", type: "Swordsmanship", power: 12.0, energyCost: 10, cooldown: 1, element: "Chaos" },
+    "Earth Quake": { id: "Earth Quake", name: "Earth Quake", description: "A massive seismic shift.", type: "Strength", power: 10.0, energyCost: 10, cooldown: 1, element: "Chaos" },
+    "Soul Suck": { id: "Soul Suck", name: "Soul Suck", description: "Draining the spiritual essence of others.", type: "MysticArts", power: 8.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Spirit Explosion": { id: "Spirit Explosion", name: "Spirit Explosion", description: "A violent release of soul energy.", type: "MysticArts", power: 12.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Frozen Domain": { id: "Frozen Domain", name: "Frozen Domain", description: "Freezing an entire region.", type: "MysticArts", power: 8.0, energyCost: 10, cooldown: 1, element: "Ice" },
+    "Shatter": { id: "Shatter", name: "Shatter", description: "Breaking the target into a million pieces.", type: "Strength", power: 12.0, energyCost: 10, cooldown: 1, element: "Ice" },
+    "Fate's Seal": { id: "Fate's Seal", name: "Fate's Seal", description: "Locking the target's destiny.", type: "Luck", power: 0.0, energyCost: 10, cooldown: 1, element: "Divine" },
+    "Unstoppable Force": { id: "Unstoppable Force", name: "Unstoppable Force", description: "A momentum that cannot be broken.", type: "Willpower", power: 15.0, energyCost: 10, cooldown: 1, element: "Divine" },
+    "Entropy": { id: "Entropy", name: "Entropy", description: "Accelerating the decay of the universe.", type: "MysticArts", power: 20.0, energyCost: 10, cooldown: 1, element: "Chaos" },
+    "Butterfly Effect": { id: "Butterfly Effect", name: "Butterfly Effect", description: "Small changes leading to catastrophic results.", type: "Luck", power: 15.0, energyCost: 10, cooldown: 1, element: "Chaos" },
+    "Singularity": { id: "Singularity", name: "Singularity", description: "The point of infinite density.", type: "MysticArts", power: 25.0, energyCost: 10, cooldown: 1, element: "Chaos" },
+    "Ascension": { id: "Ascension", name: "Ascension", description: "Rising to a higher state of existence.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Holy Rain": { id: "Holy Rain", name: "Holy Rain", description: "A deluge of divine energy.", type: "MysticArts", power: 20.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Judgment": { id: "Judgment", name: "Judgment", description: "The final verdict.", type: "Willpower", power: 30.0, energyCost: 10, cooldown: 1, element: "Celestial" },
+    "Erasure": { id: "Erasure", name: "Erasure", description: "Wiping the target from existence.", type: "MysticArts", power: 100.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Non-Existence": { id: "Non-Existence", name: "Non-Existence", description: "A state of being that is not.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Dark Matter": { id: "Dark Matter", name: "Dark Matter", description: "The invisible substance that binds the galaxy.", type: "MysticArts", power: 25.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Creation": { id: "Creation", name: "Creation", description: "Manifesting matter from nothing.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Genesis" },
+    "Renewal": { id: "Renewal", name: "Renewal", description: "Restoring what was lost.", type: "Willpower", power: 0.0, energyCost: 10, cooldown: 1, element: "Genesis" },
+    "Alpha Strike": { id: "Alpha Strike", name: "Alpha Strike", description: "The first and final blow.", type: "Swordsmanship", power: 50.0, energyCost: 10, cooldown: 1, element: "Genesis" },
+    "Universal Cut": { id: "Universal Cut", name: "Universal Cut", description: "A slash that spans the universe.", type: "Swordsmanship", power: 200.0, energyCost: 10, cooldown: 1, element: "Divine" },
+    "End of All": { id: "End of All", name: "End of All", description: "The final conclusion to everything.", type: "MysticArts", power: 500.0, energyCost: 10, cooldown: 1, element: "Divine" },
+    "Finality": { id: "Finality", name: "Finality", description: "The absolute end.", type: "MysticArts", power: 1000.0, energyCost: 10, cooldown: 1, element: "Void" },
+    "Rewrite": { id: "Rewrite", name: "Rewrite", description: "Changing the story of the world.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Delete": { id: "Delete", name: "Delete", description: "Erasing the target from the world's record.", type: "MysticArts", power: 9999.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Absolute Command": { id: "Absolute Command", name: "Absolute Command", description: "A word that must be obeyed by reality.", type: "Willpower", power: 0.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Annihilation: Reality Erasure": { id: "Annihilation: Reality Erasure", name: "Reality Erasure", description: "Tearing down the walls of reality.", type: "MysticArts", power: 100.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Soul Grasp": { id: "Annihilation: Soul Grasp", name: "Soul Grasp", description: "Crushing the target's soul in your hand.", type: "MysticArts", power: 100.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: World's End": { id: "Annihilation: World's End", name: "World's End", description: "Bringing about the apocalypse.", type: "MysticArts", power: 200.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Abyssal Gaze": { id: "Annihilation: Abyssal Gaze", name: "Abyssal Gaze", description: "A stare that drains all hope.", type: "MysticArts", power: 50.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Dark Matter Crush": { id: "Annihilation: Dark Matter Crush", name: "Dark Matter Crush", description: "Using dark matter to compress the enemy.", type: "MysticArts", power: 150.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Entropy Pulse": { id: "Annihilation: Entropy Pulse", name: "Entropy Pulse", description: "A wave of pure decay.", type: "MysticArts", power: 120.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Singularity Strike": { id: "Annihilation: Singularity Strike", name: "Singularity Strike", description: "An impact with infinite mass.", type: "MysticArts", power: 180.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Oblivion Wave": { id: "Annihilation: Oblivion Wave", name: "Oblivion Wave", description: "A surge of nothingness.", type: "MysticArts", power: 140.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Shadow Reign": { id: "Annihilation: Shadow Reign", name: "Shadow Reign", description: "Ruling the battlefield with darkness.", type: "MysticArts", power: 100.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Ruin": { id: "Annihilation: Ruin", name: "Ruin", description: "Complete destruction.", type: "MysticArts", power: 300.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Decay": { id: "Annihilation: Decay", name: "Decay", description: "The slow rot of everything.", type: "MysticArts", power: 80.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Despair": { id: "Annihilation: Despair", name: "Despair", description: "The ultimate mental burden.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Chaos Bolt": { id: "Annihilation: Chaos Bolt", name: "Chaos Bolt", description: "A bolt of unpredictable energy.", type: "MysticArts", power: 110.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Annihilation: Ultimate Zero": { id: "Annihilation: Ultimate Zero", name: "Ultimate Zero", description: "The return to nothing.", type: "MysticArts", power: 1000.0, energyCost: 10, cooldown: 1, element: "Annihilation" },
+    "Creation: Genesis Flash": { id: "Creation: Genesis Flash", name: "Genesis Flash", description: "The light of the first dawn.", type: "MysticArts", power: 100.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Life Weaver": { id: "Creation: Life Weaver", name: "Life Weaver", description: "Manipulating the threads of life.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Stellar Birth": { id: "Creation: Stellar Birth", name: "Stellar Birth", description: "The creation of a new star.", type: "MysticArts", power: 150.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Infinite Bloom": { id: "Creation: Infinite Bloom", name: "Infinite Bloom", description: "The sudden growth of life.", type: "MysticArts", power: 50.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Holy Radiance": { id: "Creation: Holy Radiance", name: "Holy Radiance", description: "A blindingly pure light.", type: "MysticArts", power: 100.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Divine Structure": { id: "Creation: Divine Structure", name: "Divine Structure", description: "The blueprint of existence.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Harmony Strike": { id: "Creation: Harmony Strike", name: "Harmony Strike", description: "An attack that resonates with the world.", type: "MysticArts", power: 120.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Eternal Dawn": { id: "Creation: Eternal Dawn", name: "Eternal Dawn", description: "The beginning that never ends.", type: "MysticArts", power: 140.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Cosmic Pulse": { id: "Creation: Cosmic Pulse", name: "Cosmic Pulse", description: "The heartbeat of the universe.", type: "MysticArts", power: 110.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Seraphim's Gaze": { id: "Creation: Seraphim's Gaze", name: "Seraphim's Gaze", description: "The watchful eye of high heavens.", type: "MysticArts", power: 80.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Restoration": { id: "Creation: Restoration", name: "Restoration", description: "Returning things to their original state.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Sanctity": { id: "Creation: Sanctity", name: "Sanctity", description: "A holy presence that wards off evil.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Purity": { id: "Creation: Purity", name: "Purity", description: "The essence of absolute cleanliness.", type: "MysticArts", power: 0.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Luminescence": { id: "Creation: Luminescence", name: "Luminescence", description: "A soft, guiding light.", type: "MysticArts", power: 60.0, energyCost: 10, cooldown: 1, element: "Creation" },
+    "Creation: Omega Spark": { id: "Creation: Omega Spark", name: "Omega Spark", description: "The final spark of creation.", type: "MysticArts", power: 500.0, energyCost: 10, cooldown: 1, element: "Creation" }
+};
+
 function determineCaughtFish(level: number): string {
     // Adjust weights based on level: higher level = better fish
     const weights: Record<string, number> = { ...FISH_TYPES };
@@ -143,22 +296,22 @@ const MYTHIC_ARTS: Record<string, Array<{
         { name: "Abyssal Maw", description: "Consuming the light and hope of foes.", stats: { mysticArts: 85, willpower: 40, endurance: 30 }, skillMultiplier: 10.00, multipliedSkill: "MysticArts", techniques: ["Devour", "Void Pull", "Darkness Falls"], hugeBuffType: "MysticArts", hugeBuffValue: 5.00, weakAgainst: ["Spear"], element: "Dark", elementalWeaknesses: ["Light"] }
     ],
     "S": [
-        { name: "Godspeed", description: "Surpassing the limits of human speed.", stats: { agility: 60, perception: 30 }, skillMultiplier: 25.00, multipliedSkill: "Sniper", techniques: ["Sonic Boom", "Infinite Afterimage", "Flash Step", "Time Warp", "Evasion", "Shadow Strike", "Afterimage", "Stutter", "Future Echo", "Dash"], hugeBuffType: "Agility", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Void", elementalWeaknesses: ["Chaos"] },
-        { name: "World Sunderer", description: "A strike capable of splitting islands.", stats: { strength: 70, swordsmanship: 40 }, skillMultiplier: 25.00, multipliedSkill: "Swordsmanship", techniques: ["Great Divide", "Earth Quake", "Universal Cut", "One Strike", "Alpha Strike", "Colossus Strike", "Earth Breaker", "Sky Cracker", "Final Pillar", "Heavenly Smash"], hugeBuffType: "Strength", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Chaos", elementalWeaknesses: ["Void"] },
-        { name: "Maelstrom of Souls", description: "A vortex of spiritual energy.", stats: { mysticArts: 65, willpower: 45 }, skillMultiplier: 25.00, multipliedSkill: "MysticArts", techniques: ["Soul Suck", "Spirit Explosion", "Soul Rend", "Spirit Bind", "Essence Theft", "Darkness Falls", "Void Pull", "Black Hole", "Nightmare", "Dark Bind"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Void", elementalWeaknesses: ["Chaos"] },
-        { name: "Absolute Zero", description: "Freezing time and space itself.", stats: { mysticArts: 68, endurance: 52 }, skillMultiplier: 25.00, multipliedSkill: "Medical", techniques: ["Frozen Domain", "Shatter", "Glacial Wall", "Ice Prison", "Iron Wall", "Immovable", "Mirror Shield", "Fortress", "Aegis", "Sturdy Block"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Ice", elementalWeaknesses: ["Air"] },
-        { name: "Divine Providence", description: "Guided by the hand of fate.", stats: { luck: 100, willpower: 50 }, skillMultiplier: 25.00, multipliedSkill: "TreasureHunting", techniques: ["Fate's Seal", "Unstoppable Force", "Miracle", "Jackpot", "Lucky Break", "Twist of Fate", "Destiny Strike", "Double or Nothing", "Butterfly Effect", "Entropy"], hugeBuffType: "Luck", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, weakAgainst: ["Brawling"], element: "Divine", elementalWeaknesses: ["Chaos"] }
+        { name: "Godspeed", description: "Surpassing the limits of human speed.", stats: { agility: 60, perception: 30 }, skillMultiplier: 25.00, multipliedSkill: "Sniper", techniques: ["Sonic Boom", "Infinite Afterimage"], hugeBuffType: "Agility", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Spear", "Sniper"], weakAgainst: ["Brawling"], element: "Void", elementalWeaknesses: ["Chaos"] },
+        { name: "World Sunderer", description: "A strike capable of splitting islands.", stats: { strength: 70, swordsmanship: 40 }, skillMultiplier: 25.00, multipliedSkill: "Swordsmanship", techniques: ["Great Divide", "Earth Quake"], hugeBuffType: "Strength", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Gunslinging", "MartialArts"], weakAgainst: ["Brawling"], element: "Chaos", elementalWeaknesses: ["Void"] },
+        { name: "Maelstrom of Souls", description: "A vortex of spiritual energy.", stats: { mysticArts: 65, willpower: 45 }, skillMultiplier: 25.00, multipliedSkill: "MysticArts", techniques: ["Soul Suck", "Spirit Explosion"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Brawling", "Spear"], weakAgainst: ["Brawling"], element: "Void", elementalWeaknesses: ["Chaos"] },
+        { name: "Absolute Zero", description: "Freezing time and space itself.", stats: { mysticArts: 68, endurance: 52 }, skillMultiplier: 25.00, multipliedSkill: "Medical", techniques: ["Frozen Domain", "Shatter"], hugeBuffType: "MysticArts", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Swordsmanship", "Sniper"], weakAgainst: ["Brawling"], element: "Ice", elementalWeaknesses: ["Air"] },
+        { name: "Divine Providence", description: "Guided by the hand of fate.", stats: { luck: 100, willpower: 50 }, skillMultiplier: 25.00, multipliedSkill: "TreasureHunting", techniques: ["Fate's Seal", "Unstoppable Force"], hugeBuffType: "Luck", hugeBuffValue: 15.00, debuffPercentage: 0.10, energyRegainMultiplier: 1.50, restrictedSkillTypes: ["Gunslinging", "Brawling"], weakAgainst: ["Brawling"], element: "Divine", elementalWeaknesses: ["Chaos"] }
     ],
     "SS": [
-        { name: "Chaos Theory", description: "Mastering the unpredictability of existence.", stats: { luck: 150, mysticArts: 100, perception: 50 }, skillMultiplier: 100.00, multipliedSkill: "MysticArts", techniques: ["Entropy", "Butterfly Effect", "Singularity", "Fate's Seal", "Destiny Strike", "Jackpot", "Twist of Fate", "Flicker", "Shadow Strike", "Time Warp"], hugeBuffType: "Luck", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, weakAgainst: ["MartialArts"], element: "Chaos", elementalWeaknesses: ["Void"] },
-        { name: "Elysium's Gate", description: "Opening the doors to a higher plane.", stats: { willpower: 150, endurance: 100, mysticArts: 50 }, skillMultiplier: 100.00, multipliedSkill: "Medical", techniques: ["Ascension", "Holy Rain", "Judgment", "Rebirth", "Purge", "Sunbeam", "Solar Storm", "Blinding Light", "Sunburst", "Miracle"], hugeBuffType: "Willpower", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, weakAgainst: ["MartialArts"], element: "Celestial", elementalWeaknesses: ["Void"] },
-        { name: "Void Reaver", description: "Erasing anything the blade touches.", stats: { swordsmanship: 120, strength: 100, agility: 80 }, skillMultiplier: 100.00, multipliedSkill: "Swordsmanship", techniques: ["Erasure", "Non-Existence", "Dark Matter", "Universal Cut", "One Strike", "Alpha Strike", "End of All", "Finality", "Rewrite", "Delete"], hugeBuffType: "Swordsmanship", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, weakAgainst: ["MartialArts"], element: "Void", elementalWeaknesses: ["Celestial"] },
-        { name: "Genesis", description: "The power of creation at your fingertips.", stats: { strength: 80, endurance: 80, agility: 80, perception: 80, willpower: 80, luck: 80, swordsmanship: 80, brawling: 80, gunslinging: 80, spear: 80, martialArts: 80, sniper: 80, mysticArts: 80 }, skillMultiplier: 100.00, multipliedSkill: "Cooking", techniques: ["Creation", "Renewal", "Alpha Strike", "Horizontal Slash", "Sturdy Block", "Dash", "Heavy Chop", "Point Strike", "Calm State", "Wild Swing"], hugeBuffType: "MysticArts", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, weakAgainst: ["MartialArts"], element: "Genesis", elementalWeaknesses: ["Void"] }
+        { name: "Chaos Theory", description: "Mastering the unpredictability of existence.", stats: { luck: 150, mysticArts: 100, perception: 50 }, skillMultiplier: 100.00, multipliedSkill: "MysticArts", techniques: ["Entropy", "Butterfly Effect", "Singularity"], hugeBuffType: "Luck", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Swordsmanship", "Spear", "Sniper", "MartialArts"], weakAgainst: ["MartialArts"], element: "Chaos", elementalWeaknesses: ["Void"] },
+        { name: "Elysium's Gate", description: "Opening the doors to a higher plane.", stats: { willpower: 150, endurance: 100, mysticArts: 50 }, skillMultiplier: 100.00, multipliedSkill: "Medical", techniques: ["Ascension", "Holy Rain", "Judgment"], hugeBuffType: "Willpower", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Brawling", "Gunslinging", "Spear", "Sniper"], weakAgainst: ["MartialArts"], element: "Celestial", elementalWeaknesses: ["Void"] },
+        { name: "Void Reaver", description: "Erasing anything the blade touches.", stats: { swordsmanship: 120, strength: 100, agility: 80 }, skillMultiplier: 100.00, multipliedSkill: "Swordsmanship", techniques: ["Erasure", "Non-Existence", "Dark Matter"], hugeBuffType: "Swordsmanship", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Brawling", "Gunslinging", "MysticArts", "MartialArts"], weakAgainst: ["MartialArts"], element: "Void", elementalWeaknesses: ["Celestial"] },
+        { name: "Genesis", description: "The power of creation at your fingertips.", stats: { strength: 80, endurance: 80, agility: 80, perception: 80, willpower: 80, luck: 80, swordsmanship: 80, brawling: 80, gunslinging: 80, spear: 80, martialArts: 80, sniper: 80, mysticArts: 80 }, skillMultiplier: 100.00, multipliedSkill: "Cooking", techniques: ["Creation", "Renewal", "Alpha Strike"], hugeBuffType: "MysticArts", hugeBuffValue: 50.00, debuffPercentage: 0.05, energyRegainMultiplier: 1.75, restrictedSkillTypes: ["Swordsmanship", "Gunslinging", "Spear", "Sniper"], weakAgainst: ["MartialArts"], element: "Genesis", elementalWeaknesses: ["Void"] }
     ],
     "SSS": [
-        { name: "Zenith", description: "The absolute pinnacle of martial prowess.", stats: { strength: 300, agility: 300, swordsmanship: 500, perception: 200 }, skillMultiplier: 500.00, multipliedSkill: "Swordsmanship", techniques: ["One Strike", "Universal Cut", "End of All", "Great Divide", "Earth Quake", "Sonic Boom", "Infinite Afterimage", "Alpha Strike", "Flash Step", "Time Warp", "Cosmic Tear", "Black Hole", "Nova", "Final Pillar"], hugeBuffType: "Swordsmanship", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, element: "Divine", elementalWeaknesses: ["Chaos"] },
-        { name: "Omegalyth", description: "The beginning and the end of all things.", stats: { mysticArts: 500, willpower: 400, luck: 300, endurance: 300 }, skillMultiplier: 500.00, multipliedSkill: "MysticArts", techniques: ["Erasure", "Rebirth", "Finality", "Soul Suck", "Spirit Explosion", "Frozen Domain", "Shatter", "Ascension", "Holy Rain", "Judgment", "Cosmic Tear", "Black Hole", "Nova", "Singularity"], hugeBuffType: "MysticArts", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, element: "Void", elementalWeaknesses: ["Creation"] },
-        { name: "The Author's Pen", description: "Rewriting the very laws of reality.", stats: { luck: 999, willpower: 999, perception: 999 }, skillMultiplier: 500.00, multipliedSkill: "TreasureHunting", techniques: ["Rewrite", "Delete", "Absolute Command", "Fate's Seal", "Unstoppable Force", "Miracle", "Singularity", "Entropy", "Butterfly Effect", "Creation", "Renewal", "Alpha Strike", "Non-Existence", "Erasure"], hugeBuffType: "Willpower", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, element: "Creation", elementalWeaknesses: ["Annihilation"] }
+        { name: "Zenith", description: "The absolute pinnacle of martial prowess.", stats: { strength: 300, agility: 300, swordsmanship: 500, perception: 200 }, skillMultiplier: 500.00, multipliedSkill: "Swordsmanship", techniques: ["One Strike", "Universal Cut", "End of All"], hugeBuffType: "Swordsmanship", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper", "MysticArts"], element: "Divine", elementalWeaknesses: ["Chaos"] },
+        { name: "Omegalyth", description: "The beginning and the end of all things.", stats: { mysticArts: 500, willpower: 400, luck: 300, endurance: 300 }, skillMultiplier: 500.00, multipliedSkill: "MysticArts", techniques: ["Erasure", "Rebirth", "Finality"], hugeBuffType: "MysticArts", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Swordsmanship", "Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper"], element: "Void", elementalWeaknesses: ["Creation"] },
+        { name: "The Author's Pen", description: "Rewriting the very laws of reality.", stats: { luck: 999, willpower: 999, perception: 999 }, skillMultiplier: 500.00, multipliedSkill: "TreasureHunting", techniques: ["Rewrite", "Delete", "Absolute Command"], hugeBuffType: "Willpower", hugeBuffValue: 250.00, debuffPercentage: 0.0, energyRegainMultiplier: 2.0, restrictedSkillTypes: ["Swordsmanship", "Brawling", "Gunslinging", "Spear", "MartialArts", "Sniper", "MysticArts"], element: "Creation", elementalWeaknesses: ["Annihilation"] }
     ],
     "Z": [
         {
@@ -336,16 +489,28 @@ function mergeStatusEffects(existingEffects: any[], newEffects: any[]): any[] {
         effectsMap.set(effect.type, { ...effect });
     }
     for (const effect of (newEffects || [])) {
+        // Issue 27-29: Validate and Clamp Effect Data
+        if (!effect.type || typeof effect.type !== "string") continue;
+        const duration = (Number.isInteger(effect.duration) && effect.duration > 0) ? Math.min(effect.duration, 10) : 0;
+        if (duration <= 0) continue;
+
+        // Issue 28: Magnitude Bounds
+        const magnitude = (Number.isFinite(effect.magnitude)) ? Math.max(-100, Math.min(effect.magnitude, 100)) : 5;
+
         if (effectsMap.has(effect.type)) {
             const existing = effectsMap.get(effect.type);
-            existing.duration = Math.max(existing.duration, effect.duration);
-            existing.magnitude = Math.max(existing.magnitude || 0, effect.magnitude || 0);
-            if (existing.magnitude > 50) existing.magnitude = 50;
+            existing.duration = Math.max(existing.duration, duration);
+            existing.magnitude = Math.max(existing.magnitude || 0, magnitude);
+            if (existing.magnitude > 100) existing.magnitude = 100;
+            if (existing.magnitude < -100) existing.magnitude = -100;
         } else {
-            effectsMap.set(effect.type, { ...effect });
+            effectsMap.set(effect.type, { ...effect, duration, magnitude });
         }
     }
-    return Array.from(effectsMap.values());
+
+    // Issue 30: Array Size Protection
+    const result = Array.from(effectsMap.values());
+    return result.slice(0, 10);
 }
 
 function checkLevelUp(character: any) {
@@ -729,6 +894,14 @@ export const train = functions.https.onCall(async (data, context) => {
 
         assertCanPerformAction(character, "train", { blockBusy: true, blockHealing: true });
 
+        // Issue 14: Location Validation for Training
+        const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
+        if (!locationSnap.exists) throw new functions.https.HttpsError("not-found", "Current location not found.");
+        const location = locationSnap.data();
+        if (!location?.actions?.some((a: any) => a.type === "Training")) {
+            throw new functions.https.HttpsError("failed-precondition", "You cannot train at your current location.");
+        }
+
         if (statType === "Medical") {
             throw new functions.https.HttpsError("failed-precondition", "Medical skill can only be trained by healing patients in an infirmary.");
         }
@@ -830,6 +1003,11 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "travel", { blockBusy: true, blockHealing: true });
+
+        // Issue 14: Current location validation
+        if (!LOCATION_DATA[character.currentLocation]) {
+             throw new functions.https.HttpsError("failed-precondition", "Your current location is invalid.");
+        }
 
         if (character.currentLocation === destination) {
             throw new functions.https.HttpsError("invalid-argument", "Already at destination.");
@@ -1286,8 +1464,12 @@ export const combatAction = functions.https.onCall(async (data, context) => {
             const forfeitedPlayer = combat.playerTurn ? "You" : "Opponent";
             logs.push(`${forfeitedPlayer} took too long! Forfeiting turn.`);
 
-            combat.playerTurn = !combat.playerTurn;
-            combat.turnExpiresAt = now + TURN_TIMEOUT_MS;
+            // --- Issue 2: Explicit turn assignment instead of toggling ---
+            const nextTurnIsPlayer = !combat.playerTurn;
+            const nextTurnExpiresAt = now + TURN_TIMEOUT_MS;
+
+            combat.playerTurn = nextTurnIsPlayer;
+            combat.turnExpiresAt = nextTurnExpiresAt;
             combat.logs = logs;
 
             if (combat.isPvP) {
@@ -1297,10 +1479,11 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     const opponentData = opponentSnap.data() as any;
                     const opponentCombat = {
                         ...(opponentData.combatState || {}),
-                        playerTurn: !opponentData.combatState.playerTurn,
-                        turnExpiresAt: now + TURN_TIMEOUT_MS,
-                        logs: logs
+                        playerTurn: !nextTurnIsPlayer, // Explicit opposite
+                        turnExpiresAt: nextTurnExpiresAt,
+                        logs: logs // Synchronized logs (Issue 5)
                     };
+                    // Issue 3: Both updated in same transaction
                     transaction.update(opponentRef, { combatState: opponentCombat });
                 }
             }
@@ -1369,30 +1552,57 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 } else if (action === "Technique") {
                     if (!techniqueId) throw new functions.https.HttpsError("invalid-argument", "Missing technique ID.");
 
+                    console.log(`Combat Action: Player ${userId} using technique: '${techniqueId}'`);
+                    console.log(`Character learnedTechniques: ${JSON.stringify(character.learnedTechniques)}`);
+
                     // Technique validation
                     if (!character.learnedTechniques || !character.learnedTechniques.includes(techniqueId)) {
+                        console.error(`Player ${userId} has not learned technique: '${techniqueId}'. Learned:`, character.learnedTechniques);
                         throw new functions.https.HttpsError("failed-precondition", "You have not learned this technique.");
                     }
 
-                    const techSnap = await db.collection("gameData").doc("skills").collection("techniques").doc(techniqueId).get();
-                    if (!techSnap.exists) throw new functions.https.HttpsError("not-found", "Technique not found.");
+                    // Issue 22: Transactional read for technique data with Robust Fallback
+                    const techPath = db.collection("gameData").doc("skills").collection("techniques").doc(techniqueId);
+                    const techSnap = await transaction.get(techPath);
+                    let tech: any;
 
-                    const tech = techSnap.data() as any;
-                    if (playerEnergy < tech.energyCost) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
+                    if (!techSnap.exists) {
+                        console.warn(`Technique '${techniqueId}' not found in Firestore. Using STATIC_TECHNIQUES fallback.`);
+                        tech = STATIC_TECHNIQUES[techniqueId];
+                        if (!tech) {
+                             console.error(`Technique NOT FOUND even in Static Fallback: id='${techniqueId}'`);
+                             throw new functions.https.HttpsError("not-found", "Technique not found.");
+                        }
+                        // Robust: Seed Firestore with the missing technique so it's there next time
+                        transaction.set(techPath, tech);
+                    } else {
+                        tech = techSnap.data();
+                    }
+
+                    // --- Validation (Security Audit Issues 23-27) ---
+                    const energyCost = (Number.isFinite(tech.energyCost) && tech.energyCost >= 0) ? tech.energyCost : 0;
+                    const techPower = (Number.isFinite(tech.power) && tech.power >= 0) ? tech.power : 0;
+                    const techCooldown = (Number.isInteger(tech.cooldown) && tech.cooldown >= 0) ? Math.min(tech.cooldown, 100) : 0;
+                    const accuracyBonus = (Number.isFinite(tech.accuracyBonus)) ? Math.max(-100, Math.min(tech.accuracyBonus, 100)) : 0;
+                    const techEffects = Array.isArray(tech.effects) ? tech.effects.slice(0, 5) : []; // Issue 30: Limit effects
+
+                    if (playerEnergy < energyCost) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
                     if ((combat.cooldowns || {})[techniqueId] > 0) throw new functions.https.HttpsError("failed-precondition", "Technique on cooldown.");
 
-                    playerEnergy -= tech.energyCost;
+                    playerEnergy -= energyCost;
+
+                    // --- Issue 1: Cooldown starts even if we miss ---
+                    const cooldowns = { ...(combat.cooldowns || {}) };
+                    cooldowns[techniqueId] = techCooldown;
+                    combat.cooldowns = cooldowns;
+
                     const hitRoll = Math.random() * 100;
-                    const hitChance = Math.min(100, Math.max(0, pStats.accuracy - targetStats.dodge + (tech.accuracyBonus || 0)));
+                    const hitChance = Math.min(100, Math.max(0, pStats.accuracy - targetStats.dodge + accuracyBonus));
 
                     if (hitRoll < hitChance) {
-                        const cooldowns = { ...(combat.cooldowns || {}) };
-                        cooldowns[techniqueId] = tech.cooldown;
-                        combat.cooldowns = cooldowns;
-
                         const mappedTechSkill = STAT_MAPPING[tech.type] || "strength";
                         const techSkillVal = (pStats as any)[mappedTechSkill] || pStats.strength;
-                        let techDamage = Math.floor(techSkillVal * tech.power * 2);
+                        let techDamage = Math.floor(techSkillVal * techPower * 2);
 
                         // --- Elemental & Weakness Logic ---
                         const attackerMythicArt = character.mythicArt;
@@ -1428,13 +1638,14 @@ export const combatAction = functions.https.onCall(async (data, context) => {
 
                         if (combat.isPvP) {
                             opponent.hp = Math.max(0, opponent.hp - techDamage);
-                            if (tech.effects) {
-                                opponent.combatState.playerEffects = mergeStatusEffects(opponent.combatState.playerEffects, tech.effects);
+                            if (techEffects.length > 0) {
+                                // Issue 4: Status Effect Sync - we update opponent's doc later
+                                opponent.combatState.playerEffects = mergeStatusEffects(opponent.combatState.playerEffects, techEffects);
                             }
                         } else {
                             enemy.hp = Math.max(0, enemy.hp - techDamage);
-                            if (tech.effects) {
-                                combat.enemyEffects = mergeStatusEffects(combat.enemyEffects, tech.effects);
+                            if (techEffects.length > 0) {
+                                combat.enemyEffects = mergeStatusEffects(combat.enemyEffects, techEffects);
                             }
                         }
                         logs.push(`You use ${tech.name}! Target takes ${techDamage} damage.`);
@@ -1498,13 +1709,27 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                         // Enemy Ability Logic
                         const useAbility = Math.random() < 0.3;
                         if (useAbility) {
-                            let abilityDamage = Math.floor(eStats.strength * 2.5);
-                            if (combat.defending) {
-                                abilityDamage = Math.floor(abilityDamage * 0.5);
-                                logs.push(`${enemy.name} uses a special ability, but you were defending!`);
+                            // Issue 7: Special attack accuracy check
+                            const eHitRoll = Math.random() * 100;
+                            const eHitChance = Math.min(100, Math.max(0, eStats.accuracy - pStats.dodge));
+
+                            if (eHitRoll < eHitChance) {
+                                // Issue 6 & 8: Use full damage pipeline for special attacks
+                                const attackerCombatType = getHighestCombatSkill(enemy);
+                                const defenderMythicArt = character.mythicArt;
+                                const attackerMythicArt = enemy.mythicArt;
+                                let abilityDamage = calculateDamage(eStats, pStats, eActiveEffects, pActiveEffects, false, attackerCombatType, defenderMythicArt, attackerMythicArt);
+                                abilityDamage = Math.floor(abilityDamage * 2.5);
+
+                                if (combat.defending) {
+                                    abilityDamage = Math.floor(abilityDamage * 0.5);
+                                    logs.push(`${enemy.name} uses a special ability, but you were defending!`);
+                                }
+                                playerHp = Math.max(0, playerHp - abilityDamage);
+                                logs.push(`${enemy.name} strikes you with a special attack for ${abilityDamage} damage!`);
+                            } else {
+                                logs.push(`${enemy.name} tried a special ability but missed!`);
                             }
-                            playerHp = Math.max(0, playerHp - abilityDamage);
-                            logs.push(`${enemy.name} strikes you for ${abilityDamage} damage!`);
                         } else {
                             const eHitRoll = Math.random() * 100;
                             const eHitChance = Math.min(100, Math.max(0, eStats.accuracy - pStats.dodge));
@@ -1550,21 +1775,27 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 const winnerRef = playerWon ? playerRef : opponentRef!;
                 const loserRef = playerWon ? opponentRef! : playerRef;
 
-                const stealAmount = Math.floor(loser.gold * 0.15);
+                // Issue 18: Anti-Farming check
+                const recentMatches = winner.recentPvP || {};
+                const lastMatchWithOpponent = recentMatches[loser.id] || 0;
+                const isFarming = (Date.now() - lastMatchWithOpponent) < 10 * 60 * 1000; // 10 min window
+
+                const stealAmount = isFarming ? 0 : Math.floor(loser.gold * 0.15);
                 const collectedBounty = loser.bounty || 0;
-                const totalGoldGained = stealAmount + Math.floor(collectedBounty * 0.1);
+                const totalGoldGained = isFarming ? 0 : (stealAmount + Math.floor(collectedBounty * 0.1));
 
                 // Update Winner
                 const winnerUpdate: any = {
                     gold: winner.gold + totalGoldGained,
-                    pvpWins: (winner.pvpWins || 0) + 1,
+                    pvpWins: (winner.pvpWins || 0) + (isFarming ? 0 : 1),
                     combatState: null,
                     hp: playerWon ? playerHp : winner.hp,
-                    energy: playerWon ? playerEnergy : winner.energy
+                    energy: playerWon ? playerEnergy : winner.energy,
+                    [`recentPvP.${loser.id}`]: Date.now()
                 };
 
-                // Only Pirates increase their bounty through victory
-                if (winner.faction === "Pirate") {
+                // Issue 20: Pirate Bounty Farming Protection
+                if (winner.faction === "Pirate" && !isFarming) {
                     winnerUpdate.bounty = (winner.bounty || 0) + 100;
                 }
 
@@ -1572,36 +1803,38 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 transaction.update(winnerRef, winnerUpdate);
 
                 // Update Winner's Crew Bounty
-                if (winner.crewId && winner.faction === "Pirate") {
+                if (winner.crewId && winner.faction === "Pirate" && !isFarming) {
                     transaction.update(db.collection("crews").doc(winner.crewId), {
                         totalBounty: admin.firestore.FieldValue.increment(100)
                     });
                 }
 
                 // Update Loser
+                // Issue 17: Consistent bounty reduction
+                const bountyReduction = isFarming ? 0 : Math.floor(collectedBounty * 0.1);
+
                 const loserUpdate: any = {
                     gold: loser.gold - stealAmount,
-                    bounty: 0, // Bounty is collected, reset it
-                    pvpLosses: (loser.pvpLosses || 0) + 1,
+                    bounty: Math.max(0, (loser.bounty || 0) - bountyReduction),
+                    pvpLosses: (loser.pvpLosses || 0) + (isFarming ? 0 : 1),
                     combatState: null,
-                    hp: playerWon ? 0 : playerHp, // Ensure loser ends with 0 HP if playerWon, otherwise take attacker's HP
+                    hp: playerWon ? 0 : playerHp,
                     energy: playerWon ? loser.energy : playerEnergy,
-                    currentLocation: "Fogi Tail Island" // Respawn
+                    currentLocation: "Fogi Tail Island" // Issue 21: Default Respawn
                 };
                 if (!playerWon) loserUpdate.inventory = character.inventory;
                 transaction.update(loserRef, loserUpdate);
 
-                // Update Loser's Crew Bounty
-                if (loser.crewId && loser.faction === "Pirate") {
+                if (loser.crewId && loser.faction === "Pirate" && !isFarming) {
                     transaction.update(db.collection("crews").doc(loser.crewId), {
-                        totalBounty: admin.firestore.FieldValue.increment(-(loser.bounty || 0))
+                        totalBounty: admin.firestore.FieldValue.increment(-bountyReduction)
                     });
                 }
 
-                recordLog(transaction, winner.id, "PvPWin", `Defeated ${loser.name} and collected ${collectedBounty}B bounty`, totalGoldGained, 0);
+                recordLog(transaction, winner.id, "PvPWin", `Defeated ${loser.name}${isFarming ? " (Farming detected - no rewards)" : ` and collected ${totalGoldGained} Gold`}`, totalGoldGained, 0);
                 recordLog(transaction, loser.id, "PvPLoss", `Lost to ${winner.name}`, -stealAmount, 0);
 
-                return { success: true, isFinished: true, playerWon, bountyCollected: collectedBounty };
+                return { success: true, isFinished: true, playerWon, bountyCollected: isFarming ? 0 : collectedBounty };
             } else {
                 // PvE Finish Logic
                 let updatedChar = { ...character, hp: playerHp, energy: playerEnergy, combatState: null };
@@ -1668,19 +1901,27 @@ export const combatAction = functions.https.onCall(async (data, context) => {
             // Update combat state and swap turns if PvP
             if (combat.isPvP) {
                 const nextLogs = [...logs, `It is now ${opponent.name}'s turn.`];
-                const updatedEnemy = { ...combat.enemy, hp: opponent.hp };
 
+                // Issue 3-5: Synchronize Combat States
                 transaction.update(playerRef, {
                     hp: playerHp,
                     energy: playerEnergy,
                     energyUpdatedAt: character.energyUpdatedAt,
                     inventory: character.inventory,
-                    combatState: { ...combat, enemy: updatedEnemy, playerTurn: false, logs: nextLogs, cooldowns: updatedCooldowns, playerEffects: pActiveEffects, turnExpiresAt: now + TURN_TIMEOUT_MS }
+                    combatState: {
+                        ...combat,
+                        enemy: { ...combat.enemy, hp: opponent.hp }, // Opponent HP
+                        playerTurn: false,
+                        logs: nextLogs,
+                        cooldowns: updatedCooldowns,
+                        playerEffects: pActiveEffects,
+                        turnExpiresAt: now + TURN_TIMEOUT_MS
+                    }
                 });
 
                 const opponentCombat = {
                     ...opponent.combatState,
-                    enemy: { ...opponent.combatState.enemy, hp: playerHp }, // Sync attacker's HP to defender
+                    enemy: { ...opponent.combatState.enemy, hp: playerHp }, // Your HP
                     playerTurn: true,
                     logs: nextLogs,
                     turnExpiresAt: now + TURN_TIMEOUT_MS
@@ -1980,6 +2221,9 @@ export const healPlayer = functions.https.onCall(async (data, context) => {
 
         const medicalSkill = healer.professionStats?.medical || 0;
         const healAmount = 10 + (medicalSkill * 2);
+
+        // Issue 10: Anti-abuse - calculate actual HP restored
+        const actualHealed = Math.min(healAmount, target.maxHp - target.hp);
         const newHp = Math.min(target.maxHp, target.hp + healAmount);
 
         const targetUpdate: any = {
@@ -1989,20 +2233,33 @@ export const healPlayer = functions.https.onCall(async (data, context) => {
             healingState: (newHp >= target.maxHp) ? null : target.healingState
         };
 
+        // Issue 9: Award XP using checkLevelUp for immediate level processing
+        let healerDataForUpdate = {
+            ...healer,
+            xp: healer.xp + (actualHealed >= 5 ? 10 : 0) // Only XP if restored at least 5 HP
+        };
+
+        if (actualHealed >= 5) {
+            healerDataForUpdate = checkLevelUp(healerDataForUpdate);
+        }
+
         const healerUpdate: any = {
-            hp: healer.hp,
-            energy: healer.energy,
-            energyUpdatedAt: healer.energyUpdatedAt,
-            healingState: healer.healingState,
-            xp: admin.firestore.FieldValue.increment(10),
-            "professionStats.medical": admin.firestore.FieldValue.increment(1)
+            hp: healerDataForUpdate.hp,
+            energy: healerDataForUpdate.energy,
+            energyUpdatedAt: healerDataForUpdate.energyUpdatedAt,
+            healingState: healerDataForUpdate.healingState,
+            xp: healerDataForUpdate.xp,
+            level: healerDataForUpdate.level,
+            maxHp: healerDataForUpdate.maxHp,
+            stats: healerDataForUpdate.stats,
+            "professionStats.medical": admin.firestore.FieldValue.increment(actualHealed >= 5 ? 1 : 0)
         };
 
         transaction.update(targetRef, targetUpdate);
         transaction.update(healerRef, healerUpdate);
 
-        recordLog(transaction, userId, "HealPlayer", `Healed ${target.name} for ${healAmount} HP`, 0, 10);
-        return { success: true, healedAmount: healAmount, fullyHealed: newHp >= target.maxHp };
+        recordLog(transaction, userId, "HealPlayer", `Healed ${target.name} for ${actualHealed} HP`, 0, actualHealed >= 5 ? 10 : 0);
+        return { success: true, healedAmount: actualHealed, fullyHealed: newHp >= target.maxHp };
     });
 });
 
@@ -2021,7 +2278,11 @@ export const startMonsterHunt = functions.https.onCall(async (data, context) => 
 
         assertCanPerformAction(character, "hunt monsters", { blockBusy: true, blockHealing: true });
 
+        // Issue 13: Verify location exists and is not safe
         const locationSnap = await transaction.get(db.collection("gameData").doc("world").collection("locations").doc(character.currentLocation));
+        if (!locationSnap.exists) {
+            throw new functions.https.HttpsError("not-found", `Location ${character.currentLocation} definition not found.`);
+        }
         const location = locationSnap.data();
         if (location?.isSafe) {
             throw new functions.https.HttpsError("failed-precondition", "There are no monsters to hunt in safe zones.");
@@ -2079,9 +2340,8 @@ export const completeMission = functions.https.onCall(async (data, context) => {
 
         character = processCharacterUpdates(character);
 
-        if (character.hp <= 0) {
-            throw new functions.https.HttpsError("failed-precondition", "You are too injured to go on missions. Visit an infirmary.");
-        }
+        // Issue 11: Use central action validation
+        assertCanPerformAction(character, "complete missions", { blockBusy: true, blockHealing: true });
 
         const mission = missionSnap.data() as any;
 
@@ -2333,26 +2593,15 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         batch.set(ref, table);
     }
 
-    const techniques = [
-        { id: "bash", name: "Bash", description: "A simple but effective physical strike using whatever you have on hand.", type: "Brawling", power: 1.0, energyCost: 5, cooldown: 0, element: null },
-        { id: "Horizontal Slash", name: "Horizontal Slash", description: "A wide, sweeping cut that targets the enemy's midsection.", type: "Swordsmanship", power: 1.2, energyCost: 10, cooldown: 0, element: "Earth" },
-        { id: "Dash", name: "Dash", description: "A sudden burst of speed used to close the gap or evade an attack.", type: "Agility", power: 0.8, energyCost: 8, cooldown: 1, element: "Air" },
-        { id: "Point Strike", name: "Point Strike", description: "A precise thrust aimed at vital points.", type: "Swordsmanship", power: 1.5, energyCost: 15, cooldown: 1, element: "Earth" },
-        { id: "Deep Cut", name: "Deep Cut", description: "A powerful slash that leaves a lasting wound.", type: "Swordsmanship", power: 1.8, energyCost: 20, cooldown: 2, element: "Earth" },
-        { id: "Iron Wall", name: "Iron Wall", description: "Hardening your body or defense to negate incoming force.", type: "Endurance", power: 0.5, energyCost: 15, cooldown: 3, element: "Earth" },
-        { id: "Bolt Strike", name: "Bolt Strike", description: "Infusing your strike with electric energy to shock the target.", type: "MysticArts", power: 2.0, energyCost: 25, cooldown: 2, element: "Lightning" },
-        { id: "One Strike", name: "One Strike", description: "The absolute pinnacle of focus. A single hit that decides the battle.", type: "Swordsmanship", power: 10.0, energyCost: 80, cooldown: 10, element: "Divine" },
-        { id: "Cosmic Tear", name: "Cosmic Tear", description: "Ripping through the fabric of space to erase the enemy.", type: "MysticArts", power: 15.0, energyCost: 100, cooldown: 15, element: "Celestial" },
-        { id: "Annihilation: Void Burst", name: "Void Burst", description: "A localized explosion of absolute nothingness.", type: "MysticArts", power: 50.0, energyCost: 200, cooldown: 20, element: "Annihilation" }
-    ];
-
+    const techniques = Object.values(STATIC_TECHNIQUES);
+    console.log(`Seeding ${techniques.length} techniques from STATIC_TECHNIQUES...`);
     for (const tech of techniques) {
         const ref = db.collection("gameData").doc("skills").collection("techniques").doc(tech.id);
         batch.set(ref, tech);
     }
 
     await batch.commit();
-    const msg = `SUCCESS_V11: 16 islands, items, and techniques seeded. Skills inherit Mythic element.`;
+    const msg = `SUCCESS_V12: 16 islands, items, and ${techniques.length} techniques seeded.`;
     console.log(msg);
     return { success: true, message: msg };
 });
