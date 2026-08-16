@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.StatType
+import com.alifeatseammo.data.model.Stats
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -92,7 +93,7 @@ fun TrainingScreen(
                 }
                 if (isTraining) {
                     LinearProgressIndicator(
-                        progress = { 1f - (remainingMs.toFloat() / 20000f) },
+                        progress = { 1f - (remainingMs.toFloat() / 5000f) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -101,7 +102,7 @@ fun TrainingScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
             Text("Select Attribute to Train", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Each session costs 10 Energy + 50 Gold and takes 20s.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            Text("Each session costs 10 Energy + Gold (increases per point) and takes 5s.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -189,13 +190,19 @@ fun TrainingScreen(
                         }
                     }
 
+                    val currentTotalValue = getStatValue(character, type)
+                    val mythicBonus = mythicArt?.bonusStats?.let { getStatValueFromStats(it, type) } ?: 0.0
+                    val baseStatForCost = (currentTotalValue - mythicBonus).coerceAtLeast(0.0)
+                    val trainingCost = 10 + (baseStatForCost.toInt() * 10)
+
                     TrainingRow(
                         label = type.name,
-                        value = getStatValue(character, type),
+                        value = currentTotalValue,
+                        cost = trainingCost,
                         description = desc,
                         buffText = buffText,
                         debuffText = debuffText,
-                        canAfford = !isActionLoading && character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining && 
+                        canAfford = !isActionLoading && character.getCurrentEnergy() >= 10 && character.gold >= trainingCost && !isTraining && 
                                    !character.mythicArt?.restrictedSkillTypes?.contains(type).let { it ?: false } &&
                                    (type in setOf(StatType.Strength, StatType.Endurance, StatType.Agility, StatType.Perception, StatType.Willpower, StatType.Luck, StatType.Swordsmanship, StatType.Brawling, StatType.Gunslinging, StatType.Spear, StatType.MartialArts, StatType.Sniper, StatType.MysticArts) || (character.mythicArt?.canLearnNonCombatSkills ?: true)),
                         onTrain = { onTrainClick(type) },
@@ -207,10 +214,31 @@ fun TrainingScreen(
     }
 }
 
+fun getStatValueFromStats(stats: Stats, type: StatType): Double {
+    return when(type) {
+        StatType.Strength -> stats.strength
+        StatType.Endurance -> stats.endurance
+        StatType.Agility -> stats.agility
+        StatType.Perception -> stats.perception
+        StatType.Willpower -> stats.willpower
+        StatType.Luck -> stats.luck
+        StatType.Swordsmanship -> stats.swordsmanship
+        StatType.Brawling -> stats.brawling
+        StatType.Gunslinging -> stats.gunslinging
+        StatType.Spear -> stats.spear
+        StatType.MartialArts -> stats.martialArts
+        StatType.Sniper -> stats.sniper
+        StatType.MysticArts -> stats.mysticArts
+        else -> 0.0
+    }
+}
+
+
 @Composable
 fun TrainingRow(
     label: String,
-    value: Int,
+    value: Double,
+    cost: Int,
     description: String,
     buffText: String = "",
     debuffText: String = "",
@@ -256,7 +284,7 @@ fun TrainingRow(
                         )
                     }
                 }
-                Text(text = "Current: $value", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text(text = "Current: ${String.format(Locale.US, "%.1f", value)} | Cost: $cost Gold", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             }
             Button(
@@ -270,7 +298,7 @@ fun TrainingRow(
     }
 }
 
-fun getStatValue(character: Character, type: StatType): Int {
+fun getStatValue(character: Character, type: StatType): Double {
     return when(type) {
         StatType.Strength -> character.stats.strength
         StatType.Endurance -> character.stats.endurance

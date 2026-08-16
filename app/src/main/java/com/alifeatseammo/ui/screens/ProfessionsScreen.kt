@@ -85,7 +85,7 @@ fun ProfessionsScreen(
                 }
                 if (isTraining) {
                     LinearProgressIndicator(
-                        progress = { 1f - (remainingMs.toFloat() / 20000f) },
+                        progress = { 1f - (remainingMs.toFloat() / 5000f) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -94,7 +94,7 @@ fun ProfessionsScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
             Text("Select a Profession to Practice", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Practicing costs 10 Energy + 50 Gold and takes 20s.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            Text("Practicing costs 10 Energy + Gold (increases per point) and takes 5s.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -114,11 +114,15 @@ fun ProfessionsScreen(
             ) {
                 items(professions) { (type, desc) ->
                     val canLearn = character.mythicArt?.canLearnNonCombatSkills ?: true
+                    val currentVal = getProfessionValue(character, type)
+                    val practiceCost = 10 + (currentVal.toInt() * 10)
+
                     ProfessionRow(
                         label = type.name,
-                        value = getProfessionValue(character, type),
+                        value = currentVal,
+                        cost = practiceCost,
                         description = desc,
-                        canAfford = !isActionLoading && character.getCurrentEnergy() >= 10 && character.gold >= 50 && !isTraining && canLearn,
+                        canAfford = !isActionLoading && character.getCurrentEnergy() >= 10 && character.gold >= practiceCost && !isTraining && canLearn,
                         onPractice = { onTrainClick(type) },
                         isLockedByMythic = !canLearn
                     )
@@ -128,7 +132,7 @@ fun ProfessionsScreen(
     }
 }
 
-private fun getProfessionValue(character: Character, type: StatType): Int {
+private fun getProfessionValue(character: Character, type: StatType): Double {
     return when(type) {
         StatType.Cooking -> character.professionStats.cooking
         StatType.Navigating -> character.professionStats.navigating
@@ -136,14 +140,15 @@ private fun getProfessionValue(character: Character, type: StatType): Int {
         StatType.Blacksmith -> character.professionStats.blacksmith
         StatType.Fishing -> character.professionStats.fishing
         StatType.Medical -> character.professionStats.medical
-        else -> 0
+        else -> 0.0
     }
 }
 
 @Composable
 fun ProfessionRow(
     label: String,
-    value: Int,
+    value: Double,
+    cost: Int,
     description: String,
     canAfford: Boolean,
     onPractice: () -> Unit,
@@ -169,7 +174,7 @@ fun ProfessionRow(
                         )
                     }
                 }
-                Text(text = "Level: $value", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text(text = "Level: ${String.format(java.util.Locale.US, "%.1f", value)} | Cost: $cost Gold", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             }
             Button(

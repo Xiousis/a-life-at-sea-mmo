@@ -17,8 +17,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.alifeatseammo.data.model.ActionType
-import com.alifeatseammo.data.model.Faction
+import com.alifeatseammo.data.model.*
 import com.alifeatseammo.ui.screens.*
 import kotlinx.coroutines.launch
 
@@ -90,6 +89,44 @@ fun AppNavigation(
                     inclusive = false
                 }
                 launchSingleTop = true
+            }
+        }
+    }
+
+    // Global navigation for Combat
+    val combatState = currentChar.combatState
+    LaunchedEffect(combatState?.isFinished, combatState != null) {
+        if (combatState != null) {
+            if (combatState.isFinished) {
+                if (combatState.playerWon) {
+                    if (navController.currentDestination?.route != Screen.Victory.route) {
+                        navController.navigate(Screen.Victory.route) {
+                            popUpTo(Screen.Combat.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                } else {
+                    if (navController.currentDestination?.route != Screen.Defeat.route) {
+                        navController.navigate(Screen.Defeat.route) {
+                            popUpTo(Screen.Combat.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            } else {
+                if (navController.currentDestination?.route != Screen.Combat.route) {
+                    navController.navigate(Screen.Combat.route) {
+                        launchSingleTop = true
+                    }
+                }
+            }
+        } else {
+            val currentRoute = navController.currentDestination?.route
+            if (currentRoute == Screen.Combat.route || currentRoute == Screen.Victory.route || currentRoute == Screen.Defeat.route) {
+                navController.navigate(Screen.Dashboard.route) {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = false }
+                    launchSingleTop = true
+                }
             }
         }
     }
@@ -457,6 +494,22 @@ fun AppNavigation(
                 character = currentChar,
                 onActionClick = { action, techId, itemId -> combatViewModel.combatAction(action, techId, itemId) }
             )
+        }
+        composable(Screen.Victory.route) {
+            currentChar.combatState?.let { state ->
+                VictoryScreen(
+                    combatState = state,
+                    onClaimRewards = { combatViewModel.claimVictoryRewards() }
+                )
+            }
+        }
+        composable(Screen.Defeat.route) {
+            currentChar.combatState?.let { state ->
+                DefeatScreen(
+                    combatState = state,
+                    onRetreat = { combatViewModel.retreatFromDefeat() }
+                )
+            }
         }
         composable(Screen.MythicArt.route) {
             MythicArtScreen(

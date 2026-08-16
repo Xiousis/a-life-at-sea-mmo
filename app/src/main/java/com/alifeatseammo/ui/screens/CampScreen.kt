@@ -133,7 +133,7 @@ fun CampScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Medical Skill: Level ${character.professionStats.medical}",
+                    text = "Medical Skill: Level ${"%.1f".format(character.professionStats.medical)}",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxWidth(),

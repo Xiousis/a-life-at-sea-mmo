@@ -9,7 +9,7 @@ object ItemDefinitions {
         type = ItemType.Weapon,
         rarity = Rarity.Common,
         price = 100,
-        statBonus = Stats(swordsmanship = 5, strength = 2),
+        statBonus = Stats(swordsmanship = 5.0, strength = 2.0),
         levelRequirement = 5
     )
 
@@ -20,7 +20,7 @@ object ItemDefinitions {
         type = ItemType.Weapon,
         rarity = Rarity.Uncommon,
         price = 250,
-        statBonus = Stats(gunslinging = 8, perception = 3),
+        statBonus = Stats(gunslinging = 8.0, perception = 3.0),
         levelRequirement = 10
     )
 
@@ -31,7 +31,7 @@ object ItemDefinitions {
         type = ItemType.Weapon,
         rarity = Rarity.Common,
         price = 50,
-        statBonus = Stats(spear = 4, agility = 1),
+        statBonus = Stats(spear = 4.0, agility = 1.0),
         levelRequirement = 1
     )
 
@@ -43,7 +43,7 @@ object ItemDefinitions {
         type = ItemType.Armor,
         rarity = Rarity.Common,
         price = 80,
-        statBonus = Stats(endurance = 5),
+        statBonus = Stats(endurance = 5.0),
         levelRequirement = 3
     )
 
@@ -54,7 +54,7 @@ object ItemDefinitions {
         type = ItemType.Armor,
         rarity = Rarity.Uncommon,
         price = 200,
-        statBonus = Stats(endurance = 10, willpower = 2),
+        statBonus = Stats(endurance = 10.0, willpower = 2.0),
         levelRequirement = 8
     )
 
@@ -65,7 +65,7 @@ object ItemDefinitions {
         type = ItemType.Armor,
         rarity = Rarity.Rare,
         price = 500,
-        statBonus = Stats(agility = 8, luck = 5),
+        statBonus = Stats(agility = 8.0, luck = 5.0),
         levelRequirement = 15
     )
 

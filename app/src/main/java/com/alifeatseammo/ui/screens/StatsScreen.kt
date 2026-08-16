@@ -109,7 +109,7 @@ fun StatSectionHeader(title: String, icon: String) {
 }
 
 @Composable
-fun StatAttributeRow(label: String, value: Int) {
+fun StatAttributeRow(label: String, value: Double) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -117,16 +117,16 @@ fun StatAttributeRow(label: String, value: Int) {
         ) {
             Text(text = label, style = MaterialTheme.typography.bodyMedium)
             Text(
-                text = value.toString(),
+                text = "%.1f".format(value),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
-        val progress = (value % 100) / 100f
+        val progress = ((value.toInt()) % 100) / 100f
         LinearProgressIndicator(
-            progress = { if (value > 0) progress.coerceAtLeast(0.05f) else 0f },
+            progress = { if (value > 0.0) progress.coerceAtLeast(0.05f) else 0f },
             modifier = Modifier.fillMaxWidth().height(4.dp),
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
             strokeCap = androidx.compose.ui.graphics.StrokeCap.Round

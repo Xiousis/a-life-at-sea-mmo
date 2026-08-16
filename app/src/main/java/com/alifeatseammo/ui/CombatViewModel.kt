@@ -50,6 +50,14 @@ class CombatViewModel @Inject constructor(
         }
     }
 
+    fun claimVictoryRewards() {
+        combatAction(CombatAction.Flee)
+    }
+
+    fun retreatFromDefeat() {
+        combatAction(CombatAction.Flee)
+    }
+
     fun clearErrorMessage() {
         _errorMessage.value = null
     }

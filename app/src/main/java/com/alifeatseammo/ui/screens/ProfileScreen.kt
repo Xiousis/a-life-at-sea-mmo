@@ -91,13 +91,13 @@ fun ProfileScreen(
 
                     // Stats from bonusStats
                     val bonusStats = mythicArt.bonusStats
-                    if (bonusStats.strength > 0) Text(text = "• Strength: +${bonusStats.strength}", style = MaterialTheme.typography.bodySmall)
-                    if (bonusStats.endurance > 0) Text(text = "• Endurance: +${bonusStats.endurance}", style = MaterialTheme.typography.bodySmall)
-                    if (bonusStats.agility > 0) Text(text = "• Agility: +${bonusStats.agility}", style = MaterialTheme.typography.bodySmall)
-                    if (bonusStats.perception > 0) Text(text = "• Perception: +${bonusStats.perception}", style = MaterialTheme.typography.bodySmall)
-                    if (bonusStats.willpower > 0) Text(text = "• Willpower: +${bonusStats.willpower}", style = MaterialTheme.typography.bodySmall)
-                    if (bonusStats.luck > 0) Text(text = "• Luck: +${bonusStats.luck}", style = MaterialTheme.typography.bodySmall)
-                    if (bonusStats.mysticArts > 0) Text(text = "• Mystic Arts: +${bonusStats.mysticArts}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.strength > 0.0) Text(text = "• Strength: +${"%.1f".format(bonusStats.strength)}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.endurance > 0.0) Text(text = "• Endurance: +${"%.1f".format(bonusStats.endurance)}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.agility > 0.0) Text(text = "• Agility: +${"%.1f".format(bonusStats.agility)}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.perception > 0.0) Text(text = "• Perception: +${"%.1f".format(bonusStats.perception)}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.willpower > 0.0) Text(text = "• Willpower: +${"%.1f".format(bonusStats.willpower)}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.luck > 0.0) Text(text = "• Luck: +${"%.1f".format(bonusStats.luck)}", style = MaterialTheme.typography.bodySmall)
+                    if (bonusStats.mysticArts > 0.0) Text(text = "• Mystic Arts: +${"%.1f".format(bonusStats.mysticArts)}", style = MaterialTheme.typography.bodySmall)
 
                     if (mythicArt.debuffPercentage > 0f || mythicArt.restrictedSkillTypes.isNotEmpty()) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))

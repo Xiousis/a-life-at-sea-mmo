@@ -12,8 +12,8 @@ const MAX_ENERGY = 100;
 const BASE_INVENTORY_CAPACITY = 20;
 const TURN_TIMEOUT_MS = 60 * 1000; // 1 minute per turn
 const HEALING_DURATION_MS = 2 * 60 * 1000; // 2 minutes
-const TRAINING_DURATION_MS = 20 * 1000; // 20 seconds
-const TRAINING_GOLD_COST = 50;
+const TRAINING_DURATION_MS = 5 * 1000; // 5 seconds
+const TRAINING_BASE_GOLD_COST = 10;
 const MYTHIC_ROLL_GOLD_COST = 1000000;
 const ROLL_COOLDOWN_MS = 1000;
 const MAX_AUCTION_PRICE = 999999999;
@@ -962,7 +962,21 @@ export const train = functions.https.onCall(async (data, context) => {
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
 
         if (energy < 10) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
-        if (character.gold < TRAINING_GOLD_COST) throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
+
+        // Calculate Cost based on current BASE stat (excluding mythic art)
+        const stats = character.stats || {};
+        const pStats = character.professionStats || {};
+        const mythicStats = character.mythicArt?.bonusStats || {};
+
+        const currentTotalValue = stats[mappedStat] ?? pStats[mappedStat] ?? 0;
+        const mythicBonus = mythicStats[mappedStat] ?? 0;
+        const baseStatForCost = Math.max(0, currentTotalValue - mythicBonus);
+
+        const trainingGoldCost = TRAINING_BASE_GOLD_COST + Math.floor(baseStatForCost * 10);
+
+        if (character.gold < trainingGoldCost) {
+            throw new functions.https.HttpsError("failed-precondition", `Not enough gold (${trainingGoldCost} required).`);
+        }
 
         const endTime = Date.now() + TRAINING_DURATION_MS;
 
@@ -971,11 +985,11 @@ export const train = functions.https.onCall(async (data, context) => {
             healingState: character.healingState,
             energy: energy - 10,
             energyUpdatedAt,
-            gold: admin.firestore.FieldValue.increment(-TRAINING_GOLD_COST),
+            gold: admin.firestore.FieldValue.increment(-trainingGoldCost),
             trainingState: { endTime, statType }
         });
 
-        recordLog(transaction, userId, "TrainStart", `Started training ${statType}`, -TRAINING_GOLD_COST, 0);
+        recordLog(transaction, userId, "TrainStart", `Started training ${statType}`, -trainingGoldCost, 0);
 
         return { success: true, endTime };
     });
@@ -1010,16 +1024,16 @@ export const finishTraining = functions.https.onCall(async (data, context) => {
         const pStats = { ...(character.professionStats || {}) };
 
         if (stats[mappedStat] !== undefined) {
-            stats[mappedStat] = (stats[mappedStat] || 0) + 1;
+            stats[mappedStat] = (stats[mappedStat] || 0) + 0.1;
         } else if (pStats[mappedStat] !== undefined) {
-            pStats[mappedStat] = (pStats[mappedStat] || 0) + 1;
+            pStats[mappedStat] = (pStats[mappedStat] || 0) + 0.1;
         } else {
             // Fallback for new stats
             const combatStats = ["swordsmanship", "brawling", "gunslinging", "spear", "martialArts", "sniper", "mysticArts"];
             if (combatStats.includes(mappedStat)) {
-                stats[mappedStat] = (stats[mappedStat] || 0) + 1;
+                stats[mappedStat] = (stats[mappedStat] || 0) + 0.1;
             } else {
-                pStats[mappedStat] = (pStats[mappedStat] || 0) + 1;
+                pStats[mappedStat] = (pStats[mappedStat] || 0) + 0.1;
             }
         }
 

@@ -11,6 +11,8 @@ sealed class Screen(val route: String) {
     object PvP : Screen("pvp")
     object Chat : Screen("chat")
     object Combat : Screen("combat")
+    object Victory : Screen("victory")
+    object Defeat : Screen("defeat")
     object Training : Screen("training")
     object Professions : Screen("professions/{skill}") {
         fun createRoute(skill: String = "all") = "professions/$skill"

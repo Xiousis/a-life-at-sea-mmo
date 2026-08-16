@@ -176,29 +176,29 @@ data class TransactionLog(
 )
 
 data class Stats(
-    val strength: Int = 0,
-    val endurance: Int = 0,
-    val agility: Int = 0,
-    val perception: Int = 0,
-    val willpower: Int = 0,
-    val luck: Int = 0,
+    val strength: Double = 0.0,
+    val endurance: Double = 0.0,
+    val agility: Double = 0.0,
+    val perception: Double = 0.0,
+    val willpower: Double = 0.0,
+    val luck: Double = 0.0,
     // Combat Skills
-    val swordsmanship: Int = 0,
-    val brawling: Int = 0,
-    val gunslinging: Int = 0,
-    val spear: Int = 0,
-    val martialArts: Int = 0,
-    val sniper: Int = 0,
-    val mysticArts: Int = 0
+    val swordsmanship: Double = 0.0,
+    val brawling: Double = 0.0,
+    val gunslinging: Double = 0.0,
+    val spear: Double = 0.0,
+    val martialArts: Double = 0.0,
+    val sniper: Double = 0.0,
+    val mysticArts: Double = 0.0
 )
 
 data class ProfessionStats(
-    val cooking: Int = 0,
-    val navigating: Int = 0,
-    val treasureHunting: Int = 0,
-    val blacksmith: Int = 0,
-    val fishing: Int = 0,
-    val medical: Int = 0
+    val cooking: Double = 0.0,
+    val navigating: Double = 0.0,
+    val treasureHunting: Double = 0.0,
+    val blacksmith: Double = 0.0,
+    val fishing: Double = 0.0,
+    val medical: Double = 0.0
 )
 
 enum class StatType {
@@ -235,10 +235,14 @@ data class Enemy(
 data class CombatState(
     val enemy: Enemy = Enemy(),
     val opponentId: String? = null,
+    @get:PropertyName("isPvP")
     val isPvP: Boolean = false,
+    @get:PropertyName("playerTurn")
     val playerTurn: Boolean = true,
     val logs: List<String> = emptyList(),
+    @get:PropertyName("isFinished")
     val isFinished: Boolean = false,
+    @get:PropertyName("playerWon")
     val playerWon: Boolean = false,
     val defending: Boolean = false,
     val turnExpiresAt: Long? = null,
@@ -367,12 +371,12 @@ fun Character.checkLevelUp(): Character {
         
         // Match server-side stat growth (+1 to all base stats)
         currentStats = currentStats.copy(
-            strength = currentStats.strength + 1,
-            endurance = currentStats.endurance + 1,
-            agility = currentStats.agility + 1,
-            perception = currentStats.perception + 1,
-            willpower = currentStats.willpower + 1,
-            luck = currentStats.luck + 1
+            strength = currentStats.strength + 1.0,
+            endurance = currentStats.endurance + 1.0,
+            agility = currentStats.agility + 1.0,
+            perception = currentStats.perception + 1.0,
+            willpower = currentStats.willpower + 1.0,
+            luck = currentStats.luck + 1.0
         )
         
         if (currentLevel < maxLevel) {
