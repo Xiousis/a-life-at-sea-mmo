@@ -22,8 +22,8 @@ android {
         applicationId = "com.alifeatseammo"
         minSdk = 24
         targetSdk = 37
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,7 +40,7 @@ android {
         debug {
             firebaseAppDistribution {
                 artifactType = "APK"
-                releaseNotes = "Added Mythic Art system. Updated Combat and Skills screens. Updated Cloud Functions logic. Improved dashboard navigation."
+                releaseNotes = "v1.4: Multi-element Mythic Arts (Omegalyth now Void/Celestial), Specialized Shops (Swords, Pistols, Snipers), and Dedicated Combat Result Screens (Victory/Defeat)."
                 testers = "oscali11@gmail.com"
             }
         }
