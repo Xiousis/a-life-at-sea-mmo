@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Item
 import com.alifeatseammo.data.model.Rarity
+import com.alifeatseammo.ui.components.getRarityColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +55,7 @@ fun MarketScreen(
             }
             
             if (selectedTab == 0) {
-                BuyTab(marketItems, character.gold, isLoading, onBuyItem)
+                BuyTab(marketItems, character, isLoading, onBuyItem)
             } else {
                 SellTab(character.inventory, isLoading, onSellItem)
             }
@@ -63,7 +64,7 @@ fun MarketScreen(
 }
 
 @Composable
-fun BuyTab(items: List<Item>, playerGold: Int, isLoading: Boolean, onBuyItem: (Item) -> Unit) {
+fun BuyTab(items: List<Item>, character: Character, isLoading: Boolean, onBuyItem: (Item) -> Unit) {
     if (items.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No items for sale here")
@@ -71,7 +72,7 @@ fun BuyTab(items: List<Item>, playerGold: Int, isLoading: Boolean, onBuyItem: (I
     } else {
         LazyColumn {
             items(items) { item ->
-                MarketItemRow(item, !isLoading && playerGold >= item.price, "Buy", onBuyItem)
+                MarketItemRow(item, character, !isLoading && character.gold >= item.price, "Buy", onBuyItem)
             }
         }
     }
@@ -86,14 +87,18 @@ fun SellTab(inventory: List<Item>, isLoading: Boolean, onSellItem: (Item) -> Uni
     } else {
         LazyColumn {
             items(inventory) { item ->
-                MarketItemRow(item, !isLoading, "Sell (${item.price / 2})", onSellItem)
+                // Character is null here for simplicity as we don't need reqs for selling
+                MarketItemRow(item, null, !isLoading, "Sell (${item.price / 2})", onSellItem)
             }
         }
     }
 }
 
 @Composable
-fun MarketItemRow(item: Item, canAfford: Boolean, actionLabel: String, onAction: (Item) -> Unit) {
+fun MarketItemRow(item: Item, character: Character?, isEnabled: Boolean, actionLabel: String, onAction: (Item) -> Unit) {
+    val missingRequirements = character?.getMissingRequirements(item) ?: emptyList()
+    val canEquip = character?.canEquip(item) ?: true
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -106,26 +111,24 @@ fun MarketItemRow(item: Item, canAfford: Boolean, actionLabel: String, onAction:
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = item.name, style = MaterialTheme.typography.titleMedium, color = getRarityColor(item.rarity))
                 Text(text = item.description, style = MaterialTheme.typography.bodySmall)
-                Text(text = "Level Req: ${item.levelRequirement}", style = MaterialTheme.typography.labelSmall)
+                
+                if (missingRequirements.isNotEmpty()) {
+                    Text(
+                        text = "Req: ${missingRequirements.joinToString(", ")}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else if (item.levelRequirement > 1) {
+                    Text(text = "Level Req: ${item.levelRequirement}", style = MaterialTheme.typography.labelSmall)
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Button(
                 onClick = { onAction(item) },
-                enabled = canAfford
+                enabled = isEnabled
             ) {
                 Text(actionLabel)
             }
         }
-    }
-}
-
-@Composable
-fun getRarityColor(rarity: Rarity): androidx.compose.ui.graphics.Color {
-    return when (rarity) {
-        Rarity.Common -> MaterialTheme.colorScheme.onSurface
-        Rarity.Uncommon -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
-        Rarity.Rare -> androidx.compose.ui.graphics.Color(0xFF2196F3)
-        Rarity.Epic -> androidx.compose.ui.graphics.Color(0xFF9C27B0)
-        Rarity.Legendary -> androidx.compose.ui.graphics.Color(0xFFFF9800)
     }
 }

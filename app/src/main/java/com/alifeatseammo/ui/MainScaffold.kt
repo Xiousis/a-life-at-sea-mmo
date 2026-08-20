@@ -6,15 +6,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.SportsKabaddi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 
@@ -25,67 +33,97 @@ fun MainScaffold(
     snackbarHostState: SnackbarHostState
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+    val currentDestination = navBackStackEntry?.destination
 
     val combatState = currentChar.combatState
     val inCombat = combatState != null
     val inTravel = currentChar.travelState != null
 
-    Scaffold(
+    NavigationSuiteScaffold(
         modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
+        navigationSuiteItems = {
             if (!inCombat && !inTravel) {
-                NavigationBar {
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.Dashboard.route,
-                        onClick = { navController.navigate(Screen.Dashboard.route) {
-                            popUpTo(navController.graph.startDestinationId)
+                item(
+                    selected = currentDestination?.hasRoute<Screen.Dashboard>() == true,
+                    onClick = {
+                        navController.navigate(Screen.Dashboard) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
                             launchSingleTop = true
-                        } },
-                        icon = { Text("🏠 HUB") }
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.Map.route,
-                        onClick = { navController.navigate(Screen.Map.route) {
-                            popUpTo(navController.graph.startDestinationId)
+                            restoreState = true
+                        }
+                    },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    label = { Text("HUB") }
+                )
+                item(
+                    selected = currentDestination?.hasRoute<Screen.Map>() == true,
+                    onClick = {
+                        navController.navigate(Screen.Map) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
                             launchSingleTop = true
-                        } },
-                        icon = { Text("🗺 SEA") }
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.PvP.route,
-                        onClick = { navController.navigate(Screen.PvP.route) {
-                            popUpTo(navController.graph.startDestinationId)
+                            restoreState = true
+                        }
+                    },
+                    icon = { Icon(Icons.Default.Map, contentDescription = null) },
+                    label = { Text("SEA") }
+                )
+                item(
+                    selected = currentDestination?.hasRoute<Screen.PvP>() == true,
+                    onClick = {
+                        navController.navigate(Screen.PvP) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
                             launchSingleTop = true
-                        } },
-                        icon = { Text("☠ BATTLE") }
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.Crew.route,
-                        onClick = { navController.navigate(Screen.Crew.route) {
-                            popUpTo(navController.graph.startDestinationId)
+                            restoreState = true
+                        }
+                    },
+                    icon = { Icon(Icons.Default.SportsKabaddi, contentDescription = null) },
+                    label = { Text("BATTLE") }
+                )
+                item(
+                    selected = currentDestination?.hasRoute<Screen.Crew>() == true,
+                    onClick = {
+                        navController.navigate(Screen.Crew) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
                             launchSingleTop = true
-                        } },
-                        icon = { Text("👥 CREW") }
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.More.route,
-                        onClick = { navController.navigate(Screen.More.route) {
-                            popUpTo(navController.graph.startDestinationId)
+                            restoreState = true
+                        }
+                    },
+                    icon = { Icon(Icons.Default.Groups, contentDescription = null) },
+                    label = { Text("CREW") }
+                )
+                item(
+                    selected = currentDestination?.hasRoute<Screen.More>() == true,
+                    onClick = {
+                        navController.navigate(Screen.More) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
                             launchSingleTop = true
-                        } },
-                        icon = { Text("☰ MORE") }
-                    )
-                }
+                            restoreState = true
+                        }
+                    },
+                    icon = { Icon(Icons.Default.Menu, contentDescription = null) },
+                    label = { Text("MORE") }
+                )
             }
         }
-    ) { padding ->
-        Box(modifier = Modifier.padding(padding)) {
+    ) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+        ) { padding ->
             AppNavigation(
                 navController = navController,
                 currentChar = currentChar,
-                snackbarHostState = snackbarHostState
+                snackbarHostState = snackbarHostState,
+                modifier = Modifier.padding(padding)
             )
         }
     }

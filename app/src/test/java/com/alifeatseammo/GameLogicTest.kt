@@ -78,4 +78,28 @@ class GameLogicTest {
         assertEquals(300, capped.level)
         assertEquals(0, capped.xp)
     }
+
+    @Test
+    fun testInventoryCapacityWithBag() {
+        val baseChar = Character(inventoryCapacity = 20)
+        assertEquals(20, baseChar.calculateMaxCapacity())
+
+        val bag = Item(id = "bag_1", name = "Large Bag", type = ItemType.Bag, storageBonus = 10)
+        val equippedChar = baseChar.copy(equipment = mapOf("Bag" to bag))
+        
+        assertEquals(30, equippedChar.calculateMaxCapacity())
+    }
+
+    @Test
+    fun testTravelStateWithEventMessage() {
+        val travelState = TravelState(
+            destination = "Tortuga Bay",
+            arrivalTime = 1000L,
+            startTime = 0L,
+            eventMessage = "You caught a strong tailwind!"
+        )
+        
+        assertEquals("You caught a strong tailwind!", travelState.eventMessage)
+        assertEquals("Tortuga Bay", travelState.destination)
+    }
 }

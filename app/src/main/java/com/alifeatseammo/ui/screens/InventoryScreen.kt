@@ -1,8 +1,9 @@
 package com.alifeatseammo.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -93,7 +94,7 @@ fun InventoryScreen(
             
             // Inventory Section
             Text(
-                text = "BACKPACK (${character.inventory.size}/${character.inventoryCapacity})",
+                text = "BACKPACK (${character.inventory.size}/${character.calculateMaxCapacity()})",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -105,12 +106,16 @@ fun InventoryScreen(
                     Text("Your backpack is empty.", style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
                 }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 320.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     items(character.inventory) { item ->
                         InventoryItemCard(
                             item = item,
+                            character = character,
                             isLoading = isLoading,
                             onEquip = { onEquipItem(item) },
                             onUse = {
@@ -201,6 +206,7 @@ fun EquipmentSlot(slotName: String, item: Item?, modifier: Modifier = Modifier, 
 @Composable
 fun InventoryItemCard(
     item: Item,
+    character: Character,
     isLoading: Boolean,
     onEquip: () -> Unit,
     onUse: () -> Unit,
@@ -213,11 +219,19 @@ fun InventoryItemCard(
         Rarity.Rare -> Color(0xFF2196F3)
         Rarity.Epic -> Color(0xFF9C27B0)
         Rarity.Legendary -> Color(0xFFFF9800)
+        Rarity.Mythic -> Color(0xFF00E5FF)
     }
+
+    val canEquip = character.canEquip(item)
+    val missingRequirements = character.getMissingRequirements(item)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        border = if (item.rarity != Rarity.Common) androidx.compose.foundation.BorderStroke(1.dp, rarityColor) else null
+        border = if (item.rarity != Rarity.Common) androidx.compose.foundation.BorderStroke(1.dp, rarityColor) else null,
+        colors = CardDefaults.cardColors(
+            containerColor = if (canEquip || item.type !in listOf(ItemType.Weapon, ItemType.Armor, ItemType.Accessory, ItemType.Bag)) 
+                MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
+        )
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -231,6 +245,16 @@ fun InventoryItemCard(
                     color = if (item.rarity != Rarity.Common) rarityColor else Color.Unspecified
                 )
                 Text(text = "${item.rarity} ${item.type.name}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                
+                if (missingRequirements.isNotEmpty() && item.type in listOf(ItemType.Weapon, ItemType.Armor, ItemType.Accessory, ItemType.Bag)) {
+                    Text(
+                        text = "Req: ${missingRequirements.joinToString(", ")}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 Text(text = item.description, style = MaterialTheme.typography.bodySmall)
             }
             
@@ -239,8 +263,9 @@ fun InventoryItemCard(
                     ItemType.Weapon, ItemType.Armor, ItemType.Accessory, ItemType.Bag -> {
                         Button(
                             onClick = onEquip,
-                            enabled = !isLoading,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            enabled = !isLoading && canEquip,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            colors = if (!canEquip) ButtonDefaults.buttonColors(containerColor = Color.Gray) else ButtonDefaults.buttonColors()
                         ) {
                             Text("Equip", fontSize = 12.sp)
                         }

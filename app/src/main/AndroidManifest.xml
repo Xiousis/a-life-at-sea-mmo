@@ -12,6 +12,11 @@
         android:roundIcon="@mipmap/a_life_at_sea_mmo_app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.ALifeAtSeaMMO">
+
+        <property
+            android:name="android.app.appfunctions.app_metadata"
+            android:resource="@xml/app_metadata" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

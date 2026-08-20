@@ -15,6 +15,7 @@ import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Crew
 import com.alifeatseammo.data.model.getXpNeeded
 import com.alifeatseammo.data.model.ElementType
+import com.alifeatseammo.data.model.RankDefinitions
 import com.alifeatseammo.ui.components.getElementColor
 import java.util.Locale
 
@@ -24,8 +25,10 @@ fun ProfileScreen(
     character: Character,
     crew: Crew? = null,
     isOwnProfile: Boolean = false,
+    canChallenge: Boolean = false,
     onBackClick: () -> Unit,
     onAttackClick: () -> Unit = {},
+    onChallengeClick: () -> Unit = {},
     onMessageClick: () -> Unit = {},
     onViewCrewClick: () -> Unit = {},
     onAddFriendClick: () -> Unit = {}
@@ -206,6 +209,19 @@ fun ProfileScreen(
                 }
                 ProfileStatRow("Crew:", crew?.name ?: "None")
                 ProfileStatRow("Rank:", character.rank)
+                
+                if (isOwnProfile) {
+                    val nextRank = RankDefinitions.getNextRank(character)
+                    if (nextRank != null) {
+                        val requirementMet = character.level >= nextRank.levelRequired
+                        ProfileStatRow(
+                            label = "Next Rank:",
+                            value = "${nextRank.rank} (Lv. ${nextRank.levelRequired})",
+                            color = if (requirementMet) Color(0xFF4CAF50) else Color.Gray
+                        )
+                    }
+                }
+
                 if (character.title.isNotEmpty()) {
                     ProfileStatRow("Title:", character.title)
                 }
@@ -237,6 +253,16 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (canChallenge) {
+                        Button(
+                            onClick = onChallengeClick,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = MaterialTheme.shapes.extraSmall
+                        ) {
+                            Text("CHALLENGE FOR RANK", fontWeight = FontWeight.Bold)
+                        }
+                    }
                     Button(
                         onClick = onAttackClick,
                         modifier = Modifier.fillMaxWidth(),

@@ -1,5 +1,6 @@
 package com.alifeatseammo.data.model
 
+@Suppress("unused")
 object MythicArtDefinitions {
     val allArts = listOf(
         // F-Tier (10)
@@ -17,7 +18,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.MartialArts),
             elements = listOf(ElementType.Physical),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Rusty Guard",
@@ -33,7 +34,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Brawling),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Quick Step",
@@ -65,7 +66,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.MartialArts),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Simple Thrust",
@@ -81,7 +82,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.05f,
             weakAgainst = listOf(StatType.Swordsmanship),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Steady Breath",
@@ -179,7 +180,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Vanguard Defense",
@@ -195,7 +196,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Fleet Foot",
@@ -243,7 +244,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Gambler's Strike",
@@ -275,7 +276,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
             elements = listOf(ElementType.Physical),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Crushing Weight",
@@ -291,7 +292,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.15f,
             weakAgainst = listOf(StatType.Gunslinging),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Eagle Eye",
@@ -357,7 +358,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Whirlwind Spin",
@@ -405,7 +406,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.30f,
             weakAgainst = listOf(StatType.Sniper),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Silent Step",
@@ -519,7 +520,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Wind Runner",
@@ -615,7 +616,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 0.60f,
             weakAgainst = listOf(StatType.Swordsmanship),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Desert Mirage",
@@ -681,7 +682,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 1.50f,
             weakAgainst = listOf(StatType.MysticArts),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Lightning Reflex",
@@ -843,7 +844,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Chronos Step",
@@ -891,7 +892,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "King's Authority",
@@ -923,7 +924,7 @@ object MythicArtDefinitions {
             hugeBuffValue = 5.00f,
             weakAgainst = listOf(StatType.Spear),
             elements = listOf(ElementType.Earth),
-            elementalWeaknesses = listOf(ElementType.Air)
+            elementalWeaknesses = listOf(ElementType.Air),
         ),
         MythicArt(
             name = "Silver Lining",
@@ -1251,6 +1252,46 @@ object MythicArtDefinitions {
             ),
             elements = listOf(ElementType.Creation),
             elementalWeaknesses = listOf(ElementType.Annihilation)
+        ),
+        MythicArt(
+            name = "Chronos Eye of Time",
+            tier = "Z",
+            description = "The third eye that sees through the flow of time. You exist in all moments simultaneously, granting unrivaled speed and perception. Travel is instantaneous (0s), but your physical presence is weakened (-50% HP).",
+            bonusStats = Stats(
+                agility = 5000.0, perception = 5000.0, luck = 2000.0,
+                strength = 500.0, endurance = 500.0, willpower = 500.0
+            ),
+            skillMultiplier = 5000.00f,
+            multipliedSkill = StatType.Navigating,
+            techniques = listOf(
+                "Chronos: Time Stop", "Chronos: Temporal Echo", "Chronos: Rewind",
+                "Chronos: Future Sight", "Chronos: Accelerated Aging", "Chronos: Stasis Field"
+            ),
+            debuffPercentage = 0.50f,
+            energyRegainMultiplier = 5.0f,
+            travelTimeMultiplier = 0.0f,
+            elements = listOf(ElementType.Void, ElementType.Celestial),
+            elementalWeaknesses = listOf(ElementType.Chaos)
+        ),
+        MythicArt(
+            name = "Void Eye of Entropy",
+            tier = "Z",
+            description = "The eye that witnesses the end of energy. A terrifying power that drains the very life force and mana from the world. Every action you take returns energy to you, but you cannot find rest (Healing disabled).",
+            bonusStats = Stats(
+                mysticArts = 10000.0, willpower = 2000.0, luck = 1000.0,
+                strength = 1000.0, endurance = 1000.0, agility = 1000.0
+            ),
+            skillMultiplier = 5000.00f,
+            multipliedSkill = StatType.MysticArts,
+            techniques = listOf(
+                "Entropy: Energy Drain", "Entropy: Mana Void", "Entropy: Life Siphon",
+                "Entropy: Thermal Death", "Entropy: Decay Aura", "Entropy: Void Pulse"
+            ),
+            debuffPercentage = 0.0f,
+            energyRegainMultiplier = 20.0f,
+            restrictedSkillTypes = listOf(StatType.Medical),
+            elements = listOf(ElementType.Void, ElementType.Annihilation),
+            elementalWeaknesses = listOf(ElementType.Genesis)
         )
     )
 

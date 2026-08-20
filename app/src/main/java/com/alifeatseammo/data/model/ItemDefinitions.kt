@@ -1,5 +1,6 @@
 package com.alifeatseammo.data.model
 
+@Suppress("unused")
 object ItemDefinitions {
     // Weapons
     val IRON_SWORD = Item(
@@ -10,6 +11,7 @@ object ItemDefinitions {
         rarity = Rarity.Common,
         price = 100,
         statBonus = Stats(swordsmanship = 5.0, strength = 2.0),
+        statRequirements = Stats(swordsmanship = 10.0),
         levelRequirement = 5
     )
 
@@ -21,6 +23,7 @@ object ItemDefinitions {
         rarity = Rarity.Uncommon,
         price = 250,
         statBonus = Stats(gunslinging = 8.0, perception = 3.0),
+        statRequirements = Stats(gunslinging = 25.0),
         levelRequirement = 10
     )
 
@@ -35,6 +38,42 @@ object ItemDefinitions {
         levelRequirement = 1
     )
 
+    val CURSED_BLADE_OF_SORROW = Item(
+        id = "cursed_blade_sorrow",
+        name = "Cursed Blade of Sorrow",
+        description = "A dark blade that hungers for souls. Grants immense power but at a terrible price.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Legendary,
+        price = 500000,
+        statBonus = Stats(swordsmanship = 50.0, strength = 30.0, endurance = -10.0),
+        statRequirements = Stats(swordsmanship = 150.0, willpower = 50.0),
+        levelRequirement = 40
+    )
+
+    val POSEIDON_TRIDENT = Item(
+        id = "poseidon_trident",
+        name = "Trident of Poseidon",
+        description = "A mythical weapon that commands the very seas.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Mythic,
+        price = 5000000,
+        statBonus = Stats(spear = 100.0, strength = 50.0, willpower = 50.0),
+        statRequirements = Stats(spear = 500.0, strength = 200.0, willpower = 200.0),
+        levelRequirement = 80
+    )
+
+    val LONG_RANGE_RIFLE = Item(
+        id = "long_range_rifle",
+        name = "Long Range Rifle",
+        description = "A precision weapon for those who strike from afar.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Rare,
+        price = 1500,
+        statBonus = Stats(sniper = 15.0, perception = 10.0),
+        statRequirements = Stats(sniper = 50.0, perception = 30.0),
+        levelRequirement = 20
+    )
+
     // Armor
     val LEATHER_VEST = Item(
         id = "leather_vest",
@@ -45,6 +84,17 @@ object ItemDefinitions {
         price = 80,
         statBonus = Stats(endurance = 5.0),
         levelRequirement = 3
+    )
+
+    val AEGIS_SHIELD = Item(
+        id = "aegis_shield",
+        name = "Aegis Shield",
+        description = "A shield forged by the gods themselves. Unbreakable.",
+        type = ItemType.Armor,
+        rarity = Rarity.Mythic,
+        price = 4500000,
+        statBonus = Stats(endurance = 120.0, willpower = 60.0),
+        levelRequirement = 75
     )
 
     val IRON_HELMET = Item(
@@ -265,5 +315,43 @@ object ItemDefinitions {
         rarity = Rarity.Legendary,
         price = 1000000000,
         mythicTier = "Z"
+    )
+
+    // Lures
+    val BASIC_LURE = Item(
+        id = "lure_basic",
+        name = "Basic Lure",
+        description = "A simple lure that increases the catching bar size slightly.",
+        type = ItemType.Lure,
+        rarity = Rarity.Common,
+        price = 150
+    )
+
+    val HEAVY_LURE = Item(
+        id = "lure_heavy",
+        name = "Heavy Lure",
+        description = "A weighted lure that slows down the bar's gravity.",
+        type = ItemType.Lure,
+        rarity = Rarity.Uncommon,
+        price = 500
+    )
+
+    val GLOWING_LURE = Item(
+        id = "lure_glowing",
+        name = "Glowing Lure",
+        description = "Attracts rare and legendary fish more easily.",
+        type = ItemType.Lure,
+        rarity = Rarity.Rare,
+        price = 2000
+    )
+
+    val allItems = listOf(
+        IRON_SWORD, FLINTLOCK_PISTOL, WOODEN_SPEAR, CURSED_BLADE_OF_SORROW, POSEIDON_TRIDENT, LONG_RANGE_RIFLE,
+        LEATHER_VEST, AEGIS_SHIELD, IRON_HELMET, PIRATE_CLOAK,
+        SALT, SPICES, SEAWEED, RAW_FISH, COOKED_FISH, SEA_STEW,
+        SMALL_BAG, MEDIUM_BAG, LARGE_BAG, LEGENDARY_BAG,
+        ARTIFACT_F, ARTIFACT_E, ARTIFACT_D, ARTIFACT_C, ARTIFACT_B,
+        ARTIFACT_A, ARTIFACT_S, ARTIFACT_SS, ARTIFACT_SSS, ARTIFACT_Z,
+        BASIC_LURE, HEAVY_LURE, GLOWING_LURE
     )
 }

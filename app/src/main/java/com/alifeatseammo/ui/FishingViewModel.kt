@@ -42,10 +42,14 @@ class FishingViewModel @Inject constructor(
     private val _caughtFish = MutableStateFlow<FishDef?>(null)
     val caughtFish: StateFlow<FishDef?> = _caughtFish.asStateFlow()
 
+    private val _barSizeState = MutableStateFlow(15f)
+    val barSizeState: StateFlow<Float> = _barSizeState.asStateFlow()
+
     private var gameJob: Job? = null
     private var barVelocity = 0f
-    private val gravity = 0.15f
-    private val thrust = 0.35f
+    private var gravity = 0.15f
+    private var thrust = 0.35f
+    private var barSize = 15f
     private var isPressing = false
 
     private val availableFish = listOf(
@@ -53,6 +57,8 @@ class FishingViewModel @Inject constructor(
         FishDef("mackerel", "Mackerel", Rarity.Common, 1.2f, FishingMovementPattern.Steady, 10, 5),
         FishDef("tuna", "Tuna", Rarity.Uncommon, 2.0f, FishingMovementPattern.Darting, 50, 15),
         FishDef("swordfish", "Swordfish", Rarity.Rare, 3.5f, FishingMovementPattern.Darting, 200, 50),
+        FishDef("megalodon_tooth", "Megalodon Tooth", Rarity.Legendary, 4.5f, FishingMovementPattern.Sinker, 500, 150),
+        FishDef("golden_koi", "Golden Koi", Rarity.Mythic, 6.0f, FishingMovementPattern.Darting, 2500, 500),
         FishDef("kraken_tentacle", "Kraken Tentacle", Rarity.Legendary, 5.0f, FishingMovementPattern.Sinker, 1000, 250)
     )
 
@@ -68,6 +74,10 @@ class FishingViewModel @Inject constructor(
                     _errorMessage.value = "Your Mythic Art is too powerful for such a mundane activity as fishing."
                     return@launch
                 }
+
+                // Check for lures
+                val lure = character.inventory.find { it.type == ItemType.Lure }
+                applyLureBuffs(lure)
 
                 val fishId = gameRepository.startFishing() ?: throw Exception("Failed to start fishing session")
                 val fish = availableFish.find { it.id == fishId } ?: availableFish.first()
@@ -124,7 +134,6 @@ class FishingViewModel @Inject constructor(
                 time += 0.05f
 
                 // Check Progress
-                val barSize = 15f // Size of the catching bar
                 val overlap = _fishPosition.value >= _barPosition.value && 
                              _fishPosition.value <= _barPosition.value + barSize
                 
@@ -143,6 +152,28 @@ class FishingViewModel @Inject constructor(
                 delay(16) // ~60 FPS
             }
         }
+    }
+
+    private fun applyLureBuffs(lure: Item?) {
+        // Reset defaults
+        barSize = 15f
+        gravity = 0.15f
+        thrust = 0.35f
+
+        when (lure?.id) {
+            "lure_basic" -> {
+                barSize = 20f
+            }
+            "lure_heavy" -> {
+                gravity = 0.10f
+                barSize = 18f
+            }
+            "lure_glowing" -> {
+                barSize = 25f
+                thrust = 0.45f
+            }
+        }
+        _barSizeState.value = barSize
     }
 
     private fun updateFishPosition(fish: FishDef, time: Float) {

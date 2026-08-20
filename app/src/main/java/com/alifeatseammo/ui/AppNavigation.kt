@@ -12,11 +12,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.navigation.toRoute
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import com.alifeatseammo.data.model.*
 import com.alifeatseammo.ui.screens.*
 import kotlinx.coroutines.launch
@@ -30,52 +34,15 @@ fun AppNavigation(
 ) {
     val viewModel: GameViewModel = hiltViewModel()
     val authViewModel: AuthViewModel = hiltViewModel()
-    val combatViewModel: CombatViewModel = hiltViewModel()
-    val travelViewModel: TravelViewModel = hiltViewModel()
-    val socialViewModel: SocialViewModel = hiltViewModel()
-    val economyViewModel: EconomyViewModel = hiltViewModel()
-    val profileViewModel: PlayerProfileViewModel = hiltViewModel()
-    val auctionViewModel: AuctionViewModel = hiltViewModel()
 
     val actionState by viewModel.actionState.collectAsState()
-    val travelActionState by travelViewModel.actionState.collectAsState()
-    val economyActionState by economyViewModel.actionState.collectAsState()
-    val auctionActionState by auctionViewModel.actionState.collectAsState()
 
-    // Consolidated Global Error Handling with Queue
-    val errorQueue = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateListOf<String>() }
-
-    val errorStates = listOf(
-        viewModel.errorMessage.collectAsState(),
-        combatViewModel.errorMessage.collectAsState(),
-        travelViewModel.errorMessage.collectAsState(),
-        socialViewModel.errorMessage.collectAsState(),
-        economyViewModel.errorMessage.collectAsState(),
-        auctionViewModel.errorMessage.collectAsState()
-    )
-
-    androidx.compose.runtime.LaunchedEffect(errorStates.map { it.value }) {
-        errorStates.forEach { state ->
-            state.value?.let { error ->
-                if (!errorQueue.contains(error)) {
-                    errorQueue.add(error)
-                }
-            }
-        }
-    }
-
-    androidx.compose.runtime.LaunchedEffect(errorQueue.size) {
-        if (errorQueue.isNotEmpty()) {
-            val error = errorQueue.first()
-            snackbarHostState.showSnackbar(error)
-            errorQueue.removeAt(0)
-            // Clear VMs once handled
+    // Global Error Handling for persistent VMs
+    val errorMsg by viewModel.errorMessage.collectAsState()
+    LaunchedEffect(errorMsg) {
+        errorMsg?.let {
+            snackbarHostState.showSnackbar(it)
             viewModel.clearErrorMessage()
-            combatViewModel.clearErrorMessage()
-            travelViewModel.clearErrorMessage()
-            socialViewModel.clearErrorMessage()
-            economyViewModel.clearErrorMessage()
-            auctionViewModel.clearErrorMessage()
         }
     }
 
@@ -84,8 +51,8 @@ fun AppNavigation(
     // Global navigation for travel completion
     LaunchedEffect(travelResult) {
         if (travelResult != null) {
-            navController.navigate(Screen.Dashboard.route) {
-                popUpTo(navController.graph.startDestinationId) {
+            navController.navigate(Screen.Dashboard) {
+                popUpTo<Screen.Dashboard> {
                     inclusive = false
                 }
                 launchSingleTop = true
@@ -99,32 +66,34 @@ fun AppNavigation(
         if (combatState != null) {
             if (combatState.isFinished) {
                 if (combatState.playerWon) {
-                    if (navController.currentDestination?.route != Screen.Victory.route) {
-                        navController.navigate(Screen.Victory.route) {
-                            popUpTo(Screen.Combat.route) { inclusive = true }
+                    if (navController.currentDestination?.hasRoute<Screen.Victory>() != true) {
+                        navController.navigate(Screen.Victory) {
+                            popUpTo<Screen.Combat> { inclusive = true }
                             launchSingleTop = true
                         }
                     }
                 } else {
-                    if (navController.currentDestination?.route != Screen.Defeat.route) {
-                        navController.navigate(Screen.Defeat.route) {
-                            popUpTo(Screen.Combat.route) { inclusive = true }
+                    if (navController.currentDestination?.hasRoute<Screen.Defeat>() != true) {
+                        navController.navigate(Screen.Defeat) {
+                            popUpTo<Screen.Combat> { inclusive = true }
                             launchSingleTop = true
                         }
                     }
                 }
             } else {
-                if (navController.currentDestination?.route != Screen.Combat.route) {
-                    navController.navigate(Screen.Combat.route) {
+                if (navController.currentDestination?.hasRoute<Screen.Combat>() != true) {
+                    navController.navigate(Screen.Combat) {
                         launchSingleTop = true
                     }
                 }
             }
         } else {
-            val currentRoute = navController.currentDestination?.route
-            if (currentRoute == Screen.Combat.route || currentRoute == Screen.Victory.route || currentRoute == Screen.Defeat.route) {
-                navController.navigate(Screen.Dashboard.route) {
-                    popUpTo(navController.graph.startDestinationId) { inclusive = false }
+            val currentDestination = navController.currentDestination
+            if (currentDestination?.hasRoute<Screen.Combat>() == true || 
+                currentDestination?.hasRoute<Screen.Victory>() == true || 
+                currentDestination?.hasRoute<Screen.Defeat>() == true) {
+                navController.navigate(Screen.Dashboard) {
+                    popUpTo<Screen.Dashboard> { inclusive = false }
                     launchSingleTop = true
                 }
             }
@@ -133,14 +102,22 @@ fun AppNavigation(
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Dashboard.route,
-        modifier = modifier
+        startDestination = Screen.Dashboard,
+        modifier = modifier,
+        enterTransition = { fadeIn(animationSpec = tween(500)) },
+        exitTransition = { fadeOut(animationSpec = tween(500)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(500)) },
+        popExitTransition = { fadeOut(animationSpec = tween(500)) }
     ) {
-        composable(Screen.Dashboard.route) {
+        composable<Screen.Dashboard> {
+            val combatViewModel: CombatViewModel = hiltViewModel()
+            val economyViewModel: EconomyViewModel = hiltViewModel()
+            
             val location by viewModel.currentLocationInfo.collectAsState()
             val playersNearby by viewModel.playersAtLocation.collectAsState()
             val missions by viewModel.missions.collectAsState()
             val mailMessages by economyViewModel.mailMessages.collectAsState()
+            
             DashboardScreen(
                 character = currentChar,
                 location = location,
@@ -151,42 +128,42 @@ fun AppNavigation(
                 travelResult = travelResult,
                 onActionClick = { actionType, parameter ->
                     when (actionType) {
-                        ActionType.Training -> navController.navigate(Screen.Training.route)
-                        ActionType.Docks -> navController.navigate(Screen.Travel.route)
+                        ActionType.Training -> navController.navigate(Screen.Training)
+                        ActionType.Docks -> navController.navigate(Screen.Travel)
                         ActionType.Bounties -> {
                             viewModel.setLeaderboardFaction(Faction.Pirate)
-                            navController.navigate(Screen.Leaderboard.route)
+                            navController.navigate(Screen.Leaderboard)
                         }
-                        ActionType.Crew -> navController.navigate(Screen.Crew.route)
+                        ActionType.Crew -> navController.navigate(Screen.Crew)
                         ActionType.Market -> {
-                            economyViewModel.setMarketCategory(parameter)
-                            navController.navigate(Screen.Market.route)
+                            navController.navigate(Screen.Market(category = parameter))
                         }
-                        ActionType.Tavern -> navController.navigate(Screen.Tavern.route)
-                        ActionType.Infirmary -> navController.navigate(Screen.Infirmary.route)
-                        ActionType.Camp -> navController.navigate(Screen.Camp.route)
+                        ActionType.Tavern -> navController.navigate(Screen.Tavern)
+                        ActionType.Infirmary -> navController.navigate(Screen.Infirmary)
+                        ActionType.Camp -> navController.navigate(Screen.Camp)
                         ActionType.Grind -> combatViewModel.startMonsterHunt()
-                        ActionType.Shipyard -> navController.navigate(Screen.Shipyard.route)
-                        ActionType.Work -> navController.navigate(Screen.Professions.createRoute("all"))
-                        ActionType.Kitchen -> navController.navigate(Screen.Professions.createRoute("Cooking"))
-                        ActionType.Forge -> navController.navigate(Screen.Professions.createRoute("Blacksmith"))
-                        ActionType.Observatory -> navController.navigate(Screen.Professions.createRoute("Navigating"))
-                        ActionType.Expedition -> navController.navigate(Screen.Professions.createRoute("TreasureHunting"))
-                        ActionType.Fishing -> navController.navigate(Screen.Fishing.route)
-                        ActionType.MythicRoll -> navController.navigate(Screen.MythicArt.route)
+                        ActionType.Shipyard -> navController.navigate(Screen.Shipyard)
+                        ActionType.Work -> navController.navigate(Screen.Professions("all"))
+                        ActionType.Kitchen -> navController.navigate(Screen.Professions("Cooking"))
+                        ActionType.Forge -> navController.navigate(Screen.Professions("Blacksmith"))
+                        ActionType.Observatory -> navController.navigate(Screen.Professions("Navigating"))
+                        ActionType.Expedition -> navController.navigate(Screen.Professions("TreasureHunting"))
+                        ActionType.Fishing -> navController.navigate(Screen.Fishing)
+                        ActionType.MythicRoll -> navController.navigate(Screen.MythicArt)
+                        ActionType.Arena -> navController.navigate(Screen.PvP)
                         else -> {}
                     }
                 },
                 onPlayerClick = { player ->
-                    navController.navigate(Screen.Character.createRoute(player.id))
+                    navController.navigate(Screen.Character(player.id))
                 },
-                onMissionsClick = { navController.navigate(Screen.Missions.route) },
-                onMailClick = { navController.navigate(Screen.Mail.route) },
+                onMissionsClick = { navController.navigate(Screen.Missions) },
+                onMailClick = { navController.navigate(Screen.Mail) },
                 onJoinFaction = { viewModel.joinFaction(it) },
                 onClearTravelResult = { viewModel.clearTravelResult() }
             )
         }
-        composable(Screen.Missions.route) {
+        composable<Screen.Missions> {
             val missions by viewModel.missions.collectAsState()
             val scope = rememberCoroutineScope()
             MissionScreen(
@@ -203,8 +180,19 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Travel.route) {
+        composable<Screen.Travel> {
+            val travelViewModel: TravelViewModel = hiltViewModel()
             val locations by travelViewModel.locations.collectAsState()
+            val travelActionState by travelViewModel.actionState.collectAsState()
+            
+            val error by travelViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    travelViewModel.clearErrorMessage()
+                }
+            }
+
             TravelScreen(
                 character = currentChar,
                 actionState = travelActionState,
@@ -213,46 +201,61 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Map.route) {
+        composable<Screen.Map> {
+            val travelViewModel: TravelViewModel = hiltViewModel()
             val locations by travelViewModel.locations.collectAsState()
             MapScreen(
                 character = currentChar,
                 locations = locations,
                 onLocationClick = { loc ->
                     travelViewModel.startTravel(loc.name)
-                    navController.navigate(Screen.Traveling.route)
+                    navController.navigate(Screen.Traveling)
                 },
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Leaderboard.route) {
+        composable<Screen.Leaderboard> {
             val players by viewModel.topPlayers.collectAsState()
             val selectedFaction by viewModel.leaderboardFaction.collectAsState()
+            val selectedSort by viewModel.leaderboardSort.collectAsState()
             LeaderboardScreen(
                 players = players,
                 selectedFaction = selectedFaction,
                 onFactionSelected = { viewModel.setLeaderboardFaction(it) },
+                selectedSort = selectedSort,
+                onSortSelected = { viewModel.setLeaderboardSort(it) },
                 onBackClick = { navController.popBackStack() },
                 onPlayerClick = { player ->
-                    navController.navigate(Screen.Character.createRoute(player.id))
+                    navController.navigate(Screen.Character(player.id))
                 }
             )
         }
-        composable(Screen.PvP.route) {
+        composable<Screen.PvP> {
+            val combatViewModel: CombatViewModel = hiltViewModel()
             val potentialTargets by viewModel.playersAtLocation.collectAsState()
             PvPScreen(
                 character = currentChar,
                 potentialTargets = potentialTargets.filter { it.id != currentChar.id },
                 onAttackClick = { target -> combatViewModel.attackPlayer(target) },
                 onPlayerClick = { player ->
-                    navController.navigate(Screen.Character.createRoute(player.id))
+                    navController.navigate(Screen.Character(player.id))
                 },
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Chat.route) {
+        composable<Screen.Chat> {
+            val socialViewModel: SocialViewModel = hiltViewModel()
             val globalMessages by socialViewModel.chatMessages.collectAsState()
             val crewMessages by socialViewModel.crewChatMessages.collectAsState()
+            
+            val error by socialViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    socialViewModel.clearErrorMessage()
+                }
+            }
+
             ChatScreen(
                 globalMessages = globalMessages,
                 crewMessages = crewMessages,
@@ -261,7 +264,7 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Training.route) {
+        composable<Screen.Training> {
             TrainingScreen(
                 character = currentChar,
                 actionState = actionState,
@@ -269,10 +272,23 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Crew.route) {
+        composable<Screen.Crew> {
+            val socialViewModel: SocialViewModel = hiltViewModel()
+            val profileViewModel: PlayerProfileViewModel = hiltViewModel()
+            
             val crew by profileViewModel.playerCrew.collectAsState()
             val crewMembers by profileViewModel.crewMembers.collectAsState()
             val invites by socialViewModel.crewInvites.collectAsState()
+            val socialActionState by socialViewModel.actionState.collectAsState()
+
+            val error by socialViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    socialViewModel.clearErrorMessage()
+                }
+            }
+
             LaunchedEffect(currentChar.crewId) {
                 currentChar.crewId?.let { profileViewModel.loadPlayer(currentChar.id) }
             }
@@ -281,67 +297,93 @@ fun AppNavigation(
                 crew = crew,
                 members = crewMembers,
                 invites = invites,
+                actionState = socialActionState,
                 onCreateCrew = { name, desc -> socialViewModel.createCrew(name, desc) },
                 onJoinCrew = { id -> socialViewModel.joinCrew(id) },
                 onLeaveCrew = { socialViewModel.leaveCrew() },
                 onInviteToCrew = { id -> socialViewModel.inviteToCrew(id) },
                 onRespondToInvite = { id, accept -> socialViewModel.respondToInvite(id, accept) },
                 onPromoteMember = { id, rank -> socialViewModel.promoteMember(id, rank) },
+                onKickMember = { id -> socialViewModel.kickMember(id) },
+                onDonateGold = { amount -> socialViewModel.donateGold(amount) },
+                onUpdateSettings = { desc, public -> socialViewModel.updateCrewSettings(desc, public) },
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(
-            route = Screen.Character.route,
-            arguments = listOf(navArgument("playerId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val playerId = backStackEntry.arguments?.getString("playerId")
+        composable<Screen.Character> { backStackEntry ->
+            val profileViewModel: PlayerProfileViewModel = hiltViewModel()
+            val combatViewModel: CombatViewModel = hiltViewModel()
+            val socialViewModel: SocialViewModel = hiltViewModel()
+            
+            val args = backStackEntry.toRoute<Screen.Character>()
+            val playerId = args.playerId
             val player by profileViewModel.playerProfile.collectAsState()
             val crew by profileViewModel.playerCrew.collectAsState()
 
             LaunchedEffect(playerId) {
-                playerId?.let { profileViewModel.loadPlayer(it) }
+                profileViewModel.loadPlayer(playerId)
             }
 
             player?.let { p ->
+                val canChallenge = (p.rank == "Fleet Admiral" || p.rank == "Pirate King") &&
+                        p.faction == currentChar.faction &&
+                        currentChar.level >= 300 &&
+                        (currentChar.rank == "Admiral" || currentChar.rank == "Yonko")
+
                 ProfileScreen(
                     character = p,
                     crew = crew,
                     isOwnProfile = p.id == currentChar.id,
+                    canChallenge = canChallenge,
                     onBackClick = { navController.popBackStack() },
                     onAttackClick = {
                         combatViewModel.attackPlayer(p)
                     },
+                    onChallengeClick = {
+                        combatViewModel.challengeHighestRank(p.id)
+                    },
                     onViewCrewClick = {
-                        navController.navigate(Screen.CrewProfile.route)
+                        navController.navigate(Screen.CrewProfile)
                     },
                     onAddFriendClick = { socialViewModel.addFriend(p.id) },
-                    onMessageClick = { navController.navigate(Screen.Chat.route) }
+                    onMessageClick = { navController.navigate(Screen.Chat) }
                 )
             } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
-        composable(Screen.More.route) {
+        composable<Screen.More> {
             MoreScreen(
                 isGuest = authViewModel.currentUser.value?.isAnonymous ?: false,
                 onMenuItemClick = { item ->
                     when (item.label) {
-                        "Character" -> navController.navigate(Screen.Character.createRoute(currentChar.id))
-                        "Inventory" -> navController.navigate(Screen.Inventory.route)
-                        "Stats" -> navController.navigate(Screen.Stats.route)
-                        "Skills" -> navController.navigate(Screen.Skills.route)
-                        "Auction House" -> navController.navigate(Screen.Auction.route)
-                        "Leaderboard" -> navController.navigate(Screen.Leaderboard.route)
-                        "Chat" -> navController.navigate(Screen.Chat.route)
-                        "Mail" -> navController.navigate(Screen.Mail.route)
-                        "Settings" -> navController.navigate(Screen.Settings.route)
-                        "Help" -> navController.navigate(Screen.Help.route)
-                        "Upgrade Account" -> navController.navigate(Screen.UpgradeAccount.route)
+                        "Character" -> navController.navigate(Screen.Character(currentChar.id))
+                        "Inventory" -> navController.navigate(Screen.Inventory)
+                        "Stats" -> navController.navigate(Screen.Stats)
+                        "Skills" -> navController.navigate(Screen.Skills)
+                        "Auction House" -> navController.navigate(Screen.Auction)
+                        "Leaderboard" -> navController.navigate(Screen.Leaderboard)
+                        "Chat" -> navController.navigate(Screen.Chat)
+                        "Mail" -> navController.navigate(Screen.Mail)
+                        "Settings" -> navController.navigate(Screen.Settings)
+                        "Help" -> navController.navigate(Screen.Help)
+                        "Upgrade Account" -> navController.navigate(Screen.UpgradeAccount)
                     }
                 }
             )
         }
-        composable(Screen.Inventory.route) {
+        composable<Screen.Inventory> {
+            val economyViewModel: EconomyViewModel = hiltViewModel()
+            val economyActionState by economyViewModel.actionState.collectAsState()
+            
+            val error by economyViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    economyViewModel.clearErrorMessage()
+                }
+            }
+
             InventoryScreen(
                 character = currentChar,
                 actionState = economyActionState,
@@ -353,13 +395,13 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Stats.route) {
+        composable<Screen.Stats> {
             StatsScreen(
                 character = currentChar,
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Skills.route) {
+        composable<Screen.Skills> {
             val allTechniques by viewModel.techniques.collectAsState()
             SkillsScreen(
                 character = currentChar,
@@ -367,11 +409,9 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(
-            route = Screen.Professions.route,
-            arguments = listOf(navArgument("skill") { defaultValue = "all"; type = NavType.StringType })
-        ) { backStackEntry ->
-            val skill = backStackEntry.arguments?.getString("skill") ?: "all"
+        composable<Screen.Professions> { backStackEntry ->
+            val args = backStackEntry.toRoute<Screen.Professions>()
+            val skill = args.skill
             ProfessionsScreen(
                 character = currentChar,
                 actionState = actionState,
@@ -380,14 +420,31 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Tavern.route) {
+        composable<Screen.Tavern> {
             TavernScreen(
                 character = currentChar,
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Market.route) {
+        composable<Screen.Market> { backStackEntry ->
+            val economyViewModel: EconomyViewModel = hiltViewModel()
+            val args = backStackEntry.toRoute<Screen.Market>()
+            
+            LaunchedEffect(args.category) {
+                economyViewModel.setMarketCategory(args.category)
+            }
+
             val marketItems by economyViewModel.marketItems.collectAsState()
+            val economyActionState by economyViewModel.actionState.collectAsState()
+            
+            val error by economyViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    economyViewModel.clearErrorMessage()
+                }
+            }
+
             MarketScreen(
                 character = currentChar,
                 actionState = economyActionState,
@@ -397,26 +454,40 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Mail.route) {
+        composable<Screen.Mail> {
+            val economyViewModel: EconomyViewModel = hiltViewModel()
             val mailMessages by economyViewModel.mailMessages.collectAsState()
+            val economyActionState by economyViewModel.actionState.collectAsState()
+            
+            val error by economyViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    economyViewModel.clearErrorMessage()
+                }
+            }
+
             MailScreen(
                 messages = mailMessages,
+                actionState = economyActionState,
                 onClaimRewards = { economyViewModel.claimMailRewards(it) },
                 onDeleteMail = { economyViewModel.deleteMail(it) },
                 onMarkAsRead = { economyViewModel.markMailAsRead(it) },
+                onSendMail = { recipient, subject, body -> economyViewModel.sendMail(recipient, subject, body) },
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.UpgradeAccount.route) {
+        composable<Screen.UpgradeAccount> {
             val authResult by authViewModel.authResult.collectAsState()
             UpgradeAccountScreen(
                 authResult = authResult,
                 onUpgrade = { email, password -> authViewModel.upgradeGuestAccount(email, password) },
+                onVerifiedEmailUpgrade = { activity -> authViewModel.startVerifiedEmailUpgrade(activity) },
                 onBackClick = { navController.popBackStack() },
                 onClearError = { authViewModel.clearAuthResult() }
             )
         }
-        composable(Screen.Infirmary.route) {
+        composable<Screen.Infirmary> {
             val playersNearby by viewModel.playersAtLocation.collectAsState()
             InfirmaryScreen(
                 character = currentChar,
@@ -429,7 +500,7 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Camp.route) {
+        composable<Screen.Camp> {
             val playersNearby by viewModel.playersAtLocation.collectAsState()
             CampScreen(
                 character = currentChar,
@@ -441,7 +512,18 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Shipyard.route) {
+        composable<Screen.Shipyard> {
+            val economyViewModel: EconomyViewModel = hiltViewModel()
+            val economyActionState by economyViewModel.actionState.collectAsState()
+            
+            val error by economyViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    economyViewModel.clearErrorMessage()
+                }
+            }
+
             val availableShips = listOf(
                 com.alifeatseammo.data.model.Ship("row_boat", "Row Boat", 0, 1.0f),
                 com.alifeatseammo.data.model.Ship("sloop", "Sloop", 500, 1.5f),
@@ -452,22 +534,27 @@ fun AppNavigation(
                 character = currentChar,
                 availableShips = availableShips,
                 onBuyShip = { economyViewModel.purchaseShip(it.id) },
+                onUpgradeShip = { economyViewModel.upgradeShip(it) },
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Settings.route) {
+        composable<Screen.Settings> {
             SettingsScreen(
                 viewModel = viewModel,
                 authViewModel = authViewModel,
+                onAdminPanelClick = { navController.navigate(Screen.AdminPanel) },
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Help.route) {
+        composable<Screen.Help> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 androidx.compose.material3.Text("Help & Support")
             }
         }
-        composable(Screen.CrewProfile.route) {
+        composable<Screen.CrewProfile> {
+            val profileViewModel: PlayerProfileViewModel = hiltViewModel()
+            val socialViewModel: SocialViewModel = hiltViewModel()
+            
             val crew by profileViewModel.playerCrew.collectAsState()
             val crewMembers by profileViewModel.crewMembers.collectAsState()
             CrewProfileScreen(
@@ -477,25 +564,36 @@ fun AppNavigation(
                 onJoinClick = { crewId -> socialViewModel.joinCrew(crewId) }
             )
         }
-        composable(Screen.Traveling.route) {
+        composable<Screen.Traveling> {
             TravelingScreen(
                 character = currentChar,
                 onCompleteClick = { viewModel.finishTravel() }
             )
         }
-        composable(Screen.Fishing.route) {
+        composable<Screen.Fishing> {
             FishingScreen(
                 onBackClick = { navController.popBackStack() },
                 snackbarHostState = snackbarHostState
             )
         }
-        composable(Screen.Combat.route) {
+        composable<Screen.Combat> {
+            val combatViewModel: CombatViewModel = hiltViewModel()
+            
+            val error by combatViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    combatViewModel.clearErrorMessage()
+                }
+            }
+
             CombatScreen(
                 character = currentChar,
                 onActionClick = { action, techId, itemId -> combatViewModel.combatAction(action, techId, itemId) }
             )
         }
-        composable(Screen.Victory.route) {
+        composable<Screen.Victory> {
+            val combatViewModel: CombatViewModel = hiltViewModel()
             currentChar.combatState?.let { state ->
                 VictoryScreen(
                     combatState = state,
@@ -503,7 +601,8 @@ fun AppNavigation(
                 )
             }
         }
-        composable(Screen.Defeat.route) {
+        composable<Screen.Defeat> {
+            val combatViewModel: CombatViewModel = hiltViewModel()
             currentChar.combatState?.let { state ->
                 DefeatScreen(
                     combatState = state,
@@ -511,7 +610,7 @@ fun AppNavigation(
                 )
             }
         }
-        composable(Screen.MythicArt.route) {
+        composable<Screen.MythicArt> {
             MythicArtScreen(
                 character = currentChar,
                 actionState = actionState,
@@ -521,8 +620,19 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        composable(Screen.Auction.route) {
+        composable<Screen.Auction> {
+            val auctionViewModel: AuctionViewModel = hiltViewModel()
             val listings by auctionViewModel.auctionListings.collectAsState()
+            val auctionActionState by auctionViewModel.actionState.collectAsState()
+            
+            val error by auctionViewModel.errorMessage.collectAsState()
+            LaunchedEffect(error) {
+                error?.let {
+                    snackbarHostState.showSnackbar(it)
+                    auctionViewModel.clearErrorMessage()
+                }
+            }
+
             AuctionScreen(
                 character = currentChar,
                 listings = listings,
@@ -530,6 +640,12 @@ fun AppNavigation(
                 onListButtonClick = { item, price -> auctionViewModel.listAuctionItem(item, price) },
                 onBuyButtonClick = { auctionViewModel.buyAuctionItem(it) },
                 onCancelButtonClick = { auctionViewModel.cancelAuctionListing(it) },
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable<Screen.AdminPanel> {
+            AdminPanelScreen(
+                viewModel = viewModel,
                 onBackClick = { navController.popBackStack() }
             )
         }

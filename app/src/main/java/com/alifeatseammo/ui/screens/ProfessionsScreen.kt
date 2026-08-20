@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.StatType
 
+import kotlin.time.Duration.Companion.milliseconds
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfessionsScreen(
@@ -28,7 +30,7 @@ fun ProfessionsScreen(
     LaunchedEffect(character.trainingState) {
         while (character.trainingState != null) {
             currentTime = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1000)
+            kotlinx.coroutines.delay(1000.milliseconds)
         }
     }
 

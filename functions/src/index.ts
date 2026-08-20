@@ -833,6 +833,8 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
             energyUpdatedAt: Date.now(),
             lastOnline: Date.now(),
             isOnline: true,
+            isAdmin: false,
+            isBanned: false,
             currentLocation: "Fogi Tail Island",
             freeMythicRolls: 3,
             mythicArt: null,
@@ -903,13 +905,13 @@ export const joinFaction = functions.https.onCall(async (data, context) => {
             if (character.currentLocation !== "Pirate\u0027s Den") {
                 throw new functions.https.HttpsError("failed-precondition", "You must be at the Pirate\u0027s Den to join the Pirates.");
             }
-            transaction.update(playerRef, { faction: "Pirate", rank: "Rogue Sailor" });
+            transaction.update(playerRef, { faction: "Pirate", rank: "Rogue" });
             recordLog(transaction, userId, "JoinFaction", "Became a Pirate", 0, 0);
         } else if (faction === "Navy") {
             if (character.currentLocation !== "Navy Outpost Aqua") {
                 throw new functions.https.HttpsError("failed-precondition", "You must be at the Navy Outpost Aqua to enlist in the Navy.");
             }
-            transaction.update(playerRef, { faction: "Navy", rank: "Navy Recruit" });
+            transaction.update(playerRef, { faction: "Navy", rank: "Navy Cadet" });
             recordLog(transaction, userId, "JoinFaction", "Enlisted in the Navy", 0, 0);
         } else {
             throw new functions.https.HttpsError("invalid-argument", "Invalid faction choice.");
@@ -1084,39 +1086,70 @@ export const startTravel = functions.https.onCall(async (data, context) => {
             travelMultiplier = character.mythicArt.travelTimeMultiplier;
         }
 
-        const travelDuration = calculateTravelTime(character.currentLocation, destination, speedMultiplier * (1.0 / travelMultiplier));
-        const arrivalTime = Date.now() + travelDuration;
+        let travelDuration = calculateTravelTime(character.currentLocation, destination, speedMultiplier * (1.0 / travelMultiplier));
+        let arrivalTime = Date.now() + travelDuration;
+        let eventMessage: string | null = null;
 
-        // Potential for random encounter here (Pirates, Monsters)
-        if (travelDuration > 10000 && Math.random() < 0.25) {
-            const enemy = generateEnemy(character.level);
+        // Random Sea Events (35% chance)
+        if (travelDuration > 10000 && Math.random() < 0.35) {
+            const eventRoll = Math.random();
 
-            transaction.update(playerRef, {
-                hp: character.hp,
-                healingState: character.healingState,
-                combatState: {
-                    enemy: enemy,
-                    playerTurn: true,
-                    logs: [`While sailing to ${destination}, you encountered a ${enemy.name}!`],
-                    isFinished: false,
-                    playerWon: false,
-                    turnCount: 0,
-                    intendedDestination: destination,
-                    intendedArrivalTime: arrivalTime,
-                    intendedStartTime: Date.now()
-                }
-            });
-            return { ambush: true, enemy };
+            if (eventRoll < 0.50) {
+                // 1. Ambush (Combat)
+                const enemy = generateEnemy(character.level);
+                transaction.update(playerRef, {
+                    hp: character.hp,
+                    healingState: character.healingState,
+                    combatState: {
+                        enemy: enemy,
+                        playerTurn: true,
+                        logs: [`While sailing to ${destination}, you encountered a ${enemy.name}!`],
+                        isFinished: false,
+                        playerWon: false,
+                        turnCount: 0,
+                        intendedDestination: destination,
+                        intendedArrivalTime: arrivalTime,
+                        intendedStartTime: Date.now()
+                    }
+                });
+                return { ambush: true, enemy };
+            } else if (eventRoll < 0.65) {
+                // 2. Tailwinds
+                travelDuration = Math.floor(travelDuration * 0.75);
+                arrivalTime = Date.now() + travelDuration;
+                eventMessage = "You caught a strong tailwind! Voyage time reduced.";
+            } else if (eventRoll < 0.75) {
+                // 3. Sudden Storm
+                const damage = Math.floor(character.maxHp * 0.15);
+                character.hp = Math.max(1, character.hp - damage); // Don't die to storm, just low HP
+                travelDuration += 30000; // 30s delay
+                arrivalTime = Date.now() + travelDuration;
+                eventMessage = "A sudden storm battered your ship! You took damage and were slowed down.";
+            } else if (eventRoll < 0.90) {
+                // 4. Floating Supplies
+                character.gold = (character.gold || 0) + 500;
+                character.energy = Math.min(character.maxEnergy, character.energy + 15);
+                eventMessage = "You found a crate of floating supplies! +500 Gold and +15 Energy.";
+            } else if (eventRoll < 0.95) {
+                // 5. Ancient Driftwood (Random Item - Simplified, granting gold value for now or specific item if needed)
+                character.gold = (character.gold || 0) + 1000;
+                eventMessage = "You salvaged something valuable from ancient driftwood! (Found hidden treasures worth 1000 Gold)";
+            } else {
+                // 6. Mermaid's Song
+                character.energy = character.maxEnergy;
+                eventMessage = "The hauntingly beautiful song of a mermaid has restored your energy.";
+            }
         }
 
         transaction.update(playerRef, {
             hp: character.hp,
+            gold: character.gold,
             energy: character.energy,
             energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
-            travelState: { destination, arrivalTime, startTime: Date.now() }
+            travelState: { destination, arrivalTime, startTime: Date.now(), eventMessage }
         });
-        return { success: true, arrivalTime, travelDuration };
+        return { success: true, arrivalTime, travelDuration, eventMessage };
     });
 });
 
@@ -1351,13 +1384,20 @@ function calculateCombatStats(charOrEnemy: any, currentEffects: any[] = []): Com
 
 function generateEnemy(playerLevel: number) {
     const seaMobs = [
-        { name: "Sea Serpent", minLevel: 1, maxLevel: 10, dropTableId: "basic_sea_loot" },
-        { name: "Pirate Scout", minLevel: 3, maxLevel: 15, dropTableId: "basic_sea_loot" },
-        { name: "Giant Squid", minLevel: 10, maxLevel: 25, dropTableId: "rare_sea_loot" },
-        { name: "Ghost Pirate", minLevel: 15, maxLevel: 40, dropTableId: "rare_sea_loot" },
-        { name: "Feral Crab", minLevel: 1, maxLevel: 5, dropTableId: "basic_sea_loot" },
-        { name: "Rogue Sloop", minLevel: 5, maxLevel: 20, dropTableId: "basic_sea_loot" },
-        { name: "Navy Enforcer", minLevel: 8, maxLevel: 30, dropTableId: "rare_sea_loot" }
+        { name: "Sea Serpent", minLevel: 1, maxLevel: 15, dropTableId: "basic_sea_loot" },
+        { name: "Pirate Scout", minLevel: 3, maxLevel: 20, dropTableId: "basic_sea_loot" },
+        { name: "Giant Squid", minLevel: 10, maxLevel: 30, dropTableId: "rare_sea_loot" },
+        { name: "Ghost Pirate", minLevel: 15, maxLevel: 45, dropTableId: "rare_sea_loot" },
+        { name: "Feral Crab", minLevel: 1, maxLevel: 8, dropTableId: "basic_sea_loot" },
+        { name: "Rogue Sloop", minLevel: 5, maxLevel: 25, dropTableId: "basic_sea_loot" },
+        { name: "Navy Enforcer", minLevel: 8, maxLevel: 35, dropTableId: "rare_sea_loot" },
+        { name: "Sunken Golem", minLevel: 20, maxLevel: 50, dropTableId: "rare_sea_loot" },
+        { name: "Abyssal Horror", minLevel: 50, maxLevel: 150, dropTableId: "mythic_sea_loot" },
+        { name: "Shadow Leviathan", minLevel: 60, maxLevel: 200, dropTableId: "mythic_sea_loot" },
+        { name: "Elite Navy Hunter", minLevel: 40, maxLevel: 100, dropTableId: "rare_sea_loot" },
+        { name: "Pirate Warlord", minLevel: 70, maxLevel: 250, dropTableId: "mythic_sea_loot" },
+        { name: "Siren", minLevel: 25, maxLevel: 60, dropTableId: "rare_sea_loot" },
+        { name: "Storm Roc", minLevel: 30, maxLevel: 80, dropTableId: "rare_sea_loot" }
     ];
 
     // Filter mobs by player level
@@ -1897,6 +1937,21 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     [`recentPvP.${loser.id}`]: Date.now()
                 };
 
+                // Rank Swap Logic for Highest Rank Challenges
+                if (combat.isRankChallenge) {
+                    if (playerWon) {
+                        // Challenger (winner) takes the rank
+                        const tempRank = winner.rank;
+                        winnerUpdate.rank = loser.rank;
+                        winnerUpdate.lastRankChallengeAt = Date.now();
+                        logs.push(`RANK CHALLENGE SUCCESS! ${winner.name} has claimed the title of ${winnerUpdate.rank}!`);
+                    } else {
+                        // Target (winner) defended the rank
+                        winnerUpdate.lastRankChallengeAt = Date.now();
+                        logs.push(`${winner.name} has successfully defended their rank!`);
+                    }
+                }
+
                 // Issue 20: Pirate Bounty Farming Protection
                 if (winner.faction === "Pirate" && !isFarming) {
                     winnerUpdate.bounty = (winner.bounty || 0) + 100;
@@ -1931,6 +1986,21 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     energy: playerWon ? loser.energy : playerEnergy,
                     currentLocation: "Fogi Tail Island" // Issue 21: Default Respawn
                 };
+
+                if (combat.isRankChallenge) {
+                    if (playerWon) {
+                        // Target (loser) is demoted to rank below
+                        const factionRanks = loser.faction === "Navy" ? ["Admiral", "Fleet Admiral"] : ["Yonko", "Pirate King"];
+                        loserUpdate.rank = factionRanks[0];
+                        loserUpdate.lastRankChallengeAt = Date.now();
+                        logs.push(`RANK CHALLENGE FAILURE! ${loser.name} has been demoted to ${loserUpdate.rank}.`);
+                    } else {
+                        // Challenger (loser) fails
+                        loserUpdate.lastRankChallengeAt = Date.now();
+                        logs.push(`RANK CHALLENGE FAILURE! ${loser.name} was unable to claim the rank.`);
+                    }
+                }
+
                 if (!playerWon) loserUpdate.inventory = character.inventory;
                 transaction.update(loserRef, loserUpdate);
 
@@ -2063,6 +2133,111 @@ export const combatAction = functions.https.onCall(async (data, context) => {
             }
             return { success: true, logs };
         }
+    });
+});
+
+export const challengeHighestRank = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { targetId } = data;
+    const userId = context.auth.uid;
+    const challengerRef = db.collection("players").doc(userId);
+    const targetRef = db.collection("players").doc(targetId);
+
+    return db.runTransaction(async (transaction) => {
+        const [challengerSnap, targetSnap] = await Promise.all([
+            transaction.get(challengerRef),
+            transaction.get(targetRef)
+        ]);
+
+        if (!challengerSnap.exists || !targetSnap.exists) {
+            throw new functions.https.HttpsError("not-found", "Player not found.");
+        }
+
+        let challenger = challengerSnap.data() as any;
+        challenger = processCharacterUpdates(challenger);
+
+        assertCanPerformAction(challenger, "challenge for rank", { blockBusy: true, blockHealing: true });
+
+        const target = targetSnap.data() as any;
+        const targetWithUpdates = processCharacterUpdates(target);
+
+        if (userId === targetId) throw new functions.https.HttpsError("invalid-argument", "You cannot challenge yourself.");
+        if (challenger.faction !== target.faction) throw new functions.https.HttpsError("failed-precondition", "You can only challenge members of your own faction.");
+
+        const highestRanks = ["Fleet Admiral", "Pirate King"];
+        if (!highestRanks.includes(target.rank)) throw new functions.https.HttpsError("failed-precondition", "Target does not hold a challengeable highest rank.");
+
+        const challengerCandidateRanks = ["Admiral", "Yonko"];
+        if (!challengerCandidateRanks.includes(challenger.rank) && challenger.level < 300) {
+            throw new functions.https.HttpsError("failed-precondition", "You must be Level 300 and at the rank of Admiral or Yonko to challenge.");
+        }
+
+        // Cooldown check: 2 days (172,800,000 ms)
+        const cooldown = 2 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        if (target.lastRankChallengeAt && (now - target.lastRankChallengeAt < cooldown)) {
+            const remainingHours = Math.ceil((cooldown - (now - target.lastRankChallengeAt)) / (60 * 60 * 1000));
+            throw new functions.https.HttpsError("failed-precondition", `This rank holder was recently challenged. Please wait ${remainingHours} more hours.`);
+        }
+
+        if (!target.isOnline) throw new functions.https.HttpsError("failed-precondition", "The rank holder is currently offline.");
+        if (targetWithUpdates.combatState || targetWithUpdates.travelState || targetWithUpdates.trainingState || targetWithUpdates.healingState) {
+            throw new functions.https.HttpsError("failed-precondition", "The rank holder is currently busy or resting.");
+        }
+
+        const challengerCombat = {
+            opponentId: targetId,
+            isPvP: true,
+            isRankChallenge: true,
+            playerTurn: true,
+            logs: [`RANK CHALLENGE: You have challenged ${target.name} for the title of ${target.rank}!`],
+            enemy: {
+                name: target.name,
+                level: target.level,
+                hp: target.hp,
+                maxHp: target.maxHp,
+                stats: target.stats
+            },
+            isFinished: false,
+            turnCount: 0,
+            playerEffects: [],
+            enemyEffects: [],
+            cooldowns: {},
+            turnExpiresAt: now + TURN_TIMEOUT_MS
+        };
+
+        const targetCombat = {
+            opponentId: userId,
+            isPvP: true,
+            isRankChallenge: true,
+            playerTurn: false,
+            logs: [`RANK CHALLENGE: ${challenger.name} has challenged you for your title of ${target.rank}!`],
+            enemy: {
+                name: challenger.name,
+                level: challenger.level,
+                hp: challenger.hp,
+                maxHp: challenger.maxHp,
+                stats: challenger.stats
+            },
+            isFinished: false,
+            turnCount: 0,
+            playerEffects: [],
+            enemyEffects: [],
+            cooldowns: {},
+            turnExpiresAt: now + TURN_TIMEOUT_MS
+        };
+
+        transaction.update(challengerRef, { ...challenger, combatState: challengerCombat });
+        transaction.update(targetRef, {
+            hp: targetWithUpdates.hp,
+            energy: targetWithUpdates.energy,
+            energyUpdatedAt: targetWithUpdates.energyUpdatedAt,
+            healingState: targetWithUpdates.healingState,
+            combatState: targetCombat
+        });
+
+        return { success: true };
     });
 });
 
@@ -2499,6 +2674,17 @@ export const completeMission = functions.https.onCall(async (data, context) => {
             xp: character.xp + (mission.xpReward || 0)
         };
 
+        if (mission.isRankUp && mission.targetRank) {
+            if (mission.targetRank === "Fleet Admiral" || mission.targetRank === "Pirate King") {
+                // Check if slots are full
+                const holdersSnap = await db.collection("players").where("rank", "==", mission.targetRank).get();
+                if (holdersSnap.size >= 2) {
+                    throw new functions.https.HttpsError("failed-precondition", `There are already 2 players holding the title of ${mission.targetRank}. You must challenge one of them for their spot.`);
+                }
+            }
+            updatedChar.rank = mission.targetRank;
+        }
+
         updatedChar = checkLevelUp(updatedChar);
         transaction.update(playerRef, updatedChar);
         recordLog(transaction, userId, "MissionCompleted", `Completed mission ${mission.title || missionId}`, mission.goldReward, mission.xpReward);
@@ -2591,11 +2777,16 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
             energyUpdatedAt: character.energyUpdatedAt
         };
 
+        // Admin Repair/Sync
+        if (context.auth?.token.admin && !character.isAdmin) {
+            updates.isAdmin = true;
+        }
+
         // Rank Repair Logic: Ensure faction members have their correct starting rank if it was lost
         if (character.faction === "Navy" && (character.rank === "Novice Sailor" || !character.rank)) {
-            updates.rank = "Navy Recruit";
+            updates.rank = "Navy Cadet";
         } else if (character.faction === "Pirate" && (character.rank === "Novice Sailor" || !character.rank)) {
-            updates.rank = "Rogue Sailor";
+            updates.rank = "Rogue";
         }
 
         // Skill Repair Logic: Ensure required techniques are learned (baseline + current Mythic Art)
@@ -2613,6 +2804,31 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
 
         if (missingTechs.length > 0) {
             updates.learnedTechniques = admin.firestore.FieldValue.arrayUnion(...missingTechs);
+        }
+
+        // Random Travel Events (20% chance during heartbeat if traveling)
+        if (character.travelState && character.travelState.arrivalTime > Date.now()) {
+            if (Math.random() < 0.20) {
+                const travelEvents = [
+                    { msg: "You spotted a pod of dolphins jumping alongside the ship.", gold: 0, energy: 5 },
+                    { msg: "A brief rain shower washed the deck. The crew feels refreshed.", gold: 0, energy: 10 },
+                    { msg: "You found a small pouch of gold stuck in a fishing net! +100 Gold", gold: 100, energy: 0 },
+                    { msg: "The sunset is particularly beautiful tonight. It fills you with determination.", gold: 0, energy: 0, hp: 5 },
+                    { msg: "A passing merchant ship shared some supplies. +200 Gold", gold: 200, energy: 0 },
+                    { msg: "You discovered a small uncharted sandbar with some washed up crates. +300 Gold", gold: 300, energy: 0 },
+                    { msg: "A calm sea allows for some extra rest. +20 Energy", gold: 0, energy: 20 },
+                    { msg: "The crew caught a massive fish! Everyone is well-fed. +15 Energy", gold: 0, energy: 15 },
+                    { msg: "Distant gulls cry out, signaling you're on the right path.", gold: 0, energy: 0 },
+                    { msg: "The ship's cook made a special hardtack soup. +5 Energy", gold: 0, energy: 5 }
+                ];
+                const selected = travelEvents[Math.floor(Math.random() * travelEvents.length)];
+                const newEvent = { message: selected.msg, timestamp: Date.now() };
+
+                updates["travelState.events"] = admin.firestore.FieldValue.arrayUnion(newEvent);
+                if (selected.gold) updates.gold = admin.firestore.FieldValue.increment(selected.gold);
+                if (selected.energy) updates.energy = Math.min(character.maxEnergy, updates.energy + selected.energy);
+                if (selected.hp) updates.hp = Math.min(character.maxHp, updates.hp + selected.hp);
+            }
         }
 
         transaction.update(playerRef, updates);
@@ -2643,7 +2859,8 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 1680, y: 960, actions: [{ type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -600, y: 720, actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Market", label: "Sniper Shop", icon: "🎯", parameter: "Sniper" }, { type: "Observatory", label: "Star Gazing", icon: "🔭" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
         { name: "Serpent's Maw", region: "Grand Line", description: "A terrifying island shaped like a giant serpent's head.", isSafe: false, weather: "Foggy", x: 2000, y: 2000, actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-        { name: "Island of World Secrets", region: "Unknown", description: "A mystical island shrouded in secrets. Here, you can roll for Mythic Arts.", isSafe: true, weather: "Celestial", x: 4000, y: 4000, actions: [{ type: "MythicRoll", label: "Ancient Altar", icon: "✨" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
+        { name: "Island of World Secrets", region: "Unknown", description: "A mystical island shrouded in secrets. Here, you can roll for Mythic Arts.", isSafe: true, weather: "Celestial", x: 4000, y: 4000, actions: [{ type: "MythicRoll", label: "Ancient Altar", icon: "✨" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
+        { name: "Champion's Colosseum", region: "Grand Line", description: "A legendary island where the strongest warriors gather for ranked battles. Home to the world-renowned Arena.", isSafe: true, weather: "Clear", x: 2500, y: -2500, actions: [{ type: "Arena", label: "Grand Arena", icon: "🏟" }, { type: "Infirmary", label: "Arena Hospital", icon: "🏥" }, { type: "Market", label: "General Store", icon: "🛍" }, { type: "Market", label: "Armor Shop", icon: "🛡", parameter: "Armor" }, { type: "BlackMarket", label: "Gladiator's Black Market", icon: "🕵" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
     ];
 
     // Delete old/invalid locations
@@ -2676,20 +2893,24 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
     const items = [
         { id: "fish_scales", name: "Fish Scales", description: "Shiny scales from a sea creature.", type: "Miscellaneous", rarity: "Common", price: 5 },
         { id: "sea_shell", name: "Sea Shell", description: "A pretty shell from the ocean floor.", type: "Miscellaneous", rarity: "Common", price: 10 },
-        { id: "rusty_cutlass", name: "Rusty Cutlass", description: "An old, worn-out sword.", type: "Weapon", rarity: "Common", price: 50, levelRequirement: 1, statBonus: { strength: 2 }, weaponCategory: "Sword" },
-        { id: "steel_sabre", name: "Steel Sabre", description: "A sharp and reliable blade.", type: "Weapon", rarity: "Uncommon", price: 500, levelRequirement: 5, statBonus: { strength: 5, agility: 2 }, weaponCategory: "Sword" },
-        { id: "katana", name: "Refined Katana", description: "A masterpiece of craftsmanship.", type: "Weapon", rarity: "Rare", price: 5000, levelRequirement: 15, statBonus: { strength: 10, agility: 10 }, weaponCategory: "Sword" },
-        { id: "flintlock", name: "Old Flintlock", description: "A basic single-shot pistol.", type: "Weapon", rarity: "Common", price: 100, levelRequirement: 1, statBonus: { gunslinging: 2 }, weaponCategory: "Pistol" },
-        { id: "navy_revolver", name: "Navy Revolver", description: "A standard issue marine sidearm.", type: "Weapon", rarity: "Uncommon", price: 800, levelRequirement: 10, statBonus: { gunslinging: 8 }, weaponCategory: "Pistol" },
-        { id: "long_rifle", name: "Hunter's Long Rifle", description: "Accurate at long ranges.", type: "Weapon", rarity: "Uncommon", price: 1500, levelRequirement: 10, statBonus: { sniper: 12 }, weaponCategory: "Sniper" },
-        { id: "scoped_musket", name: "Scoped Musket", description: "Equipped with a primitive but effective lens.", type: "Weapon", rarity: "Rare", price: 10000, levelRequirement: 25, statBonus: { sniper: 30, perception: 5 }, weaponCategory: "Sniper" },
+        { id: "rusty_cutlass", name: "Rusty Cutlass", description: "An old, worn-out sword.", type: "Weapon", rarity: "Common", price: 50, levelRequirement: 1, statBonus: { strength: 2 }, statRequirements: { swordsmanship: 2 }, weaponCategory: "Sword" },
+        { id: "steel_sabre", name: "Steel Sabre", description: "A sharp and reliable blade.", type: "Weapon", rarity: "Uncommon", price: 500, levelRequirement: 5, statBonus: { strength: 5, agility: 2 }, statRequirements: { swordsmanship: 10 }, weaponCategory: "Sword" },
+        { id: "katana", name: "Refined Katana", description: "A masterpiece of craftsmanship.", type: "Weapon", rarity: "Rare", price: 5000, levelRequirement: 15, statBonus: { strength: 10, agility: 10 }, statRequirements: { swordsmanship: 40 }, weaponCategory: "Sword" },
+        { id: "flintlock", name: "Old Flintlock", description: "A basic single-shot pistol.", type: "Weapon", rarity: "Common", price: 100, levelRequirement: 1, statBonus: { gunslinging: 2 }, statRequirements: { gunslinging: 5 }, weaponCategory: "Pistol" },
+        { id: "navy_revolver", name: "Navy Revolver", description: "A standard issue marine sidearm.", type: "Weapon", rarity: "Uncommon", price: 800, levelRequirement: 10, statBonus: { gunslinging: 8 }, statRequirements: { gunslinging: 25 }, weaponCategory: "Pistol" },
+        { id: "long_rifle", name: "Hunter's Long Rifle", description: "Accurate at long ranges.", type: "Weapon", rarity: "Uncommon", price: 1500, levelRequirement: 10, statBonus: { sniper: 12 }, statRequirements: { sniper: 30 }, weaponCategory: "Sniper" },
+        { id: "scoped_musket", name: "Scoped Musket", description: "Equipped with a primitive but effective lens.", type: "Weapon", rarity: "Rare", price: 10000, levelRequirement: 25, statBonus: { sniper: 30, perception: 5 }, statRequirements: { sniper: 80 }, weaponCategory: "Sniper" },
         { id: "old_boots", name: "Old Boots", description: "Waterlogged but still wearable.", type: "Armor", rarity: "Common", price: 40, levelRequirement: 1, statBonus: { endurance: 2 } },
         { id: "pearl", name: "Pearl", description: "A rare and valuable gem from a Giant Squid.", type: "Miscellaneous", rarity: "Rare", price: 200 },
         // Bags
         { id: "bag_small", name: "Small Cotton Bag", description: "A simple bag that adds 5 slots to your inventory.", type: "Bag", rarity: "Common", price: 500, storageBonus: 5 },
         { id: "bag_medium", name: "Sturdy Leather Satchel", description: "A well-made satchel that adds 10 slots to your inventory.", type: "Bag", rarity: "Uncommon", price: 5000, storageBonus: 10 },
         { id: "bag_large", name: "Reinforced Sea-Chest Bag", description: "A massive bag for serious collectors. Adds 20 slots.", type: "Bag", rarity: "Rare", price: 50000, storageBonus: 20 },
-        { id: "bag_legendary", name: "Infinite Void Pouch", description: "A pouch that seems to defy the laws of space. Adds 50 slots.", type: "Bag", rarity: "Legendary", price: 1000000, storageBonus: 50 }
+        { id: "bag_legendary", name: "Infinite Void Pouch", description: "A pouch that seems to defy the laws of space. Adds 50 slots.", type: "Bag", rarity: "Legendary", price: 1000000, storageBonus: 50 },
+        // Arena Items
+        { id: "gladiator_helmet", name: "Gladiator's Helmet", description: "A heavy steel helmet worn by arena champions.", type: "Armor", rarity: "Rare", price: 15000, levelRequirement: 20, statBonus: { endurance: 15, agility: 5 } },
+        { id: "champion_cape", name: "Champion's Cape", description: "A majestic red cape that inspires awe and terror.", type: "Accessory", rarity: "Epic", price: 50000, levelRequirement: 30, statBonus: { willpower: 20, luck: 10 } },
+        { id: "arena_medallion", name: "Arena Medallion", description: "A symbol of prowess in the Champion's Colosseum.", type: "Accessory", rarity: "Rare", price: 25000, levelRequirement: 25, statBonus: { strength: 10, agility: 10 } }
     ];
 
     for (const item of items) {
@@ -2728,8 +2949,40 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         batch.set(ref, tech);
     }
 
+    const rankUpMissions = [
+        // Navy
+        { id: "navy_rank_1", title: "Navy Recruit Trial", description: "Complete your basic training to become a Navy Recruit.", energyCost: 10, minLevel: 1, goldReward: 500, xpReward: 100, difficulty: 1, factionRequirement: "Navy", isRankUp: true, targetRank: "Navy Recruit" },
+        { id: "navy_rank_2", title: "Petty Officer Exam", description: "Demonstrate your skills to be promoted to Petty Officer.", energyCost: 20, minLevel: 20, goldReward: 2000, xpReward: 500, difficulty: 2, factionRequirement: "Navy", isRankUp: true, targetRank: "Petty Officer" },
+        { id: "navy_rank_3", title: "Chief Petty Officer Qualification", description: "Prove your leadership and combat prowess.", energyCost: 30, minLevel: 40, goldReward: 5000, xpReward: 1000, difficulty: 3, factionRequirement: "Navy", isRankUp: true, targetRank: "Chief Petty Officer" },
+        { id: "navy_rank_4", title: "Ensign Commission", description: "Ascend to the rank of a commissioned officer.", energyCost: 40, minLevel: 60, goldReward: 10000, xpReward: 2000, difficulty: 4, factionRequirement: "Navy", isRankUp: true, targetRank: "Ensign" },
+        { id: "navy_rank_5", title: "Lieutenant Promotion", description: "Face dangerous pirates to earn your stripes.", energyCost: 50, minLevel: 80, goldReward: 20000, xpReward: 4000, difficulty: 5, factionRequirement: "Navy", isRankUp: true, targetRank: "Lieutenant" },
+        { id: "navy_rank_6", title: "Commander Selection", description: "Lead a fleet operation to prove you are Commander material.", energyCost: 60, minLevel: 100, goldReward: 50000, xpReward: 8000, difficulty: 6, factionRequirement: "Navy", isRankUp: true, targetRank: "Commander" },
+        { id: "navy_rank_7", title: "Captaincy Trial", description: "Take command of your own ship and secure the seas.", energyCost: 70, minLevel: 130, goldReward: 100000, xpReward: 15000, difficulty: 7, factionRequirement: "Navy", isRankUp: true, targetRank: "Captain" },
+        { id: "navy_rank_8", title: "Commodore Investiture", description: "Command multiple divisions in a strategic victory.", energyCost: 80, minLevel: 160, goldReward: 250000, xpReward: 30000, difficulty: 8, factionRequirement: "Navy", isRankUp: true, targetRank: "Commodore" },
+        { id: "navy_rank_9", title: "Vice Admiral Ascension", description: "Face the terrors of the Grand Line and emerge victorious.", energyCost: 90, minLevel: 200, goldReward: 500000, xpReward: 60000, difficulty: 9, factionRequirement: "Navy", isRankUp: true, targetRank: "Vice Admiral" },
+        { id: "navy_rank_10", title: "Admiral's Call", description: "A test of absolute justice. Defeat a legendary pirate.", energyCost: 100, minLevel: 250, goldReward: 1000000, xpReward: 120000, difficulty: 10, factionRequirement: "Navy", isRankUp: true, targetRank: "Admiral" },
+        { id: "navy_rank_11", title: "Fleet Admiral's Zenith", description: "Reach the pinnacle of Navy leadership.", energyCost: 100, minLevel: 300, goldReward: 5000000, xpReward: 500000, difficulty: 12, factionRequirement: "Navy", isRankUp: true, targetRank: "Fleet Admiral" },
+        // Pirates
+        { id: "pirate_rank_1", title: "Rogue Sailor Initiation", description: "Prove your worth to the pirate code.", energyCost: 10, minLevel: 1, goldReward: 500, xpReward: 100, difficulty: 1, factionRequirement: "Pirate", isRankUp: true, targetRank: "Rogue Sailor" },
+        { id: "pirate_rank_2", title: "Skirmisher's Greed", description: "Plunder enough gold to be known as a Skirmisher.", energyCost: 20, minLevel: 20, goldReward: 2000, xpReward: 500, difficulty: 2, factionRequirement: "Pirate", isRankUp: true, targetRank: "Skirmisher" },
+        { id: "pirate_rank_3", title: "Deckhand Mastery", description: "Work your way up the pirate hierarchy.", energyCost: 30, minLevel: 40, goldReward: 5000, xpReward: 1000, difficulty: 3, factionRequirement: "Pirate", isRankUp: true, targetRank: "Deckhand" },
+        { id: "pirate_rank_4", title: "Swashbuckler's Duel", description: "Win a high-stakes duel in a tavern brawl.", energyCost: 40, minLevel: 60, goldReward: 10000, xpReward: 2000, difficulty: 4, factionRequirement: "Pirate", isRankUp: true, targetRank: "Swashbuckler" },
+        { id: "pirate_rank_5", title: "Marauder's Raid", description: "Lead a successful raid on a merchant convoy.", energyCost: 50, minLevel: 80, goldReward: 20000, xpReward: 4000, difficulty: 5, factionRequirement: "Pirate", isRankUp: true, targetRank: "Marauder" },
+        { id: "pirate_rank_6", title: "Buccaneer's Infamy", description: "Build your reputation as a feared Buccaneer.", energyCost: 60, minLevel: 100, goldReward: 50000, xpReward: 8000, difficulty: 6, factionRequirement: "Pirate", isRankUp: true, targetRank: "Buccaneer" },
+        { id: "pirate_rank_7", title: "Corsair's Ambition", description: "Command a crew of outlaws to claim your own territory.", energyCost: 70, minLevel: 130, goldReward: 100000, xpReward: 15000, difficulty: 7, factionRequirement: "Pirate", isRankUp: true, targetRank: "Corsair" },
+        { id: "pirate_rank_8", title: "Dread Pirate Legend", description: "Let your name strike fear into the hearts of all.", energyCost: 80, minLevel: 160, goldReward: 250000, xpReward: 30000, difficulty: 8, factionRequirement: "Pirate", isRankUp: true, targetRank: "Dread Pirate" },
+        { id: "pirate_rank_9", title: "Pirate Lord's Council", description: "Prove your strength to the existing Pirate Lords.", energyCost: 90, minLevel: 200, goldReward: 500000, xpReward: 60000, difficulty: 9, factionRequirement: "Pirate", isRankUp: true, targetRank: "Pirate Lord" },
+        { id: "pirate_rank_10", title: "Emperor's Challenge", description: "Defeat a high-ranking Marine to be recognized as Yonko.", energyCost: 100, minLevel: 250, goldReward: 1000000, xpReward: 120000, difficulty: 10, factionRequirement: "Pirate", isRankUp: true, targetRank: "Yonko" },
+        { id: "pirate_rank_11", title: "Pirate King's Legacy", description: "Find the ultimate treasure and claim the title of Pirate King.", energyCost: 100, minLevel: 300, goldReward: 5000000, xpReward: 500000, difficulty: 12, factionRequirement: "Pirate", isRankUp: true, targetRank: "Pirate King" }
+    ];
+
+    for (const m of rankUpMissions) {
+        const ref = db.collection("gameData").doc("world").collection("missions").doc(m.id);
+        batch.set(ref, m);
+    }
+
     await batch.commit();
-    const msg = `SUCCESS_V12: 16 islands, items, and ${techniques.length} techniques seeded.`;
+    const msg = `SUCCESS_V13: 17 islands, items, and ${techniques.length} techniques seeded.`;
     console.log(msg);
     return { success: true, message: msg };
 });
@@ -2774,6 +3027,8 @@ export async function checkAdmin(context: functions.https.CallableContext) {
     if (playerSnap.exists && adminNames.includes((playerSnap.data() as any).nameLower)) {
         // Grant admin claim permanently for this user
         await admin.auth().setCustomUserClaims(userId, { admin: true });
+        // Sync to Firestore immediately
+        await db.collection("players").doc(userId).update({ isAdmin: true });
         return;
     }
 
@@ -3070,6 +3325,17 @@ export const equipItem = functions.https.onCall(async (data, context) => {
         // Level Requirement Check
         if (character.level < (item.levelRequirement || 1)) {
             throw new functions.https.HttpsError("failed-precondition", "Level too low to equip this item.");
+        }
+
+        // Stat Requirement Check
+        if (item.statRequirements) {
+            const charStats = character.stats || {};
+            const reqs = item.statRequirements;
+            for (const [stat, value] of Object.entries(reqs)) {
+                if ((charStats[stat] || 0) < (value as number)) {
+                    throw new functions.https.HttpsError("failed-precondition", `Insufficient ${stat}. Required: ${value}`);
+                }
+            }
         }
 
         const equipment = character.equipment || {};

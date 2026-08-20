@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.ui.AuthViewModel
@@ -14,6 +15,7 @@ import com.alifeatseammo.ui.GameViewModel
 fun SettingsScreen(
     viewModel: GameViewModel,
     authViewModel: AuthViewModel,
+    onAdminPanelClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
     var showLogoutWarning by remember { mutableStateOf(false) }
@@ -68,9 +70,16 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { viewModel.seedWorld() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
                 ) {
                     Text("Seed World Data (Admin)")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { onAdminPanelClick() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                ) {
+                    Text("Admin Panel")
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

@@ -7,7 +7,11 @@ plugins {
     alias(libs.plugins.firebase.appdistribution)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-    kotlin("plugin.serialization") version "2.0.21"
+    alias(libs.plugins.kotlin.serialization)
+}
+
+ksp {
+    arg("appfunctions:aggregateAppFunctions", "true")
 }
 
 kotlin {
@@ -20,10 +24,10 @@ android {
 
     defaultConfig {
         applicationId = "com.alifeatseammo"
-        minSdk = 24
+        minSdk = 28
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,7 +44,7 @@ android {
         debug {
             firebaseAppDistribution {
                 artifactType = "APK"
-                releaseNotes = "v1.4: Multi-element Mythic Arts (Omegalyth now Void/Celestial), Specialized Shops (Swords, Pistols, Snipers), and Dedicated Combat Result Screens (Victory/Defeat)."
+                releaseNotes = "v1.5: New AppFunctions integration for system-wide shortcuts, Admin Panel for developers, Major refactor of data models (Combat, Economy, Ranks), and UI improvements across all screens."
                 testers = "oscali11@gmail.com"
             }
         }
@@ -66,10 +70,19 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation("androidx.lifecycle:lifecycle-process:2.11.0")
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.compose.material3.adaptive)
+    implementation(libs.androidx.compose.material3.adaptive.layout)
+    implementation(libs.androidx.compose.material3.adaptive.navigation)
+    implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.androidx.appfunctions)
+    implementation(libs.androidx.appfunctions.service)
+    ksp(libs.androidx.appfunctions.compiler)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.firebase.ai)
@@ -81,7 +94,6 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

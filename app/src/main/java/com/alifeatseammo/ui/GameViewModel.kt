@@ -130,11 +130,7 @@ class GameViewModel @Inject constructor(
 
     val isAdmin: StateFlow<Boolean> = character
         .map { char ->
-            val name = char?.name?.lowercase()?.trim() ?: ""
-            val adminNames = listOf("sedna", "von")
-            val isMatch = adminNames.contains(name)
-            Log.d("GameViewModel", "Admin check for name '$name': $isMatch")
-            isMatch
+            char?.isAdmin == true || char?.isHardcodedAdmin() == true
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, false)
 
@@ -159,7 +155,7 @@ class GameViewModel @Inject constructor(
 
     private fun scheduleTravelFinish(arrivalTime: Long) {
         travelJob?.cancel()
-        val delayMs = arrivalTime - System.currentTimeMillis()
+        val delayMs = (arrivalTime - System.currentTimeMillis()) + 2000 // 2s buffer for clock skew
         travelJob = viewModelScope.launch {
             if (delayMs > 0) delay(delayMs)
             finishTravel()
@@ -168,7 +164,7 @@ class GameViewModel @Inject constructor(
 
     private fun scheduleHealingFinish(endTime: Long) {
         healingJob?.cancel()
-        val delayMs = endTime - System.currentTimeMillis()
+        val delayMs = (endTime - System.currentTimeMillis()) + 2000 // 2s buffer for clock skew
         healingJob = viewModelScope.launch {
             if (delayMs > 0) delay(delayMs)
             finishHealing()
@@ -177,7 +173,7 @@ class GameViewModel @Inject constructor(
 
     private fun scheduleTrainingFinish(endTime: Long) {
         trainingJob?.cancel()
-        val delayMs = (endTime - System.currentTimeMillis()) + 500 // Add 500ms buffer for clock skew
+        val delayMs = (endTime - System.currentTimeMillis()) + 2000 // 2s buffer for clock skew
         trainingJob = viewModelScope.launch {
             if (delayMs > 0) delay(delayMs)
             finishTraining()
@@ -196,15 +192,25 @@ class GameViewModel @Inject constructor(
     private val _leaderboardFaction = MutableStateFlow<Faction?>(Faction.Pirate)
     val leaderboardFaction: StateFlow<Faction?> = _leaderboardFaction.asStateFlow()
 
+    private val _leaderboardSort = MutableStateFlow("level")
+    val leaderboardSort: StateFlow<String> = _leaderboardSort.asStateFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    val topPlayers: StateFlow<List<Character>> = leaderboardFaction
-        .flatMapLatest { faction ->
-            gameRepository.getTopPlayers(20, faction)
-        }
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    val topPlayers: StateFlow<List<Character>> = combine(
+        leaderboardFaction,
+        leaderboardSort
+    ) { faction, sort ->
+        faction to sort
+    }.flatMapLatest { (faction, sort) ->
+        gameRepository.getTopPlayers(20, faction, sort)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun setLeaderboardFaction(faction: Faction?) {
         _leaderboardFaction.value = faction
+    }
+
+    fun setLeaderboardSort(sort: String) {
+        _leaderboardSort.value = sort
     }
 
     val missions: StateFlow<List<Mission>> = gameRepository.getAvailableMissions()
@@ -354,4 +360,36 @@ class GameViewModel @Inject constructor(
             }
         }
     }
+
+    fun mutePlayer(userId: String, reason: String, durationHours: Int) {
+        performAction("Muting Player") {
+            adminRepository.mutePlayer(userId, reason, durationHours)
+        }
+    }
+
+    fun banPlayer(userId: String, reason: String) {
+        performAction("Banning Player") {
+            adminRepository.banPlayer(userId, reason)
+        }
+    }
+
+    fun teleportPlayer(userId: String, location: String) {
+        performAction("Teleporting Player") {
+            adminRepository.teleportPlayer(userId, location)
+        }
+    }
+
+    fun adjustGold(userId: String, amount: Int, reason: String) {
+        performAction("Adjusting Gold") {
+            adminRepository.adjustGold(userId, amount, reason)
+        }
+    }
+
+    fun sendGlobalAnnouncement(message: String) {
+        performAction("Sending Announcement") {
+            adminRepository.sendGlobalAnnouncement(message)
+        }
+    }
+
+    fun searchPlayers(query: String) = adminRepository.searchPlayers(query)
 }

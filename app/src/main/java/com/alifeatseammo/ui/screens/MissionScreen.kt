@@ -23,9 +23,12 @@ fun MissionScreen(
     onBackClick: () -> Unit
 ) {
     val isLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
+    
+    // Sort missions so Rank Up ones are on top
     val filteredMissions = missions.filter { 
         it.factionRequirement == Faction.Neutral || it.factionRequirement == character.faction 
-    }
+    }.sortedByDescending { it.isRankUp }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -67,13 +70,26 @@ fun MissionScreen(
 
 @Composable
 fun MissionItem(mission: Mission, isLocked: Boolean, lockReason: String, onClick: (Mission) -> Unit) {
+    val borderColor = if (mission.isRankUp) MaterialTheme.colorScheme.primary else Color.Transparent
+    val borderStroke = if (mission.isRankUp) androidx.compose.foundation.BorderStroke(2.dp, borderColor) else null
+
     Card(
         onClick = { if (!isLocked) onClick(mission) },
         modifier = Modifier.fillMaxWidth(),
         enabled = !isLocked,
+        border = borderStroke,
         colors = if (isLocked) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)) else CardDefaults.cardColors()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            if (mission.isRankUp) {
+                Text(
+                    text = "⭐ RANK UP MISSION",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
                     text = mission.title, 

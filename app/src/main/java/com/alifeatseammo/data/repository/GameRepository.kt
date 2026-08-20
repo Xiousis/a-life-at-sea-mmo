@@ -24,6 +24,7 @@ interface GameRepository {
     suspend fun unequipItem(slot: String): Boolean
     suspend fun purchaseItem(itemId: String, shopId: String): Boolean
     suspend fun purchaseShip(shipId: String): Boolean
+    suspend fun upgradeShip(upgradeType: String): Boolean
     suspend fun sellItem(itemId: String): Boolean
     suspend fun useItem(itemId: String): Boolean
     suspend fun joinFaction(faction: Faction): Boolean
@@ -33,7 +34,7 @@ interface GameRepository {
     suspend fun finishHealing(): Boolean
     suspend fun instantHeal(): Boolean
     fun getPlayersAtLocation(location: String): Flow<List<Character>>
-    fun getTopPlayers(limit: Int, faction: Faction? = null): Flow<List<Character>>
+    fun getTopPlayers(limit: Int, faction: Faction? = null, sortBy: String = "level"): Flow<List<Character>>
     fun getPlayerProfile(playerId: String): Flow<Character?>
     fun getCharacters(ids: List<String>): Flow<List<Character>>
     fun getLocations(): Flow<List<LocationDef>>
@@ -44,6 +45,7 @@ interface GameRepository {
     suspend fun markMailAsRead(mailId: String): Boolean
     suspend fun deleteMail(mailId: String): Boolean
     suspend fun claimMailRewards(mailId: String): Boolean
+    suspend fun sendMail(recipientId: String, subject: String, body: String): Boolean
     fun getMarketItems(category: String? = null): Flow<List<Item>>
     suspend fun startFishing(): String?
     suspend fun catchFish(): Boolean
@@ -52,6 +54,7 @@ interface GameRepository {
     suspend fun healPlayer(targetPlayerId: String): Boolean
     suspend fun startMonsterHunt(): Boolean
     suspend fun rollMythicArt(): Boolean
+    suspend fun challengeHighestRank(targetId: String): Boolean
     suspend fun adminGrantTestItems(): Boolean
 }
 
@@ -176,6 +179,12 @@ class FirestoreGameRepository(
         return true
     }
 
+    override suspend fun upgradeShip(upgradeType: String): Boolean {
+        val data = hashMapOf("upgradeType" to upgradeType)
+        functions.getHttpsCallable("upgradeShip").call(data).await()
+        return true
+    }
+
     override suspend fun sellItem(itemId: String): Boolean {
         val data = hashMapOf("itemId" to itemId)
         functions.getHttpsCallable("sellItem").call(data).await()
@@ -235,19 +244,18 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun getTopPlayers(limit: Int, faction: Faction?): Flow<List<Character>> = callbackFlow {
+    override fun getTopPlayers(limit: Int, faction: Faction?, sortBy: String): Flow<List<Character>> = callbackFlow {
         var query: com.google.firebase.firestore.Query = db.collection("players")
         
         if (faction != null) {
             query = query.whereEqualTo("faction", faction.name)
-            if (faction == Faction.Pirate) {
-                query = query.orderBy("bounty", Query.Direction.DESCENDING)
-            } else {
-                query = query.orderBy("level", Query.Direction.DESCENDING)
-                             .orderBy("xp", Query.Direction.DESCENDING)
-            }
-        } else {
-            query = query.orderBy("level", Query.Direction.DESCENDING)
+        }
+
+        query = when (sortBy) {
+            "bounty" -> query.orderBy("bounty", Query.Direction.DESCENDING)
+            "infamy" -> query.orderBy("infamy", Query.Direction.DESCENDING)
+            "gold" -> query.orderBy("gold", Query.Direction.DESCENDING)
+            else -> query.orderBy("level", Query.Direction.DESCENDING)
                          .orderBy("xp", Query.Direction.DESCENDING)
         }
 
@@ -377,6 +385,16 @@ class FirestoreGameRepository(
         return true
     }
 
+    override suspend fun sendMail(recipientId: String, subject: String, body: String): Boolean {
+        val data = hashMapOf(
+            "recipientId" to recipientId,
+            "subject" to subject,
+            "body" to body
+        )
+        functions.getHttpsCallable("sendMail").call(data).await()
+        return true
+    }
+
     override fun getMarketItems(category: String?): Flow<List<Item>> = callbackFlow {
         var query = db.collection("gameData").document("items").collection("all")
             .whereNotEqualTo("type", "Artifact")
@@ -436,6 +454,11 @@ class FirestoreGameRepository(
 
     override suspend fun rollMythicArt(): Boolean {
         functions.getHttpsCallable("rollMythicArt").call().await()
+        return true
+    }
+
+    override suspend fun challengeHighestRank(targetId: String): Boolean {
+        functions.getHttpsCallable("challengeHighestRank").call(hashMapOf("targetId" to targetId)).await()
         return true
     }
 }

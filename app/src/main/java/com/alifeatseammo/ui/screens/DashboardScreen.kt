@@ -136,6 +136,17 @@ fun DashboardScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
+                val nextRank = RankDefinitions.getNextRank(character)
+                if (nextRank != null && character.level >= nextRank.levelRequired) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "⭐ RANK UP AVAILABLE: ${nextRank.rank}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

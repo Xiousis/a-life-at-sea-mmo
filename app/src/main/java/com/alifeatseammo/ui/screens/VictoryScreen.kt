@@ -1,6 +1,5 @@
 package com.alifeatseammo.ui.screens
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -89,6 +88,7 @@ fun VictoryScreen(
                                 Rarity.Rare -> Color(0xFF2196F3)
                                 Rarity.Epic -> Color(0xFF9C27B0)
                                 Rarity.Legendary -> Color(0xFFFF9800)
+                                Rarity.Mythic -> Color(0xFF00E5FF)
                             }
                         )
                     }

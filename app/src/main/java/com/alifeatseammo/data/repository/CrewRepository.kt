@@ -18,6 +18,9 @@ interface CrewRepository {
     suspend fun inviteToCrew(targetId: String): Boolean
     suspend fun respondToInvite(crewId: String, accept: Boolean): Boolean
     suspend fun promoteMember(targetId: String, rank: String): Boolean
+    suspend fun kickMember(targetId: String): Boolean
+    suspend fun donateToCrew(amount: Int): Boolean
+    suspend fun updateCrewSettings(description: String, isPublic: Boolean): Boolean
     fun getInvitesForUser(userId: String): Flow<List<CrewInvite>>
 }
 
@@ -75,6 +78,24 @@ class FirestoreCrewRepository(
     override suspend fun promoteMember(targetId: String, rank: String): Boolean {
         val data = hashMapOf("targetId" to targetId, "rank" to rank)
         functions.getHttpsCallable("promoteMember").call(data).await()
+        return true
+    }
+
+    override suspend fun kickMember(targetId: String): Boolean {
+        val data = hashMapOf("targetId" to targetId)
+        functions.getHttpsCallable("kickMember").call(data).await()
+        return true
+    }
+
+    override suspend fun donateToCrew(amount: Int): Boolean {
+        val data = hashMapOf("amount" to amount)
+        functions.getHttpsCallable("donateToCrew").call(data).await()
+        return true
+    }
+
+    override suspend fun updateCrewSettings(description: String, isPublic: Boolean): Boolean {
+        val data = hashMapOf("description" to description, "isPublic" to isPublic)
+        functions.getHttpsCallable("updateCrewSettings").call(data).await()
         return true
     }
 

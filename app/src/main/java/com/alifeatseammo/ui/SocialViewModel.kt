@@ -22,6 +22,28 @@ class SocialViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _actionState = MutableStateFlow<UIActionState>(UIActionState.Idle)
+    val actionState: StateFlow<UIActionState> = _actionState.asStateFlow()
+
+    private fun performAction(label: String, block: suspend () -> Unit) {
+        if (_actionState.value is UIActionState.Loading) return
+
+        viewModelScope.launch {
+            _actionState.value = UIActionState.Loading(label)
+            try {
+                block()
+                _actionState.value = UIActionState.Success(label)
+                kotlinx.coroutines.delay(2000)
+                if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
+                    _actionState.value = UIActionState.Idle
+                }
+            } catch (e: Exception) {
+                _actionState.value = UIActionState.Error(e.message ?: "Action failed")
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
     private val currentUser = authRepository.currentUser
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -79,86 +101,96 @@ class SocialViewModel @Inject constructor(
             _errorMessage.value = "Only Navy or Pirates can create crews."
             return
         }
-        viewModelScope.launch {
-            try {
-                crewRepository.createCrew(name, description)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Creating Crew") {
+            crewRepository.createCrew(name, description)
         }
     }
 
     fun joinCrew(crewId: String) {
         val char = character.value ?: return
-        viewModelScope.launch {
-            try {
-                val crew = crewRepository.getCrew(crewId).firstOrNull()
-                if (crew != null && crew.faction != char.faction) {
-                    _errorMessage.value = "You can only join crews of your own faction."
-                    return@launch
-                }
-                crewRepository.joinCrew(crewId)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
+        performAction("Joining Crew") {
+            val crew = crewRepository.getCrew(crewId).firstOrNull()
+            if (crew != null && crew.faction != char.faction) {
+                throw Exception("You can only join crews of your own faction.")
             }
+            crewRepository.joinCrew(crewId)
         }
     }
 
     fun leaveCrew() {
-        viewModelScope.launch {
-            try {
-                crewRepository.leaveCrew()
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Leaving Crew") {
+            crewRepository.leaveCrew()
         }
     }
 
     fun inviteToCrew(targetId: String) {
-        viewModelScope.launch {
-            try {
-                crewRepository.inviteToCrew(targetId)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
-            }
+        performAction("Sending Invite") {
+            crewRepository.inviteToCrew(targetId)
         }
     }
 
     fun respondToInvite(crewId: String, accept: Boolean) {
         if (!accept) {
-            viewModelScope.launch {
-                try {
-                    crewRepository.respondToInvite(crewId, false)
-                } catch (e: Exception) {
-                    _errorMessage.value = e.message
-                }
+            performAction("Declining Invite") {
+                crewRepository.respondToInvite(crewId, false)
             }
             return
         }
 
         val char = character.value ?: return
-        viewModelScope.launch {
-            try {
-                val crew = crewRepository.getCrew(crewId).firstOrNull()
-                if (crew != null && crew.faction != char.faction) {
-                    _errorMessage.value = "You cannot join a crew of a different faction."
-                    crewRepository.respondToInvite(crewId, false)
-                    return@launch
-                }
-                crewRepository.respondToInvite(crewId, accept)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
+        performAction("Accepting Invite") {
+            val crew = crewRepository.getCrew(crewId).firstOrNull()
+            if (crew != null && crew.faction != char.faction) {
+                crewRepository.respondToInvite(crewId, false)
+                throw Exception("You cannot join a crew of a different faction.")
             }
+            crewRepository.respondToInvite(crewId, accept)
         }
     }
 
     fun promoteMember(targetId: String, rank: String) {
-        viewModelScope.launch {
-            try {
-                crewRepository.promoteMember(targetId, rank)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
+        performAction("Setting Rank to $rank") {
+            crewRepository.promoteMember(targetId, rank)
+        }
+    }
+
+    fun kickMember(targetId: String) {
+        val char = character.value ?: return
+        performAction("Kicking Member") {
+            val crewId = char.crewId ?: throw Exception("You are not in a crew.")
+            val crew = crewRepository.getCrew(crewId).firstOrNull() ?: throw Exception("Crew not found.")
+            val myRole = crew.roles[char.id] ?: CrewRole.Member
+            if (myRole != CrewRole.Captain && myRole != CrewRole.CoCaptain) {
+                throw Exception("Only Captains or Co-Captains can kick members.")
             }
+            crewRepository.kickMember(targetId)
+        }
+    }
+
+    fun donateGold(amount: Int) {
+        if (amount <= 0) {
+            _errorMessage.value = "Amount must be greater than 0"
+            return
+        }
+        val char = character.value ?: return
+        if (char.gold < amount) {
+            _errorMessage.value = "Insufficient gold"
+            return
+        }
+        performAction("Donating $amount Gold") {
+            crewRepository.donateToCrew(amount)
+        }
+    }
+
+    fun updateCrewSettings(description: String, isPublic: Boolean) {
+        val char = character.value ?: return
+        performAction("Updating Crew Settings") {
+            val crewId = char.crewId ?: throw Exception("You are not in a crew.")
+            val crew = crewRepository.getCrew(crewId).firstOrNull() ?: throw Exception("Crew not found.")
+            if (crew.captainId != char.id) {
+                throw Exception("Only the Captain can update crew settings.")
+            }
+            crewRepository.updateCrewSettings(description, isPublic)
         }
     }
 

@@ -40,6 +40,16 @@ class CombatViewModel @Inject constructor(
         }
     }
 
+    fun challengeHighestRank(targetId: String) {
+        viewModelScope.launch {
+            try {
+                gameRepository.challengeHighestRank(targetId)
+            } catch (e: Exception) {
+                _errorMessage.value = e.message
+            }
+        }
+    }
+
     fun startMonsterHunt() {
         viewModelScope.launch {
             try {

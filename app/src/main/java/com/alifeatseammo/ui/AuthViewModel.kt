@@ -1,5 +1,10 @@
 package com.alifeatseammo.ui
 
+import android.app.Activity
+import androidx.credentials.CredentialManager
+import androidx.credentials.DigitalCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetDigitalCredentialOption
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alifeatseammo.data.model.Gender
@@ -13,6 +18,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.security.SecureRandom
+import java.util.Base64
 import javax.inject.Inject
 
 @HiltViewModel
@@ -61,6 +69,103 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _authResult.value = AuthResult.Loading
             _authResult.value = authRepository.upgradeGuestAccount(email, password)
+        }
+    }
+
+    @OptIn(androidx.credentials.ExperimentalDigitalCredentialApi::class)
+    fun startVerifiedEmailUpgrade(activity: Activity) {
+        viewModelScope.launch {
+            _authResult.value = AuthResult.Loading
+            try {
+                val credentialManager = CredentialManager.create(activity)
+                val nonce = generateNonce()
+                
+                val openId4vpRequest = """
+                    {
+                      "requests": [
+                        {
+                          "protocol": "openid4vp-v1-unsigned",
+                          "data": {
+                            "response_type": "vp_token",
+                            "response_mode": "dc_api",
+                            "nonce": "$nonce",
+                            "dcql_query": {
+                              "credentials": [
+                                {
+                                  "id": "user_info_query",
+                                  "format": "dc+sd-jwt",
+                                   "meta": { 
+                                      "vct_values": ["UserInfoCredential"] 
+                                   },
+                                  "claims": [ 
+                                    {"path": ["email"]}, 
+                                    {"path": ["name"]},  
+                                    {"path": ["email_verified"]}
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                """.trimIndent()
+
+                val getDigitalCredentialOption = GetDigitalCredentialOption(requestJson = openId4vpRequest)
+                val request = GetCredentialRequest(listOf(getDigitalCredentialOption))
+                
+                val result = credentialManager.getCredential(activity, request)
+                
+                when (val credential = result.credential) {
+                    is DigitalCredential -> {
+                        val responseJsonString = credential.credentialJson
+                        // In a real app, we would send this to our backend for validation.
+                        // Here we'll simulate success by extracting the email if possible.
+                        val email = extractEmailFromSdJwt(responseJsonString)
+                        if (email != null) {
+                            // Link the guest account with this email (using a random password for now)
+                            _authResult.value = authRepository.upgradeGuestAccount(email, "quick-upgrade-${System.currentTimeMillis()}")
+                        } else {
+                            _authResult.value = AuthResult.Error("Could not retrieve verified email.")
+                        }
+                    }
+                    else -> _authResult.value = AuthResult.Error("Unexpected credential type.")
+                }
+            } catch (e: Exception) {
+                _authResult.value = AuthResult.Error(e.localizedMessage ?: "Verified Email retrieval failed")
+            }
+        }
+    }
+
+    private fun generateNonce(): String {
+        val bytes = ByteArray(16)
+        SecureRandom().nextBytes(bytes)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+    }
+
+    private fun extractEmailFromSdJwt(responseJson: String): String? {
+        return try {
+            val responseData = JSONObject(responseJson)
+            val vpToken = responseData.getJSONObject("vp_token")
+            val credentialId = vpToken.keys().next()
+            val rawSdJwt = vpToken.getJSONArray(credentialId).getString(0)
+            
+            // Simulating SD-JWT parsing. Real parsing involves splitting by '~'
+            // and decoding base64 disclosures.
+            // For demo purposes, we look for a part that looks like an email.
+            val parts = rawSdJwt.split("~")
+            parts.forEach { part ->
+                val decoded = String(Base64.getUrlDecoder().decode(part.toByteArray()))
+                if (decoded.contains("@")) {
+                    // SD-JWT disclosures are [salt, name, value]
+                    val jsonArray = JSONObject(decoded)
+                    // This is a simplification
+                    return jsonArray.optString("email") ?: decoded.substringAfterLast("\"").substringBeforeLast("\"")
+                }
+            }
+            null
+        } catch (e: Exception) {
+            null
         }
     }
 

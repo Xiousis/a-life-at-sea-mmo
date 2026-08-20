@@ -70,7 +70,11 @@ class EconomyViewModel @Inject constructor(
 
     fun equipItem(item: Item) {
         val char = character.value ?: return
-        if (char.level < item.levelRequirement) return
+        if (!char.canEquip(item)) {
+            val missing = char.getMissingRequirements(item).joinToString(", ")
+            _errorMessage.value = "Missing requirements: $missing"
+            return
+        }
         performAction("Equipping ${item.name}") {
             gameRepository.equipItem(item.id, item.type.name)
         }
@@ -117,6 +121,12 @@ class EconomyViewModel @Inject constructor(
         }
     }
 
+    fun upgradeShip(upgradeType: String) {
+        performAction("Upgrading Ship") {
+            gameRepository.upgradeShip(upgradeType)
+        }
+    }
+
     fun claimMailRewards(mailId: String) {
         performAction("Claiming Rewards") {
             gameRepository.claimMailRewards(mailId)
@@ -126,6 +136,16 @@ class EconomyViewModel @Inject constructor(
     fun deleteMail(mailId: String) {
         performAction("Deleting Mail") {
             gameRepository.deleteMail(mailId)
+        }
+    }
+
+    fun sendMail(recipientId: String, subject: String, body: String) {
+        if (recipientId.isBlank() || subject.isBlank() || body.isBlank()) {
+            _errorMessage.value = "Recipient, subject, and body are required"
+            return
+        }
+        performAction("Sending Mail") {
+            gameRepository.sendMail(recipientId, subject, body)
         }
     }
 

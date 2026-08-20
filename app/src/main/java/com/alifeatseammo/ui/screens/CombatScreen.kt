@@ -1,5 +1,7 @@
 package com.alifeatseammo.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -46,6 +48,22 @@ fun CombatScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (combatState.isRankChallenge) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = "RANK CHALLENGE",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+        }
         Text(
             text = "────────────────────────",
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -77,7 +95,8 @@ fun CombatScreen(
             hp = character.hp,
             maxHp = character.maxHp,
             barColor = Color(0xFF4CAF50),
-            effects = combatState.playerEffects
+            effects = combatState.playerEffects,
+            elements = character.mythicArt?.elements ?: emptyList()
         )
         
         if (character.mythicArt != null) {
@@ -99,7 +118,9 @@ fun CombatScreen(
             hp = enemy.hp,
             maxHp = enemy.maxHp,
             barColor = Color(0xFFF44336),
-            effects = combatState.enemyEffects
+            effects = combatState.enemyEffects,
+            elements = enemy.elements,
+            playerArt = character.mythicArt
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -247,11 +268,63 @@ fun CombatScreen(
 }
 
 @Composable
-fun CombatantStatus(name: String, hp: Int, maxHp: Int, barColor: Color, effects: List<StatusEffect> = emptyList()) {
+fun CombatantStatus(
+    name: String,
+    hp: Int,
+    maxHp: Int,
+    barColor: Color,
+    effects: List<StatusEffect> = emptyList(),
+    elements: List<ElementType> = emptyList(),
+    playerArt: MythicArt? = null
+) {
+    var previousHp by remember { mutableIntStateOf(hp) }
+    var flashActive by remember { mutableStateOf(false) }
+
+    val flashColor by animateColorAsState(
+        targetValue = if (flashActive) Color.Red.copy(alpha = 0.4f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 150),
+        label = "HitFlash",
+        finishedListener = { flashActive = false }
+    )
+
+    LaunchedEffect(hp) {
+        if (hp < previousHp) {
+            flashActive = true
+        }
+        previousHp = hp
+    }
+
     val percentage = (hp.toFloat() / maxHp.toFloat() * 100).toInt()
-    Column(horizontalAlignment = Alignment.Start, modifier = Modifier.fillMaxWidth()) {
+    Column(
+        horizontalAlignment = Alignment.Start,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(flashColor, RoundedCornerShape(8.dp))
+            .padding(4.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(text = name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // Elements
+            elements.forEach { element ->
+                val isAdvantage = playerArt?.elements?.any { isEffective(it, element) } == true
+                val isWeakness = playerArt?.elementalWeaknesses?.contains(element) == true
+                
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 2.dp)
+                        .border(
+                            width = 1.dp,
+                            color = if (isAdvantage) Color.Green else if (isWeakness) Color.Red else Color.Transparent,
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .padding(2.dp)
+                ) {
+                    Text(text = element.symbol, fontSize = 14.sp)
+                }
+            }
+
             Spacer(modifier = Modifier.width(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 effects.forEach { effect ->
@@ -283,6 +356,24 @@ fun CombatantStatus(name: String, hp: Int, maxHp: Int, barColor: Color, effects:
                 labelOverride = "$percentage%"
             )
         }
+    }
+}
+
+private fun isEffective(attacker: ElementType, defender: ElementType): Boolean {
+    return when (attacker) {
+        ElementType.Fire -> defender == ElementType.Ice || defender == ElementType.Air
+        ElementType.Water -> defender == ElementType.Fire || defender == ElementType.Earth
+        ElementType.Earth -> defender == ElementType.Lightning || defender == ElementType.Air
+        ElementType.Air -> defender == ElementType.Earth || defender == ElementType.Fire
+        ElementType.Lightning -> defender == ElementType.Water || defender == ElementType.Ice
+        ElementType.Ice -> defender == ElementType.Air || defender == ElementType.Water
+        ElementType.Light -> defender == ElementType.Dark
+        ElementType.Dark -> defender == ElementType.Light
+        ElementType.Void -> defender != ElementType.Void && defender != ElementType.Annihilation
+        ElementType.Celestial -> defender == ElementType.Dark || defender == ElementType.Chaos
+        ElementType.Annihilation -> true // Effective against everything except Creation
+        ElementType.Creation -> defender == ElementType.Annihilation
+        else -> false
     }
 }
 

@@ -203,7 +203,7 @@ fun TrainingScreen(
                         buffText = buffText,
                         debuffText = debuffText,
                         canAfford = !isActionLoading && character.getCurrentEnergy() >= 10 && character.gold >= trainingCost && !isTraining && 
-                                   !character.mythicArt?.restrictedSkillTypes?.contains(type).let { it ?: false } &&
+                                   !(character.mythicArt?.restrictedSkillTypes?.contains(type) ?: false) &&
                                    (type in setOf(StatType.Strength, StatType.Endurance, StatType.Agility, StatType.Perception, StatType.Willpower, StatType.Luck, StatType.Swordsmanship, StatType.Brawling, StatType.Gunslinging, StatType.Spear, StatType.MartialArts, StatType.Sniper, StatType.MysticArts) || (character.mythicArt?.canLearnNonCombatSkills ?: true)),
                         onTrain = { onTrainClick(type) },
                         isLockedByMythic = !(character.mythicArt?.canLearnNonCombatSkills ?: true) && type in setOf(StatType.Cooking, StatType.Navigating, StatType.TreasureHunting, StatType.Blacksmith, StatType.Fishing, StatType.Medical)
@@ -326,7 +326,7 @@ fun getStatValue(character: Character, type: StatType): Double {
 @Composable
 fun TrainingScreenPreview() {
     TrainingScreen(
-        character = com.alifeatseammo.data.model.Character(name = "Test Pirate"),
+        character = Character(name = "Test Pirate"),
         actionState = com.alifeatseammo.ui.UIActionState.Idle,
         onTrainClick = {},
         onBackClick = {}

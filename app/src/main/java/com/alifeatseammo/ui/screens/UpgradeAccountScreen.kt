@@ -1,10 +1,12 @@
 package com.alifeatseammo.ui.screens
 
+import android.app.Activity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -14,9 +16,13 @@ import com.alifeatseammo.data.repository.AuthResult
 fun UpgradeAccountScreen(
     authResult: AuthResult?,
     onUpgrade: (String, String) -> Unit,
+    onVerifiedEmailUpgrade: (Activity) -> Unit,
     onBackClick: () -> Unit,
     onClearError: () -> Unit
 ) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+    
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -96,6 +102,18 @@ fun UpgradeAccountScreen(
             } else {
                 Text("Upgrade Account")
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedButton(
+            onClick = {
+                activity?.let { onVerifiedEmailUpgrade(it) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = authResult !is AuthResult.Loading
+        ) {
+            Text("Quick Upgrade with Google")
         }
 
         TextButton(

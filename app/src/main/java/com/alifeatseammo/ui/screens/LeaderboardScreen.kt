@@ -4,9 +4,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Faction
@@ -17,6 +20,8 @@ fun LeaderboardScreen(
     players: List<Character>,
     selectedFaction: Faction?,
     onFactionSelected: (Faction?) -> Unit,
+    selectedSort: String,
+    onSortSelected: (String) -> Unit,
     onBackClick: () -> Unit,
     onPlayerClick: (Character) -> Unit
 ) {
@@ -26,24 +31,42 @@ fun LeaderboardScreen(
                 title = { Text("Leaderboards") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Text("Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            val tabs = listOf(Faction.Pirate, Faction.Navy, null)
-            val tabTitles = listOf("Pirates", "Navy", "Global")
-            
-            val selectedIndex = tabs.indexOf(selectedFaction).coerceAtLeast(0)
+            val factions = listOf(Faction.Pirate, Faction.Navy, null)
+            val factionTitles = listOf("Pirates", "Navy", "Global")
+            val selectedFactionIndex = factions.indexOf(selectedFaction).coerceAtLeast(0)
 
-            SecondaryTabRow(selectedTabIndex = selectedIndex) {
-                tabTitles.forEachIndexed { index, title ->
+            SecondaryTabRow(selectedTabIndex = selectedFactionIndex) {
+                factionTitles.forEachIndexed { index, title ->
                     Tab(
-                        selected = selectedIndex == index,
-                        onClick = { onFactionSelected(tabs[index]) },
+                        selected = selectedFactionIndex == index,
+                        onClick = { onFactionSelected(factions[index]) },
                         text = { Text(title) }
+                    )
+                }
+            }
+
+            val sorts = listOf("level", "bounty", "infamy", "gold")
+            val sortTitles = listOf("Level", "Bounty", "Infamy", "Gold")
+            val selectedSortIndex = sorts.indexOf(selectedSort).coerceAtLeast(0)
+
+            SecondaryScrollableTabRow(
+                selectedTabIndex = selectedSortIndex,
+                edgePadding = 16.dp,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                divider = {}
+            ) {
+                sortTitles.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedSortIndex == index,
+                        onClick = { onSortSelected(sorts[index]) },
+                        text = { Text(title, style = MaterialTheme.typography.labelSmall) }
                     )
                 }
             }
@@ -57,11 +80,16 @@ fun LeaderboardScreen(
                         headlineContent = { Text("${index + 1}. ${player.name}") },
                         supportingContent = { Text("Level ${player.level} | ${player.faction}") },
                         trailingContent = { 
-                            if (selectedFaction == Faction.Pirate) {
-                                Text("${player.bounty} B")
-                            } else {
-                                Text("Lvl ${player.level}")
-                            }
+                            Text(
+                                text = when (selectedSort) {
+                                    "bounty" -> "${player.bounty} B"
+                                    "infamy" -> "${player.infamy} Inf"
+                                    "gold" -> "${player.gold} G"
+                                    else -> "Lvl ${player.level}"
+                                },
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         },
                         modifier = Modifier.clickable { onPlayerClick(player) }
                     )

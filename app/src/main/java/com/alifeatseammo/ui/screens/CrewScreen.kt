@@ -10,6 +10,8 @@ import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Crew
 import com.alifeatseammo.data.model.CrewInvite
 import com.alifeatseammo.data.model.CrewRole
+import com.alifeatseammo.ui.UIActionState
+import com.alifeatseammo.ui.components.ActionOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -18,15 +20,21 @@ fun CrewScreen(
     crew: Crew?,
     members: List<Character>,
     invites: List<CrewInvite>,
+    actionState: UIActionState,
     onCreateCrew: (String, String) -> Unit,
     onJoinCrew: (String) -> Unit,
     onLeaveCrew: () -> Unit,
     onInviteToCrew: (String) -> Unit,
     onRespondToInvite: (String, Boolean) -> Unit,
     onPromoteMember: (String, String) -> Unit,
+    onKickMember: (String) -> Unit,
+    onDonateGold: (Int) -> Unit,
+    onUpdateSettings: (String, Boolean) -> Unit,
     onBackClick: () -> Unit
 ) {
     var showInviteDialog by remember { mutableStateOf(false) }
+    var showDonateDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -39,6 +47,12 @@ fun CrewScreen(
                 },
                 actions = {
                     if (character.crewId != null) {
+                        val myRole = crew?.roles?.get(character.id) ?: CrewRole.Member
+                        if (myRole == CrewRole.Captain) {
+                            IconButton(onClick = { showSettingsDialog = true }) {
+                                Text("⚙️")
+                            }
+                        }
                         IconButton(onClick = { showInviteDialog = true }) {
                             Text("Invite")
                         }
@@ -139,24 +153,55 @@ fun CrewScreen(
                     
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(text = "MEMBERS: ${crew?.members?.size ?: 0} / 20")
-                            Text(text = "TOTAL BOUNTY: ${crew?.totalBounty ?: 0} B")
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(text = "MEMBERS: ${crew?.members?.size ?: 0} / 20")
+                                Text(text = "TOTAL BOUNTY: ${crew?.totalBounty ?: 0} B")
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "TREASURY: ${crew?.gold ?: 0} Gold")
+                                Button(onClick = { showDonateDialog = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)) {
+                                    Text("Donate", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
                         }
                     }
                     
+                    if (crew?.unlockedPerks?.isNotEmpty() == true) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(text = "CREW PERKS", style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.Start))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            crew.unlockedPerks.forEach { perk ->
+                                FilterChip(
+                                    selected = true,
+                                    onClick = {},
+                                    label = { Text(perk.label) },
+                                    leadingIcon = { Text("✨") }
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(text = "MEMBERS", style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.Start))
                     
                     members.sortedByDescending { it.id == crew?.captainId }.forEach { member ->
-                        val role = crew?.roles?.get(member.id) ?: com.alifeatseammo.data.model.CrewRole.Member
-                        val roleDisplay = if (role == com.alifeatseammo.data.model.CrewRole.Captain && crew?.faction == com.alifeatseammo.data.model.Faction.Pirate) {
+                        val role = crew?.roles?.get(member.id) ?: CrewRole.Member
+                        val roleDisplay = if (role == CrewRole.Captain && crew?.faction == com.alifeatseammo.data.model.Faction.Pirate) {
                             "Pirate Captain"
+                        } else if (role == CrewRole.CoCaptain) {
+                            "Co-Captain"
                         } else {
                             role.name
                         }
 
                         val onlineStatus = if (member.isOnline) "Online" else "Offline"
                         val statusColor = if (member.isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+
+                        var showRoleMenu by remember { mutableStateOf(false) }
 
                         ListItem(
                             headlineContent = { 
@@ -172,9 +217,36 @@ fun CrewScreen(
                                 }
                             },
                             trailingContent = {
-                                if (crew?.captainId == character.id && member.id != character.id) {
-                                    IconButton(onClick = { onPromoteMember(member.id, "Officer") }) {
-                                        Text("↑")
+                                val myRole = crew?.roles?.get(character.id) ?: CrewRole.Member
+                                val canManage = myRole == CrewRole.Captain || myRole == CrewRole.CoCaptain
+                                
+                                if (canManage && member.id != character.id) {
+                                    Box {
+                                        IconButton(onClick = { showRoleMenu = true }) {
+                                            Text("⚙️")
+                                        }
+                                        DropdownMenu(
+                                            expanded = showRoleMenu,
+                                            onDismissRequest = { showRoleMenu = false }
+                                        ) {
+                                            CrewRole.entries.filter { it != CrewRole.Captain }.forEach { r ->
+                                                DropdownMenuItem(
+                                                    text = { Text("Set as ${r.name}") },
+                                                    onClick = {
+                                                        onPromoteMember(member.id, r.name)
+                                                        showRoleMenu = false
+                                                    }
+                                                )
+                                            }
+                                            HorizontalDivider()
+                                            DropdownMenuItem(
+                                                text = { Text("Kick Member", color = MaterialTheme.colorScheme.error) },
+                                                onClick = {
+                                                    onKickMember(member.id)
+                                                    showRoleMenu = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -222,4 +294,78 @@ fun CrewScreen(
             }
         )
     }
+
+    if (showDonateDialog) {
+        var amountText by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showDonateDialog = false },
+            title = { Text("Donate Gold to Crew") },
+            text = {
+                Column {
+                    Text("Your Gold: ${character.gold}", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { if (it.all { char -> char.isDigit() }) amountText = it },
+                        label = { Text("Amount") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val amount = amountText.toIntOrNull() ?: 0
+                    if (amount > 0) {
+                        onDonateGold(amount)
+                        showDonateDialog = false
+                    }
+                }) {
+                    Text("Donate")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDonateDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showSettingsDialog && crew != null) {
+        var description by remember { mutableStateOf(crew.description) }
+        var isPublic by remember { mutableStateOf(crew.isPublic) }
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = { Text("Crew Settings") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = isPublic, onCheckedChange = { isPublic = it })
+                        Text("Public Crew")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    onUpdateSettings(description, isPublic)
+                    showSettingsDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSettingsDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    ActionOverlay(actionState)
 }

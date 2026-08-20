@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -15,6 +17,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.ElementType
+import com.alifeatseammo.data.model.Rarity
+import com.alifeatseammo.ui.UIActionState
+import androidx.compose.material3.CircularProgressIndicator
+
+@Composable
+fun ActionOverlay(state: UIActionState) {
+    if (state is UIActionState.Loading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = state.label, color = Color.White, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
 
 @Composable
 fun getElementColor(element: ElementType?): Color {
@@ -49,7 +72,12 @@ fun StatusBar(
     modifier: Modifier = Modifier,
     labelOverride: String? = null
 ) {
-    val progress = if (max > 0) (current.toFloat() / max.toFloat()).coerceIn(0f, 1f) else 0f
+    val targetProgress = if (max > 0) (current.toFloat() / max.toFloat()).coerceIn(0f, 1f) else 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = targetProgress,
+        label = "StatusBarProgress"
+    )
+
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -79,7 +107,7 @@ fun StatusBar(
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(progress)
+                    .fillMaxWidth(animatedProgress)
                     .fillMaxHeight()
                     .background(
                         Brush.horizontalGradient(
@@ -102,5 +130,17 @@ fun RewardCard(label: String, value: String, color: Color) {
     ) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text = value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = color)
+    }
+}
+
+@Composable
+fun getRarityColor(rarity: Rarity): Color {
+    return when (rarity) {
+        Rarity.Common -> MaterialTheme.colorScheme.onSurface
+        Rarity.Uncommon -> Color(0xFF4CAF50) // Green
+        Rarity.Rare -> Color(0xFF2196F3) // Blue
+        Rarity.Epic -> Color(0xFF9C27B0) // Purple
+        Rarity.Legendary -> Color(0xFFFF9800) // Orange
+        Rarity.Mythic -> Color(0xFFF44336) // Red
     }
 }

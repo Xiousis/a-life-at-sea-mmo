@@ -30,6 +30,7 @@ fun FishingScreen(
     val progress by viewModel.progress.collectAsState()
     val caughtFish by viewModel.caughtFish.collectAsState()
     val errorMsg by viewModel.errorMessage.collectAsState()
+    val barSize by viewModel.barSizeState.collectAsState()
 
     LaunchedEffect(errorMsg) {
         errorMsg?.let {
@@ -82,7 +83,7 @@ fun FishingScreen(
                     Text("Waiting for a bite...", style = MaterialTheme.typography.bodyLarge)
                 }
                 FishingState.HOOKED -> {
-                    FishingMiniGame(fishPos, barPos, progress)
+                    FishingMiniGame(fishPos, barPos, progress, barSize)
                 }
                 FishingState.SUCCESS -> {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -107,7 +108,7 @@ fun FishingScreen(
 }
 
 @Composable
-fun FishingMiniGame(fishPos: Float, barPos: Float, progress: Float) {
+fun FishingMiniGame(fishPos: Float, barPos: Float, progress: Float, barSize: Float) {
     Row(
         modifier = Modifier
             .height(400.dp)
@@ -146,7 +147,7 @@ fun FishingMiniGame(fishPos: Float, barPos: Float, progress: Float) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.15f) // 15% of height
+                    .fillMaxHeight(barSize / 100f)
                     .offset(y = (barPos / 100f * 400).dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(Color.Green.copy(alpha = 0.5f))
