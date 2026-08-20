@@ -1,2 +1,3 @@
 <AppFunctionAppMetadata xmlns:appfn="http://schemas.android.com/apk/androidx.appfunctions"
-    appfn:description="A Life at Sea MMO. Manage your character, go fishing, complete missions, and interact with other players in this pirate-themed world." />
+    appfn:description="Manage your character, go fishing, complete missions, and interact with other players in this pirate-themed world."
+    appfn:displayDescription="A Life at Sea MMO - Pirate Adventure" />
