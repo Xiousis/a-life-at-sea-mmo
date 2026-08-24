@@ -52,8 +52,14 @@ class AuctionViewModel @Inject constructor(
         else flowOf(null)
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val auctionListings: StateFlow<List<AuctionListing>> = auctionRepository.getAuctionListings()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .catch { e ->
+            android.util.Log.e("AuctionViewModel", "Error in auctionListings flow", e)
+            _errorMessage.value = "Failed to load auctions: ${e.localizedMessage}"
+            emit(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun listAuctionItem(item: Item, price: Int) {
         if (price <= 0) {

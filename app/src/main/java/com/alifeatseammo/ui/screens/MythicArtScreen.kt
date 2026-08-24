@@ -31,13 +31,24 @@ fun MythicArtScreen(
     actionState: com.alifeatseammo.ui.UIActionState,
     onRollClick: () -> Unit,
     onAdminGrantTestItems: () -> Unit,
-    onSeedWorldClick: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val isLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
     val isRolling = actionState is com.alifeatseammo.ui.UIActionState.Loading && actionState.label.contains("Rolling")
     
     var rollButtonEnabled by remember { mutableStateOf(true) }
+    
+    val tiers = listOf("F", "E", "D", "C", "B", "A", "S", "SS", "SSS", "Z")
+    var displayTierIndex by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(isRolling) {
+        if (isRolling) {
+            while (true) {
+                displayTierIndex = (displayTierIndex + 1) % tiers.size
+                kotlinx.coroutines.delay(80)
+            }
+        }
+    }
     
     LaunchedEffect(isRolling) {
         if (!isRolling) {
@@ -125,15 +136,6 @@ fun MythicArtScreen(
                             ) {
                                 Text(if (isLoading && actionState.label.contains("Granting")) "GRANTING..." else "ADMIN: GRANT TEST ARTIFACTS")
                             }
-                            
-                            Button(
-                                onClick = onSeedWorldClick,
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                enabled = !isLoading,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                            ) {
-                                Text("ADMIN: RE-SEED WORLD DATA")
-                            }
                         }
                     }
 
@@ -167,12 +169,13 @@ fun MythicArtScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         if (isRolling) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
+                            Text(
+                                text = tiers[displayTierIndex],
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
                             Text("AWAKENING...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                         } else {
                             Text(

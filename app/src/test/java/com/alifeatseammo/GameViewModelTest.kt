@@ -3,6 +3,7 @@ package com.alifeatseammo
 import com.alifeatseammo.data.model.StatType
 import com.alifeatseammo.data.repository.AdminRepository
 import com.alifeatseammo.data.repository.AuthRepository
+import com.alifeatseammo.data.repository.CrewRepository
 import com.alifeatseammo.data.repository.GameRepository
 import com.alifeatseammo.ui.GameViewModel
 import com.google.firebase.auth.FirebaseUser
@@ -24,6 +25,7 @@ class GameViewModelTest {
     private lateinit var viewModel: GameViewModel
     private val authRepository: AuthRepository = mockk(relaxed = true)
     private val gameRepository: GameRepository = mockk(relaxed = true)
+    private val crewRepository: CrewRepository = mockk(relaxed = true)
     private val adminRepository: AdminRepository = mockk(relaxed = true)
     
     private val testDispatcher = StandardTestDispatcher()
@@ -36,7 +38,7 @@ class GameViewModelTest {
         every { user.uid } returns "test_uid"
         every { authRepository.currentUser } returns MutableStateFlow(user)
         
-        viewModel = GameViewModel(authRepository, gameRepository, adminRepository)
+        viewModel = GameViewModel(authRepository, gameRepository, crewRepository, adminRepository)
     }
 
     @After

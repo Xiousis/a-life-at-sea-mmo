@@ -16,16 +16,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.LocationDef
+import com.alifeatseammo.data.model.RaidBoss
+import com.alifeatseammo.data.model.SeaEvent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     character: Character,
     locations: List<LocationDef>,
+    activeRaids: List<RaidBoss> = emptyList(),
+    seaEvents: List<SeaEvent> = emptyList(),
     onLocationClick: (LocationDef) -> Unit,
     onBackClick: () -> Unit
 ) {
     var selectedLocation by remember { mutableStateOf<LocationDef?>(null) }
+    var selectedEvent by remember { mutableStateOf<SeaEvent?>(null) }
 
     // Dynamic scaling based on location bounds
     val minX = locations.minOfOrNull { it.x }?.toFloat() ?: -500f
@@ -79,11 +84,23 @@ fun MapScreen(
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(locations, mapMinX, mapMaxX, mapMinY, mapMaxY) {
+                        .pointerInput(locations, seaEvents, mapMinX, mapMaxX, mapMinY, mapMaxY) {
                             detectTapGestures { offset ->
                                 val canvasWidth = size.width
                                 val canvasHeight = size.height
                                 
+                                // Check events first (smaller/more specific)
+                                seaEvents.forEach { event ->
+                                    val x = (event.x - mapMinX) * (canvasWidth / mapWidth)
+                                    val y = (event.y - mapMinY) * (canvasHeight / mapHeight)
+                                    val eventOffset = Offset(x, y)
+                                    if ((offset - eventOffset).getDistance() < 40f) {
+                                        selectedEvent = event
+                                        selectedLocation = null
+                                        return@detectTapGestures
+                                    }
+                                }
+
                                 locations.forEach { loc ->
                                     val x = (loc.x - mapMinX) * (canvasWidth / mapWidth)
                                     val y = (loc.y - mapMinY) * (canvasHeight / mapHeight)
@@ -91,6 +108,7 @@ fun MapScreen(
                                     
                                     if ((offset - locOffset).getDistance() < 40f) {
                                         selectedLocation = loc
+                                        selectedEvent = null
                                     }
                                 }
                             }
@@ -108,16 +126,58 @@ fun MapScreen(
                         drawLine(Color.White.copy(alpha = 0.3f), Offset(0f, i * stepH), Offset(size.width, i * stepH))
                     }
 
+                    // Draw Sea Events Areas
+                    seaEvents.forEach { event ->
+                        val x = (event.x - mapMinX) * (size.width / mapWidth)
+                        val y = (event.y - mapMinY) * (size.height / mapHeight)
+                        val radius = event.radius.toFloat() * (size.width / mapWidth)
+                        
+                        drawCircle(
+                            color = Color(android.graphics.Color.parseColor(event.type.color)).copy(alpha = 0.2f),
+                            radius = radius,
+                            center = Offset(x, y)
+                        )
+                    }
+
                     // Draw Locations
                     locations.forEach { loc ->
                         val x = (loc.x - mapMinX) * (size.width / mapWidth)
                         val y = (loc.y - mapMinY) * (size.height / mapHeight)
                         
                         val isCurrent = loc.name == character.currentLocation
+                        val raidAtLocation = activeRaids.find { it.locationId == loc.id }
+
+                        if (raidAtLocation != null) {
+                            // Draw Skull for Raid
+                            drawCircle(
+                                color = Color.Black,
+                                radius = 10f,
+                                center = Offset(x, y)
+                            )
+                            // We can't easily draw "💀" in Canvas without nativeCanvas or textMeasurer
+                            // Let's use a distinct color and border for now, or nativeCanvas
+                            drawCircle(
+                                color = Color.White,
+                                radius = 6f,
+                                center = Offset(x, y)
+                            )
+                        } else {
+                            drawCircle(
+                                color = if (isCurrent) Color.Red else if (loc.isSafe) Color(0xFF4CAF50) else Color(0xFF795548),
+                                radius = if (isCurrent) 12f else 8f,
+                                center = Offset(x, y)
+                            )
+                        }
+                    }
+
+                    // Draw Sea Event Icons
+                    seaEvents.forEach { event ->
+                        val x = (event.x - mapMinX) * (size.width / mapWidth)
+                        val y = (event.y - mapMinY) * (size.height / mapHeight)
                         
                         drawCircle(
-                            color = if (isCurrent) Color.Red else if (loc.isSafe) Color(0xFF4CAF50) else Color(0xFF795548),
-                            radius = if (isCurrent) 12f else 8f,
+                            color = Color(android.graphics.Color.parseColor(event.type.color)),
+                            radius = 10f,
                             center = Offset(x, y)
                         )
                     }
@@ -134,7 +194,31 @@ fun MapScreen(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    selectedLocation?.let { loc ->
+                    if (selectedEvent != null) {
+                        val event = selectedEvent!!
+                        Text(
+                            text = "${event.type.icon} ${event.name}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = event.description,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Effect: ${event.effectDescription}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        val timeLeft = (event.endTime - System.currentTimeMillis()) / 1000 / 60
+                        Text(
+                            text = "Ends in: ${timeLeft.coerceAtLeast(0)} mins",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray
+                        )
+                    } else {
+                        selectedLocation?.let { loc ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -147,6 +231,20 @@ fun MapScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.secondary
                                 )
+                                val raidAtLocation = activeRaids.find { it.locationId == loc.id }
+                                if (raidAtLocation != null) {
+                                    Text(
+                                        text = "⚠️ RAID BOSS: ${raidAtLocation.enemy.name}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = Color.Red,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    Text(
+                                        text = "Rewards: Standard XP/Gold\nTop 3 Dmg: +0.1% Exclusive Drop",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                             if (loc.isSafe) {
                                 Surface(
@@ -204,3 +302,5 @@ fun MapScreen(
         }
     }
 }
+}
+

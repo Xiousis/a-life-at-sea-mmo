@@ -1,7 +1,8 @@
 package com.alifeatseammo.ui.screens
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -16,16 +17,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.*
 import com.alifeatseammo.ui.components.StatusBar
+import com.alifeatseammo.ui.components.getElementColor
 
 @Composable
 fun CombatScreen(
     character: Character,
+    raidBoss: RaidBoss? = null,
     onActionClick: (CombatAction, String?, String?) -> Unit
 ) {
     val combatState = character.combatState ?: return
@@ -34,6 +38,10 @@ fun CombatScreen(
     
     var showTechniques by remember { mutableStateOf(false) }
     var showItems by remember { mutableStateOf(false) }
+    var showLeaderboard by remember { mutableStateOf(false) }
+
+    val primaryElementColor = getElementColor(character.mythicArt?.elements?.firstOrNull())
+
 
     LaunchedEffect(combatState.logs.size) {
         if (combatState.logs.isNotEmpty()) {
@@ -64,6 +72,29 @@ fun CombatScreen(
                 )
             }
         }
+
+        if (combatState.isRaid) {
+            Surface(
+                color = Color.Black,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = "WORLD RAID BOSS",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+            CombatButton(
+                label = "Leaderboard",
+                modifier = Modifier.padding(bottom = 8.dp),
+                color = Color.Yellow
+            ) { showLeaderboard = true }
+        }
+
         Text(
             text = "────────────────────────",
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -74,6 +105,14 @@ fun CombatScreen(
             fontWeight = FontWeight.Bold,
             letterSpacing = 4.sp
         )
+        if (combatState.comboCount > 0) {
+            Text(
+                text = "COMBO x${combatState.comboCount}",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color(0xFFFF9800),
+                fontWeight = FontWeight.Black
+            )
+        }
         Text(
             text = "────────────────────────",
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -114,7 +153,7 @@ fun CombatScreen(
 
         // Enemy Section
         CombatantStatus(
-            name = enemy.name.uppercase(),
+            name = if (combatState.isRaid) "WORLD BOSS: ${enemy.name.uppercase()}" else enemy.name.uppercase(),
             hp = enemy.hp,
             maxHp = enemy.maxHp,
             barColor = Color(0xFFF44336),
@@ -139,12 +178,20 @@ fun CombatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(combatState.logs) { log ->
+                    val textColor = when {
+                        log.contains("CRITICAL", ignoreCase = true) -> Color(0xFFFFC107) // Amber
+                        log.contains("DODGED", ignoreCase = true) || log.contains("EVADED", ignoreCase = true) -> Color(0xFF03A9F4) // Light Blue
+                        log.contains("WEAKNESS", ignoreCase = true) -> Color(0xFFE91E63) // Pink/Red
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
                     Text(
                         text = log,
                         style = MaterialTheme.typography.bodyLarge,
+                        color = textColor,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth(),
-                        lineHeight = 24.sp
+                        lineHeight = 24.sp,
+                        fontWeight = if (textColor != MaterialTheme.colorScheme.onSurface) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
@@ -165,7 +212,12 @@ fun CombatScreen(
             val isPlayerTurn = combatState.playerTurn
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CombatButton("Attack", Modifier.weight(1f), enabled = isPlayerTurn) { onActionClick(CombatAction.Attack, null, null) }
-                CombatButton("Technique", Modifier.weight(1f), enabled = isPlayerTurn) { showTechniques = true }
+                CombatButton(
+                    label = "Technique", 
+                    modifier = Modifier.weight(1f), 
+                    enabled = isPlayerTurn,
+                    color = primaryElementColor
+                ) { showTechniques = true }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CombatButton("Defend", Modifier.weight(1f), enabled = isPlayerTurn) { onActionClick(CombatAction.Defend, null, null) }
@@ -265,6 +317,51 @@ fun CombatScreen(
             }
         )
     }
+
+    if (showLeaderboard && raidBoss != null) {
+        AlertDialog(
+            onDismissRequest = { showLeaderboard = false },
+            title = { Text("RAID LEADERBOARD") },
+            text = {
+                val sortedParticipants = raidBoss.participants.values.sortedByDescending { it.totalDamage }
+                Column {
+                    Text(
+                        "Only Top 3 damage performers get a 0.1% chance for Exclusive Drops. All participants get standard Gold & XP.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    sortedParticipants.take(10).forEachIndexed { index, participant ->
+                        val isSelf = participant.userId == character.id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .background(if (isSelf) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent)
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "${index + 1}. ${participant.userName.uppercase()}",
+                                fontWeight = if (index < 3) FontWeight.Bold else FontWeight.Normal,
+                                color = if (index < 3) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${participant.totalDamage} DMG",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (isSelf) FontWeight.Black else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLeaderboard = false }) { Text("Close") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -287,6 +384,12 @@ fun CombatantStatus(
         finishedListener = { flashActive = false }
     )
 
+    val shakeOffset by animateDpAsState(
+        targetValue = if (flashActive) 8.dp else 0.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessHigh),
+        label = "Shake"
+    )
+
     LaunchedEffect(hp) {
         if (hp < previousHp) {
             flashActive = true
@@ -299,6 +402,7 @@ fun CombatantStatus(
         horizontalAlignment = Alignment.Start,
         modifier = Modifier
             .fillMaxWidth()
+            .offset(x = shakeOffset)
             .background(flashColor, RoundedCornerShape(8.dp))
             .padding(4.dp)
     ) {
@@ -378,18 +482,20 @@ private fun isEffective(attacker: ElementType, defender: ElementType): Boolean {
 }
 
 @Composable
-fun CombatButton(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+fun CombatButton(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = Color.Unspecified, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         shape = MaterialTheme.shapes.extraSmall,
-        contentPadding = PaddingValues(12.dp)
+        contentPadding = PaddingValues(12.dp),
+        border = if (color != Color.Unspecified) BorderStroke(2.dp, SolidColor(color)) else ButtonDefaults.outlinedButtonBorder(enabled = enabled)
     ) {
         Text(
             text = "[ $label ]",
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = if (color != Color.Unspecified) color else Color.Unspecified
         )
     }
 }

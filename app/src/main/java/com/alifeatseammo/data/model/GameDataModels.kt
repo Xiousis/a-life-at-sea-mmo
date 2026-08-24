@@ -12,6 +12,7 @@ data class LocationDef(
     val recommendedLevel: Int = 1,
     val weather: String = "Clear",
     val actions: List<ActionDef> = emptyList(),
+    val controlledBy: Faction = Faction.Neutral,
     val x: Int = 0,
     val y: Int = 0,
 )
@@ -43,6 +44,7 @@ data class Technique(
     val power: Float = 1.0f,
     val energyCost: Int = 10,
     val cooldown: Int = 0,
+    val factionRequirement: Faction = Faction.Neutral,
     val element: ElementType? = null,
     val effects: List<StatusEffect> = emptyList()
 )
@@ -72,5 +74,38 @@ data class FishDef(
 enum class FishingMovementPattern {
     Steady, Sinker, Floater, Darting
 }
+
+data class SeaEvent(
+    val id: String = "",
+    val name: String = "",
+    val description: String = "",
+    val type: SeaEventType = SeaEventType.Storm,
+    val x: Int = 0,
+    val y: Int = 0,
+    val radius: Int = 100,
+    val startTime: Long = 0,
+    val endTime: Long = 0,
+    val effectDescription: String = "",
+    val active: Boolean = true
+)
+
+enum class SeaEventType(val icon: String, val color: String) {
+    Storm("⛈️", "#2C3E50"),
+    MerchantConvoy("🚢", "#F1C40F"),
+    Kraken("🐙", "#8E44AD"),
+    Shipwreck("🏚️", "#7F8C8D"),
+    Whirlpool("🌀", "#2980B9"),
+    MysticMist("🌫️", "#BDC3C7")
+}
+
+data class WarState(
+    val id: String = "current",
+    val targetLocation: String = "",
+    val startTime: Long = 0,
+    val endTime: Long = 0,
+    val navyScore: Int = 0,
+    val pirateScore: Int = 0,
+    val isActive: Boolean = false
+)
 
 

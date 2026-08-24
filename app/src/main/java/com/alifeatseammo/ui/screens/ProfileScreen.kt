@@ -2,11 +2,16 @@ package com.alifeatseammo.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -136,12 +141,13 @@ fun ProfileScreen(
                 title = { Text("Player Profile") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Text("Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
         }
     ) { padding ->
+        val clipboardManager = LocalClipboardManager.current
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -202,6 +208,20 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Player ID:", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = character.id.take(8) + "...", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                        IconButton(onClick = { clipboardManager.setText(AnnotatedString(character.id)) }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy ID", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+
                 ProfileStatRow("Bounty:", String.format(locale, "%,d", character.bounty), color = MaterialTheme.colorScheme.error)
                 ProfileStatRow("Faction:", character.faction.name)
                 if (character.infamy > 0) {

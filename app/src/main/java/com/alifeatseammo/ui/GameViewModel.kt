@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.seconds
 import javax.inject.Inject
 
 sealed class CharacterState {
@@ -23,9 +24,10 @@ sealed class CharacterState {
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    private val authRepository: AuthRepository,
+    authRepository: AuthRepository,
     private val gameRepository: GameRepository,
-    private val adminRepository: AdminRepository
+    private val crewRepository: CrewRepository,
+    private val adminRepository: AdminRepository,
 ) : ViewModel() {
 
     val currentUser: StateFlow<FirebaseUser?> = authRepository.currentUser
@@ -50,7 +52,7 @@ class GameViewModel @Inject constructor(
     private var heartbeatJob: Job? = null
 
     val character: StateFlow<Character?> = characterState
-        .map { if (it is CharacterState.Loaded) it.character else null }
+        .map { (it as? CharacterState.Loaded)?.character }
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     private val _actionState = MutableStateFlow<UIActionState>(UIActionState.Idle)
@@ -117,8 +119,9 @@ class GameViewModel @Inject constructor(
             try {
                 block()
                 _actionState.value = UIActionState.Success(label)
-                delay(2000)
-                if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
+                delay(2.seconds)
+                val currentState = _actionState.value
+                if ((currentState is UIActionState.Success) && (currentState.label == label)) {
                     _actionState.value = UIActionState.Idle
                 }
             } catch (e: Exception) {
@@ -132,7 +135,7 @@ class GameViewModel @Inject constructor(
         .map { char ->
             char?.isAdmin == true || char?.isHardcodedAdmin() == true
         }
-        .stateIn(viewModelScope, SharingStarted.Lazily, false)
+        .stateIn(viewModelScope, SharingStarted.Lazily, initialValue = false)
 
     private fun startHeartbeat() {
         heartbeatJob?.cancel()
@@ -195,15 +198,24 @@ class GameViewModel @Inject constructor(
     private val _leaderboardSort = MutableStateFlow("level")
     val leaderboardSort: StateFlow<String> = _leaderboardSort.asStateFlow()
 
+    private val _leaderboardCrewSort = MutableStateFlow("level")
+    val leaderboardCrewSort: StateFlow<String> = _leaderboardCrewSort.asStateFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val topPlayers: StateFlow<List<Character>> = combine(
         leaderboardFaction,
-        leaderboardSort
+        leaderboardSort,
     ) { faction, sort ->
         faction to sort
     }.flatMapLatest { (faction, sort) ->
         gameRepository.getTopPlayers(20, faction, sort)
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val topCrews: StateFlow<List<Crew>> = leaderboardCrewSort
+        .flatMapLatest { sort ->
+            crewRepository.getTopCrews(20, sort)
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun setLeaderboardFaction(faction: Faction?) {
         _leaderboardFaction.value = faction
@@ -211,6 +223,10 @@ class GameViewModel @Inject constructor(
 
     fun setLeaderboardSort(sort: String) {
         _leaderboardSort.value = sort
+    }
+
+    fun setLeaderboardCrewSort(sort: String) {
+        _leaderboardCrewSort.value = sort
     }
 
     val missions: StateFlow<List<Mission>> = gameRepository.getAvailableMissions()
@@ -221,6 +237,18 @@ class GameViewModel @Inject constructor(
 
     val techniques: StateFlow<List<Technique>> = gameRepository.getTechniques()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val activeRaids: StateFlow<List<RaidBoss>> = gameRepository.getActiveRaids()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val islandQuests: StateFlow<List<IslandQuest>> = gameRepository.getIslandQuests()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val announcements: StateFlow<List<String>> = gameRepository.getGlobalAnnouncements()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val warState: StateFlow<WarState?> = gameRepository.getWarState()
+        .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val currentLocationInfo: StateFlow<LocationDef?> = combine(
@@ -267,6 +295,18 @@ class GameViewModel @Inject constructor(
             if (_actionState.value is UIActionState.Success) {
                 _actionState.value = UIActionState.Idle
             }
+        }
+    }
+
+    fun completeQuest(questId: String) {
+        performAction("Completing Quest") {
+            gameRepository.completeQuest(questId)
+        }
+    }
+
+    fun raidCombatAction(raidId: String, action: CombatAction, techniqueId: String? = null, itemId: String? = null) {
+        performAction("Raid Action") {
+            gameRepository.raidCombatAction(raidId, action, techniqueId, itemId)
         }
     }
 
@@ -335,12 +375,6 @@ class GameViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Failed to finish training", e)
             }
-        }
-    }
-
-    fun startMonsterHunt() {
-        performAction("Starting Monster Hunt") {
-            gameRepository.startMonsterHunt()
         }
     }
 

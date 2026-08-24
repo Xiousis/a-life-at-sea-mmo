@@ -44,7 +44,7 @@ android {
         debug {
             firebaseAppDistribution {
                 artifactType = "APK"
-                releaseNotes = "v1.5: New AppFunctions integration for system-wide shortcuts, Admin Panel for developers, Major refactor of data models (Combat, Economy, Ranks), and UI improvements across all screens."
+                releaseNotes = "v1.5: New Scheduled World Raid system (daily at 5:30PM EST), AppFunctions integration, Admin Panel, and major data model refactor."
                 testers = "oscali11@gmail.com"
             }
         }

@@ -92,12 +92,31 @@ class EconomyViewModel @Inject constructor(
         }
     }
 
-    fun cookFish(item: Item) {
+    private val _recipes = MutableStateFlow<List<Recipe>>(emptyList())
+    val recipes: StateFlow<List<Recipe>> = _recipes.asStateFlow()
+
+    fun loadRecipes() {
+        viewModelScope.launch {
+            try {
+                _recipes.value = gameRepository.getRecipes()
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to load recipes"
+            }
+        }
+    }
+
+    fun cook(recipe: Recipe) {
         val char = character.value ?: return
-        if (char.mythicArt?.tier == "Z") {
-            _errorMessage.value = "A God's Eye user does not cook. They create or annihilate."
+        if (char.professionStats.cooking < recipe.levelRequirement) {
+            _errorMessage.value = "Cooking level too low"
             return
         }
+        performAction("Cooking ${recipe.name}") {
+            gameRepository.cook(recipe.id)
+        }
+    }
+
+    fun cookFish(item: Item) {
         performAction("Cooking ${item.name}") {
             gameRepository.cookFish(item.id)
         }

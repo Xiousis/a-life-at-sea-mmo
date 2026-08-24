@@ -99,7 +99,31 @@ fun TrainingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Derived Stats Card
+            val derived = character.getDerivedStats()
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("Combat Potential", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Crit Chance: ${String.format(Locale.US, "%.1f", derived.criticalChance)}%", style = MaterialTheme.typography.bodySmall)
+                            Text("Dodge Chance: ${String.format(Locale.US, "%.1f", derived.dodgeChance)}%", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Block Power: ${String.format(Locale.US, "%.1f", derived.blockEffectiveness)}%", style = MaterialTheme.typography.bodySmall)
+                            Text("MP Regen: ${String.format(Locale.US, "%.2f", derived.manaRegenPerSecond)}/s", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             
             Text("Select Attribute to Train", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text("Each session costs 10 Energy + Gold (increases per point) and takes 5s.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)

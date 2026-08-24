@@ -13,6 +13,8 @@ data class Character(
     val energy: Int = 100,
     val maxEnergy: Int = 100,
     val gold: Int = 0,
+    val justicePoints: Int = 0,
+    val pirateReputation: Int = 0,
     val xp: Int = 0,
     val level: Int = 1,
     val bounty: Long = 0,
@@ -44,12 +46,15 @@ data class Character(
     val healingState: HealingState? = null,
     val trainingState: TrainingState? = null,
     val ship: Ship = Ship(),
+    val ownedShips: List<Ship> = emptyList(),
     val mythicArt: MythicArt? = null,
     val freeMythicRolls: Int = 3,
     val mythicMana: Int = 100,
     val maxMythicMana: Int = 100,
     val mythicManaUpdatedAt: Long = System.currentTimeMillis(),
-    val lastRankChallengeAt: Long = 0
+    val lastRankChallengeAt: Long = 0,
+    val completedQuests: List<String> = emptyList(),
+    val warContribution: Int = 0,
 ) {
     fun isHardcodedAdmin(): Boolean {
         val admins = listOf("sedna", "von")
@@ -57,29 +62,31 @@ data class Character(
     }
 
     fun canEquip(item: Item): Boolean {
-        if (level < item.levelRequirement) return false
-        
+        if (item.factionRequirement != Faction.Neutral && item.factionRequirement != faction) {
+            return false
+        }
         val reqs = item.statRequirements
-        if (stats.strength < reqs.strength) return false
-        if (stats.endurance < reqs.endurance) return false
-        if (stats.agility < reqs.agility) return false
-        if (stats.perception < reqs.perception) return false
-        if (stats.willpower < reqs.willpower) return false
-        if (stats.luck < reqs.luck) return false
-        
-        if (stats.swordsmanship < reqs.swordsmanship) return false
-        if (stats.brawling < reqs.brawling) return false
-        if (stats.gunslinging < reqs.gunslinging) return false
-        if (stats.spear < reqs.spear) return false
-        if (stats.martialArts < reqs.martialArts) return false
-        if (stats.sniper < reqs.sniper) return false
-        if (stats.mysticArts < reqs.mysticArts) return false
-        
-        return true
+        return (level >= item.levelRequirement) &&
+                (stats.strength >= reqs.strength) &&
+                (stats.endurance >= reqs.endurance) &&
+                (stats.agility >= reqs.agility) &&
+                (stats.perception >= reqs.perception) &&
+                (stats.willpower >= reqs.willpower) &&
+                (stats.luck >= reqs.luck) &&
+                (stats.swordsmanship >= reqs.swordsmanship) &&
+                (stats.brawling >= reqs.brawling) &&
+                (stats.gunslinging >= reqs.gunslinging) &&
+                (stats.spear >= reqs.spear) &&
+                (stats.martialArts >= reqs.martialArts) &&
+                (stats.sniper >= reqs.sniper) &&
+                (stats.mysticArts >= reqs.mysticArts)
     }
 
     fun getMissingRequirements(item: Item): List<String> {
         val missing = mutableListOf<String>()
+        if (item.factionRequirement != Faction.Neutral && item.factionRequirement != faction) {
+            missing.add("Faction: ${item.factionRequirement}")
+        }
         if (level < item.levelRequirement) {
             missing.add("Level ${item.levelRequirement}")
         }
@@ -108,6 +115,7 @@ data class Character(
         equipment["Bag"]?.let {
             capacity += it.storageBonus
         }
+        capacity += ship.upgrades.storageLevel * 5
         return capacity
     }
 
@@ -134,40 +142,16 @@ data class Character(
         return (mythicMana + regenerated).coerceAtMost(maxMythicMana)
     }
 
-}
+    fun getDerivedStats(): DerivedStats {
+        return DerivedStats(
+            criticalChance = (stats.perception * 0.1) + (stats.luck * 0.05),
+            dodgeChance = (stats.agility * 0.15),
+            blockEffectiveness = (stats.endurance * 0.2),
+            manaRegenPerSecond = (stats.willpower * 0.01),
+        )
+    }
 
-data class CharacterPrivate(
-    val stats: Stats = Stats(),
-    val hp: Int = 100,
-    val maxHp: Int = 100,
-    val energy: Int = 100,
-    val maxEnergy: Int = 100,
-    val gold: Int = 0,
-    val xp: Int = 0,
-    val infamy: Int = 0,
-    val rank: String = "Novice Sailor",
-    val title: String = "",
-    val unlockedTitles: List<String> = emptyList(),
-    val energyUpdatedAt: Long = System.currentTimeMillis(),
-    val travelState: TravelState? = null,
-    val combatState: CombatState? = null,
-    val inventory: List<Item> = emptyList(),
-    val inventoryCapacity: Int = 20,
-    val equipment: Map<String, Item?> = emptyMap(),
-    val friends: List<String> = emptyList(),
-    val blocked: List<String> = emptyList(),
-    val learnedTechniques: List<String> = emptyList(),
-    val professionStats: ProfessionStats = ProfessionStats(),
-    val hasMedicalLicense: Boolean = false,
-    val healingState: HealingState? = null,
-    val trainingState: TrainingState? = null,
-    val ship: Ship = Ship(),
-    val mythicArt: MythicArt? = null,
-    val freeMythicRolls: Int = 3,
-    val mythicMana: Int = 100,
-    val maxMythicMana: Int = 100,
-    val mythicManaUpdatedAt: Long = System.currentTimeMillis()
-)
+}
 
 data class MythicArt(
     val name: String = "",
@@ -214,7 +198,11 @@ data class Ship(
 data class ShipUpgrades(
     val hullLevel: Int = 0,
     val sailLevel: Int = 0,
-    val cannonLevel: Int = 0
+    val cannonLevel: Int = 0,
+    val rudderLevel: Int = 0,
+    val storageLevel: Int = 0,
+    val cabinLevel: Int = 0,
+    val figureheadLevel: Int = 0
 )
 
 enum class Gender {
@@ -229,8 +217,22 @@ enum class Rarity {
     Common, Uncommon, Rare, Epic, Legendary, Mythic
 }
 
-enum class Race {
-    Human, Abyssal, Beastkin, Celestian, Automaton
+enum class Race(val description: String) {
+    Human("Versatile and adaptable, humans thrive in any environment."),
+    Abyssal("Resilient dwellers of the deep, known for their immense endurance."),
+    Beastkin("Fierce and agile warriors with animalistic instincts."),
+    Celestian("Ethereal beings with strong willpower and sharp perception."),
+    Automaton("Constructed for power and durability, built to last.");
+
+    fun getStatBoosts(): Stats {
+        return when (this) {
+            Human -> Stats(luck = 2.0, strength = 1.0, endurance = 1.0, agility = 1.0)
+            Abyssal -> Stats(endurance = 3.0, willpower = 2.0)
+            Beastkin -> Stats(agility = 3.0, perception = 2.0)
+            Celestian -> Stats(willpower = 3.0, perception = 2.0)
+            Automaton -> Stats(strength = 3.0, endurance = 2.0)
+        }
+    }
 }
 
 data class TravelEvent(
@@ -260,7 +262,17 @@ data class Stats(
     val spear: Double = 0.0,
     val martialArts: Double = 0.0,
     val sniper: Double = 0.0,
-    val mysticArts: Double = 0.0
+    val mysticArts: Double = 0.0,
+    // Elemental Stats
+    val elementalResistances: Map<ElementType, Double> = emptyMap(),
+    val elementalMastery: Map<ElementType, Double> = emptyMap()
+)
+
+data class DerivedStats(
+    val criticalChance: Double = 0.0,
+    val dodgeChance: Double = 0.0,
+    val blockEffectiveness: Double = 0.0,
+    val manaRegenPerSecond: Double = 0.0
 )
 
 data class ProfessionStats(
@@ -287,10 +299,14 @@ data class Crew(
     val roles: Map<String, CrewRole> = emptyMap(),
     val totalBounty: Long = 0,
     val gold: Long = 0,
+    val totalDonated: Long = 0,
+    val pvpWins: Int = 0,
+    val pvpLosses: Int = 0,
+    val isPvPEnabled: Boolean = false,
     val level: Int = 1,
     val experience: Long = 0,
     val faction: Faction = Faction.Neutral,
-    val unlockedPerks: List<CrewPerk> = emptyList(),
+    val unlockedPerks: Map<String, Int> = emptyMap(),
     val isPublic: Boolean = true
 )
 
@@ -299,7 +315,12 @@ enum class CrewPerk(val label: String, val description: String) {
     GoldenPlunder("Golden Plunder", "Increases gold rewards from missions by 15%"),
     BountifulSeas("Bountiful Seas", "Increases fishing success rate and rare fish chance"),
     CombatHardened("Combat Hardened", "Increases crew members' defense by 5%"),
-    LuckyFind("Lucky Find", "Increases chance to find artifacts in missions")
+    LuckyFind("Lucky Find", "Increases chance to find artifacts in missions"),
+    CartographyExpertise("Cartography Expertise", "Reduces travel time by an additional 5% per level"),
+    MerchantTies("Merchant Ties", "Increases sell prices by 2% per level"),
+    VanguardTactics("Vanguard Tactics", "Increases crew members' attack by 2% per level"),
+    IronHold("Iron Hold", "Increases crew members' defense by 2% per level"),
+    SeaBreadRegimen("Sea Bread Regimen", "Increases crew members' max HP by 50 per level")
 }
 
 enum class CrewRole {
@@ -328,7 +349,7 @@ data class MailMessage(
 )
 
 enum class ActionType {
-    Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Cave, Fishing, Infirmary, Work,
+    Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Fishing, Infirmary, Work,
     Kitchen, Forge, Observatory, Expedition, Grind, MythicRoll
 }
 
@@ -347,11 +368,11 @@ fun Character.checkLevelUp(): Character {
     var currentStats = stats
 
     var xpNeeded = currentLevel * currentLevel * 100
-    while (currentXp >= xpNeeded && (currentLevel < maxLevel)) {
+    while ((currentXp >= xpNeeded) && (currentLevel < maxLevel)) {
         currentXp -= xpNeeded
         currentLevel++
         currentMaxHp += 20
-        if (currentLevel % 5 == 0) {
+        if ((currentLevel % 5) == 0) {
             currentMaxEnergy += 5
         }
         

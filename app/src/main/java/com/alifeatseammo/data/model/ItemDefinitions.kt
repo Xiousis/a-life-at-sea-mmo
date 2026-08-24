@@ -74,6 +74,106 @@ object ItemDefinitions {
         levelRequirement = 20
     )
 
+    val CURSED_CUTLASS = Item(
+        id = "cursed_cutlass",
+        name = "Cursed Cutlass",
+        description = "A wicked blade that hums with dark energy. High damage, but carries a heavy burden.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Rare,
+        price = 12000,
+        statBonus = Stats(swordsmanship = 35.0, strength = 10.0, endurance = -5.0),
+        statRequirements = Stats(swordsmanship = 80.0),
+        levelRequirement = 25,
+        factionRequirement = Faction.Pirate
+    )
+
+    val PLUNDERERS_PISTOL = Item(
+        id = "plunderers_pistol",
+        name = "Plunderer's Pistol",
+        description = "A pirate's best friend. Guaranteed to find more loot.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Uncommon,
+        price = 4500,
+        statBonus = Stats(gunslinging = 12.0, luck = 10.0),
+        statRequirements = Stats(gunslinging = 30.0),
+        levelRequirement = 15,
+        factionRequirement = Faction.Pirate
+    )
+
+    val NAVY_SABER = Item(
+        id = "navy_saber",
+        name = "Navy Officer Saber",
+        description = "A finely crafted saber issued to high-ranking Navy officers.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Rare,
+        price = 15000,
+        statBonus = Stats(swordsmanship = 25.0, agility = 10.0),
+        statRequirements = Stats(swordsmanship = 100.0),
+        levelRequirement = 30,
+        factionRequirement = Faction.Navy
+    )
+
+    val NAVY_CARBINE = Item(
+        id = "navy_carbine",
+        name = "Navy Carbine",
+        description = "A powerful and accurate rifle for elite Marine units.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Rare,
+        price = 18000,
+        statBonus = Stats(sniper = 35.0, perception = 15.0),
+        statRequirements = Stats(sniper = 120.0),
+        levelRequirement = 35,
+        factionRequirement = Faction.Navy
+    )
+
+    val IRON_SPEAR = Item(
+        id = "iron_spear",
+        name = "Iron Spear",
+        description = "A long-reaching thrusting weapon.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Common,
+        price = 120,
+        statBonus = Stats(spear = 4.0, strength = 1.0),
+        statRequirements = Stats(spear = 5.0),
+        levelRequirement = 2
+    )
+
+    val TRIDENT_OF_THE_DEEP = Item(
+        id = "trident_of_the_deep",
+        name = "Trident of the Deep",
+        description = "A mystical trident found in the depths.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Rare,
+        price = 15000,
+        statBonus = Stats(spear = 30.0, strength = 10.0, willpower = 20.0),
+        statRequirements = Stats(spear = 100.0),
+        levelRequirement = 30
+    )
+
+    val PIRATE_MUSKET = Item(
+        id = "pirate_musket",
+        name = "Blackbeard's Musket",
+        description = "A pirate's favorite ranged weapon.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Uncommon,
+        price = 2000,
+        statBonus = Stats(gunslinging = 15.0, perception = 5.0),
+        statRequirements = Stats(gunslinging = 40.0),
+        levelRequirement = 12
+    )
+
+    val DOUBLE_PISTOL = Item(
+        id = "double_pistol",
+        name = "Double-Barreled Pistol",
+        description = "Two shots are better than one.",
+        type = ItemType.Weapon,
+        rarity = Rarity.Rare,
+        price = 8000,
+        statBonus = Stats(gunslinging = 35.0, agility = 5.0),
+        statRequirements = Stats(gunslinging = 90.0),
+        levelRequirement = 20
+    )
+
     // Armor
     val LEATHER_VEST = Item(
         id = "leather_vest",
@@ -81,9 +181,89 @@ object ItemDefinitions {
         description = "Provides basic protection against cuts and scrapes.",
         type = ItemType.Armor,
         rarity = Rarity.Common,
-        price = 80,
+        price = 150,
         statBonus = Stats(endurance = 5.0),
         levelRequirement = 3
+    )
+
+    val IRON_CHESTPLATE = Item(
+        id = "iron_chestplate",
+        name = "Iron Chestplate",
+        description = "Solid iron protection.",
+        type = ItemType.Armor,
+        rarity = Rarity.Uncommon,
+        price = 1200,
+        statBonus = Stats(endurance = 15.0, willpower = 2.0),
+        levelRequirement = 10
+    )
+
+    val NAVY_UNIFORM = Item(
+        id = "navy_uniform",
+        name = "Marine Uniform",
+        description = "The standard issue blues.",
+        type = ItemType.Armor,
+        rarity = Rarity.Uncommon,
+        price = 2500,
+        statBonus = Stats(endurance = 20.0, agility = 5.0),
+        levelRequirement = 15,
+        factionRequirement = Faction.Navy
+    )
+
+    val NAVY_OFFICER_UNIFORM = Item(
+        id = "navy_officer_uniform",
+        name = "Navy Officer Uniform",
+        description = "Commanding presence with reinforced protection.",
+        type = ItemType.Armor,
+        rarity = Rarity.Rare,
+        price = 20000,
+        statBonus = Stats(endurance = 45.0, willpower = 10.0),
+        levelRequirement = 30,
+        factionRequirement = Faction.Navy
+    )
+
+    val JUSTICE_CAPE = Item(
+        id = "justice_cape",
+        name = "Navy Justice Cape",
+        description = "The iconic white cape with 'JUSTICE' emblazoned on the back.",
+        type = ItemType.Armor,
+        rarity = Rarity.Epic,
+        price = 50000,
+        statBonus = Stats(endurance = 60.0, willpower = 30.0, luck = 10.0),
+        levelRequirement = 50,
+        factionRequirement = Faction.Navy
+    )
+
+    val SEA_CAPTAIN_COAT = Item(
+        id = "sea_captain_coat",
+        name = "Sea Captain's Coat",
+        description = "A heavy coat that commands respect.",
+        type = ItemType.Armor,
+        rarity = Rarity.Rare,
+        price = 12000,
+        statBonus = Stats(endurance = 40.0, willpower = 15.0, luck = 5.0),
+        levelRequirement = 25
+    )
+
+    val REINFORCED_BOOTS = Item(
+        id = "reinforced_boots",
+        name = "Reinforced Boots",
+        description = "Sturdy boots for rough terrain.",
+        type = ItemType.Armor,
+        rarity = Rarity.Uncommon,
+        price = 800,
+        statBonus = Stats(endurance = 8.0, agility = 3.0),
+        levelRequirement = 8
+    )
+
+    val STEEL_GLOVES = Item(
+        id = "steel_gloves",
+        name = "Steel Plated Gloves",
+        description = "Protect your hands during combat.",
+        type = ItemType.Armor,
+        rarity = Rarity.Uncommon,
+        price = 1500,
+        statBonus = Stats(endurance = 10.0, strength = 5.0),
+        levelRequirement = 12
     )
 
     val AEGIS_SHIELD = Item(
@@ -117,6 +297,42 @@ object ItemDefinitions {
         price = 500,
         statBonus = Stats(agility = 8.0, luck = 5.0),
         levelRequirement = 15
+    )
+
+    val SMUGGLERS_CLOAK = Item(
+        id = "smugglers_cloak",
+        name = "Smuggler's Cloak",
+        description = "Enchanted to hide contraband and the wearer. High Agility and Luck.",
+        type = ItemType.Armor,
+        rarity = Rarity.Rare,
+        price = 8000,
+        statBonus = Stats(agility = 20.0, luck = 15.0, endurance = -2.0),
+        levelRequirement = 20,
+        factionRequirement = Faction.Pirate
+    )
+
+    val MARINE_MEDAL_OF_VALOR = Item(
+        id = "marine_medal_valor",
+        name = "Marine Medal of Valor",
+        description = "A prestigious award for bravery in the line of duty.",
+        type = ItemType.Accessory,
+        rarity = Rarity.Rare,
+        price = 5000, // In Justice Points (Backend logic needed)
+        statBonus = Stats(willpower = 15.0, endurance = 10.0),
+        levelRequirement = 30,
+        factionRequirement = Faction.Navy
+    )
+
+    val ADMIRALS_COMMAND_WHISTLE = Item(
+        id = "admirals_whistle",
+        name = "Admiral's Command Whistle",
+        description = "The sound of authority. Boosts the morale of nearby allies.",
+        type = ItemType.Accessory,
+        rarity = Rarity.Epic,
+        price = 25000, // In Justice Points
+        statBonus = Stats(willpower = 40.0, perception = 10.0),
+        levelRequirement = 50,
+        factionRequirement = Faction.Navy
     )
 
     // Ingredients
@@ -345,13 +561,48 @@ object ItemDefinitions {
         price = 2000
     )
 
+    // Ships
+    val SLOOP = Item(
+        id = "sloop",
+        name = "Sloop",
+        description = "A fast and maneuverable one-masted ship.",
+        type = ItemType.Ship,
+        rarity = Rarity.Uncommon,
+        price = 500,
+        levelRequirement = 10
+    )
+
+    val CARAVEL = Item(
+        id = "caravel",
+        name = "Caravel",
+        description = "A sturdy vessel capable of longer voyages.",
+        type = ItemType.Ship,
+        rarity = Rarity.Rare,
+        price = 2500,
+        levelRequirement = 20
+    )
+
+    val GALLEON = Item(
+        id = "galleon",
+        name = "Galleon",
+        description = "A massive warship with heavy firepower.",
+        type = ItemType.Ship,
+        rarity = Rarity.Epic,
+        price = 10000,
+        levelRequirement = 40
+    )
+
     val allItems = listOf(
         IRON_SWORD, FLINTLOCK_PISTOL, WOODEN_SPEAR, CURSED_BLADE_OF_SORROW, POSEIDON_TRIDENT, LONG_RANGE_RIFLE,
-        LEATHER_VEST, AEGIS_SHIELD, IRON_HELMET, PIRATE_CLOAK,
+        NAVY_SABER, NAVY_CARBINE, CURSED_CUTLASS, PLUNDERERS_PISTOL,
+        IRON_SPEAR, TRIDENT_OF_THE_DEEP, PIRATE_MUSKET, DOUBLE_PISTOL,
+        LEATHER_VEST, IRON_CHESTPLATE, NAVY_UNIFORM, NAVY_OFFICER_UNIFORM, JUSTICE_CAPE, SEA_CAPTAIN_COAT, REINFORCED_BOOTS, STEEL_GLOVES,
+        AEGIS_SHIELD, IRON_HELMET, PIRATE_CLOAK, SMUGGLERS_CLOAK, MARINE_MEDAL_OF_VALOR, ADMIRALS_COMMAND_WHISTLE,
         SALT, SPICES, SEAWEED, RAW_FISH, COOKED_FISH, SEA_STEW,
         SMALL_BAG, MEDIUM_BAG, LARGE_BAG, LEGENDARY_BAG,
         ARTIFACT_F, ARTIFACT_E, ARTIFACT_D, ARTIFACT_C, ARTIFACT_B,
         ARTIFACT_A, ARTIFACT_S, ARTIFACT_SS, ARTIFACT_SSS, ARTIFACT_Z,
-        BASIC_LURE, HEAVY_LURE, GLOWING_LURE
+        BASIC_LURE, HEAVY_LURE, GLOWING_LURE,
+        SLOOP, CARAVEL, GALLEON
     )
 }

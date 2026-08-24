@@ -32,10 +32,12 @@ sealed interface Screen {
     @Serializable object UpgradeAccount : Screen
     @Serializable object Infirmary : Screen
     @Serializable object Camp : Screen
+    @Serializable object CookBook : Screen
     @Serializable object Traveling : Screen
     @Serializable object Shipyard : Screen
     @Serializable object Fishing : Screen
     @Serializable object MythicArt : Screen
     @Serializable object Auction : Screen
+    @Serializable object Quests : Screen
     @Serializable object AdminPanel : Screen
 }

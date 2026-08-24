@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Ship
 
@@ -117,7 +118,11 @@ fun UpgradesContent(
     val upgrades = listOf(
         Triple("hull", "Reinforce Hull", "Increases Ship HP and Defense"),
         Triple("sail", "Improve Sails", "Increases Sailing Speed"),
-        Triple("cannon", "Sharpen Cannons", "Increases Ship Attack Power")
+        Triple("cannon", "Sharpen Cannons", "Increases Ship Attack Power"),
+        Triple("rudder", "Refine Rudder", "Improves Maneuverability and Evasion"),
+        Triple("storage", "Expand Storage", "Adds +5 Inventory Slots per level"),
+        Triple("cabin", "Luxurious Cabin", "Increases HP and Energy Regen while sailing"),
+        Triple("figurehead", "Ornate Figurehead", "Increases Luck and Rare Encounter chance")
     )
 
     LazyColumn(
@@ -134,13 +139,38 @@ fun UpgradesContent(
                 "hull" -> ship.upgrades.hullLevel
                 "sail" -> ship.upgrades.sailLevel
                 "cannon" -> ship.upgrades.cannonLevel
+                "rudder" -> ship.upgrades.rudderLevel
+                "storage" -> ship.upgrades.storageLevel
+                "cabin" -> ship.upgrades.cabinLevel
+                "figurehead" -> ship.upgrades.figureheadLevel
                 else -> 0
             }
             val cost = (level + 1) * 2000 // Sample cost formula
+            
+            val statDelta = when(type) {
+                "hull" -> "HP: ${ship.maxHp + (level * 20)} -> ${ship.maxHp + ((level + 1) * 20)}"
+                "sail" -> "Speed: x${String.format(Locale.US, "%.2f", ship.speedMultiplier + (level * 0.05f))} -> x${String.format(Locale.US, "%.2f", ship.speedMultiplier + ((level + 1) * 0.05f))}"
+                "cannon" -> "Attack: ${ship.attack + (level * 5)} -> ${ship.attack + ((level + 1) * 5)}"
+                "storage" -> "Slots: +${level * 5} -> +${(level + 1) * 5}"
+                else -> null
+            }
 
             OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = { Text("$label (Lv. $level)") },
+                    headlineContent = { 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("$label (Lv. $level)")
+                            if (statDelta != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = statDelta,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    },
                     supportingContent = { Text(desc) },
                     trailingContent = {
                         Column(horizontalAlignment = Alignment.End) {

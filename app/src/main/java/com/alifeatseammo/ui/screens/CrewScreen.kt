@@ -1,10 +1,18 @@
 package com.alifeatseammo.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Crew
@@ -30,6 +38,8 @@ fun CrewScreen(
     onKickMember: (String) -> Unit,
     onDonateGold: (Int) -> Unit,
     onUpdateSettings: (String, Boolean) -> Unit,
+    onToggleCrewPvP: (Boolean) -> Unit,
+    onUpgradePerk: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
     var showInviteDialog by remember { mutableStateOf(false) }
@@ -42,7 +52,7 @@ fun CrewScreen(
                 title = { Text("Crew") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Text("Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
@@ -50,10 +60,10 @@ fun CrewScreen(
                         val myRole = crew?.roles?.get(character.id) ?: CrewRole.Member
                         if (myRole == CrewRole.Captain) {
                             IconButton(onClick = { showSettingsDialog = true }) {
-                                Text("⚙️")
+                                Icon(Icons.Default.Settings, contentDescription = "Settings")
                             }
                         }
-                        IconButton(onClick = { showInviteDialog = true }) {
+                        TextButton(onClick = { showInviteDialog = true }) {
                             Text("Invite")
                         }
                     }
@@ -149,7 +159,24 @@ fun CrewScreen(
                 ) {
                     Text(text = crew?.name ?: "Loading...", style = MaterialTheme.typography.headlineLarge)
                     Text(text = "Level ${crew?.level ?: 1}", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    if (crew?.description?.isNotEmpty() == true) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+                        ) {
+                            Text(
+                                text = "\"${crew.description}\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                modifier = Modifier.padding(16.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                     
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -157,9 +184,17 @@ fun CrewScreen(
                                 Text(text = "MEMBERS: ${crew?.members?.size ?: 0} / 20")
                                 Text(text = "TOTAL BOUNTY: ${crew?.totalBounty ?: 0} B")
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(text = "PVP WINS: ${crew?.pvpWins ?: 0}", color = MaterialTheme.colorScheme.primary)
+                                Text(text = "PVP LOSSES: ${crew?.pvpLosses ?: 0}", color = MaterialTheme.colorScheme.error)
+                            }
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "TREASURY: ${crew?.gold ?: 0} Gold")
+                                Column {
+                                    Text(text = "TREASURY: ${crew?.gold ?: 0} Gold", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                                    Text(text = "Your Contribution: ${crew?.totalDonated ?: 0} Gold", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                }
                                 Button(onClick = { showDonateDialog = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)) {
                                     Text("Donate", style = MaterialTheme.typography.labelSmall)
                                 }
@@ -170,17 +205,42 @@ fun CrewScreen(
                     if (crew?.unlockedPerks?.isNotEmpty() == true) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(text = "CREW PERKS", style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.Start))
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            crew.unlockedPerks.forEach { perk ->
-                                FilterChip(
-                                    selected = true,
-                                    onClick = {},
-                                    label = { Text(perk.label) },
-                                    leadingIcon = { Text("✨") }
-                                )
+                        
+                        val myRole = crew.roles[character.id] ?: CrewRole.Member
+                        val canUpgrade = myRole == CrewRole.Captain || myRole == CrewRole.CoCaptain
+
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                            crew.unlockedPerks.forEach { (perkName, perkLevel) ->
+                                val perk = com.alifeatseammo.data.model.CrewPerk.entries.find { it.name == perkName }
+                                if (perk != null) {
+                                    OutlinedCard(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(text = "${perk.label} (Lv. $perkLevel)", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                                                Text(text = perk.description, style = MaterialTheme.typography.bodySmall)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                LinearProgressIndicator(
+                                                    progress = { (perkLevel % 10) / 10f },
+                                                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                                )
+                                            }
+                                            if (canUpgrade) {
+                                                Button(
+                                                    onClick = { onUpgradePerk(perkName) },
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                                    modifier = Modifier.height(32.dp)
+                                                ) {
+                                                    Text("Upgrade", style = MaterialTheme.typography.labelSmall)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -204,6 +264,14 @@ fun CrewScreen(
                         var showRoleMenu by remember { mutableStateOf(false) }
 
                         ListItem(
+                            leadingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(statusColor, CircleShape)
+                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape)
+                                )
+                            },
                             headlineContent = { 
                                 Text(
                                     text = if (member.id == character.id) "${member.name} (You)" else member.name,
@@ -334,6 +402,7 @@ fun CrewScreen(
     if (showSettingsDialog && crew != null) {
         var description by remember { mutableStateOf(crew.description) }
         var isPublic by remember { mutableStateOf(crew.isPublic) }
+        var isPvPEnabled by remember { mutableStateOf(crew.isPvPEnabled) }
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
             title = { Text("Crew Settings") },
@@ -349,6 +418,21 @@ fun CrewScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = isPublic, onCheckedChange = { isPublic = it })
                         Text("Public Crew")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(
+                            checked = isPvPEnabled,
+                            onCheckedChange = { 
+                                isPvPEnabled = it
+                                onToggleCrewPvP(it)
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Crew vs Crew PvP", style = MaterialTheme.typography.bodyMedium)
+                            Text("Opt-in to be challenged by other crews.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                        }
                     }
                 }
             },

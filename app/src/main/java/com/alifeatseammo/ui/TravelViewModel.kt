@@ -44,6 +44,12 @@ class TravelViewModel @Inject constructor(
     val locations: StateFlow<List<LocationDef>> = gameRepository.getLocations()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    val activeRaids: StateFlow<List<com.alifeatseammo.data.model.RaidBoss>> = gameRepository.getActiveRaids()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val seaEvents: StateFlow<List<com.alifeatseammo.data.model.SeaEvent>> = gameRepository.getSeaEvents()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     fun startTravel(destination: String) {
         performAction("Traveling to $destination") {
             gameRepository.startTravel(destination)

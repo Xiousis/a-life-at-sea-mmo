@@ -21,6 +21,9 @@ interface CrewRepository {
     suspend fun kickMember(targetId: String): Boolean
     suspend fun donateToCrew(amount: Int): Boolean
     suspend fun updateCrewSettings(description: String, isPublic: Boolean): Boolean
+    suspend fun upgradeCrewPerk(perk: String): Boolean
+    suspend fun toggleCrewPvP(enabled: Boolean): Boolean
+    fun getTopCrews(limit: Int, sortBy: String = "level"): Flow<List<Crew>>
     fun getInvitesForUser(userId: String): Flow<List<CrewInvite>>
 }
 
@@ -97,6 +100,41 @@ class FirestoreCrewRepository(
         val data = hashMapOf("description" to description, "isPublic" to isPublic)
         functions.getHttpsCallable("updateCrewSettings").call(data).await()
         return true
+    }
+
+    override suspend fun upgradeCrewPerk(perk: String): Boolean {
+        val data = hashMapOf("perk" to perk)
+        functions.getHttpsCallable("upgradeCrewPerk").call(data).await()
+        return true
+    }
+
+    override suspend fun toggleCrewPvP(enabled: Boolean): Boolean {
+        val data = hashMapOf("enabled" to enabled)
+        functions.getHttpsCallable("toggleCrewPvP").call(data).await()
+        return true
+    }
+
+    override fun getTopCrews(limit: Int, sortBy: String): Flow<List<Crew>> = callbackFlow {
+        var query: com.google.firebase.firestore.Query = db.collection("crews")
+        
+        query = when (sortBy) {
+            "pvpWins" -> query.orderBy("pvpWins", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            "totalBounty" -> query.orderBy("totalBounty", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            else -> query.orderBy("level", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                         .orderBy("experience", com.google.firebase.firestore.Query.Direction.DESCENDING)
+        }
+
+        val subscription = query.limit(limit.toLong())
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("CrewRepository", "Error fetching top crews", error)
+                    return@addSnapshotListener
+                }
+                snapshot?.let {
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Crew>() })
+                }
+            }
+        awaitClose { subscription.remove() }
     }
 
     override fun getInvitesForUser(userId: String): Flow<List<CrewInvite>> = callbackFlow {

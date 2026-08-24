@@ -4,11 +4,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import com.alifeatseammo.data.model.AuctionListing
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.Item
@@ -40,7 +44,22 @@ fun AuctionScreen(
                 title = { Text("Auction House") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Text("Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.padding(end = 16.dp)
+                    ) {
+                        Text(
+                            text = "💰 ${character.gold}",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
             )
@@ -103,7 +122,10 @@ fun AuctionScreen(
                 2 -> MyListings(character, listings, onCancelButtonClick)
             }
         }
-        ActionOverlay(actionState)
+        
+        if (actionState is UIActionState.Loading) {
+            ActionOverlay(actionState)
+        }
     }
 }
 
@@ -113,9 +135,22 @@ fun BrowseListings(
     listings: List<AuctionListing>,
     onBuyButtonClick: (AuctionListing) -> Unit
 ) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        items(listings.filter { it.sellerId != character.id }) { listing ->
-            AuctionListingCard(listing, onBuyButtonClick, "Buy")
+    val otherListings = listings.filter { it.sellerId != character.id }
+    
+    if (otherListings.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = if (listings.isEmpty()) "No listings found matching your criteria." else "No other players have listings currently.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(32.dp)
+            )
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            items(otherListings) { listing ->
+                AuctionListingCard(listing, onBuyButtonClick, "Buy")
+            }
         }
     }
 }
@@ -165,23 +200,33 @@ fun MyInventory(
             matchesSearch && matchesCategory
         }
 
-        LazyColumn(modifier = Modifier.weight(1f).padding(16.dp)) {
-            items(filteredInventory) { item ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = item.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = getRarityColor(item.rarity)
-                            )
-                            Text(text = item.type.name, style = MaterialTheme.typography.bodySmall)
-                            if (item.quantity > 1) {
-                                Text(text = "Qty: ${item.quantity}", style = MaterialTheme.typography.labelSmall)
+        if (filteredInventory.isEmpty()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = if (character.inventory.isEmpty()) "Your inventory is empty." else "No items match your search.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(modifier = Modifier.weight(1f).padding(16.dp)) {
+                items(filteredInventory) { item ->
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = item.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = getRarityColor(item.rarity)
+                                )
+                                Text(text = item.type.name, style = MaterialTheme.typography.bodySmall)
+                                if (item.quantity > 1) {
+                                    Text(text = "Qty: ${item.quantity}", style = MaterialTheme.typography.labelSmall)
+                                }
                             }
-                        }
-                        Button(onClick = { showListDialog = item }) {
-                            Text("List")
+                            Button(onClick = { showListDialog = item }) {
+                                Text("List")
+                            }
                         }
                     }
                 }
@@ -229,9 +274,20 @@ fun MyListings(
     listings: List<AuctionListing>,
     onCancelButtonClick: (AuctionListing) -> Unit
 ) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        items(listings.filter { it.sellerId == character.id }) { listing ->
-            AuctionListingCard(listing, onCancelButtonClick, "Cancel")
+    val myListings = listings.filter { it.sellerId == character.id }
+    if (myListings.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = "You have no active listings.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            items(myListings) { listing ->
+                AuctionListingCard(listing, onCancelButtonClick, "Cancel")
+            }
         }
     }
 }
@@ -242,25 +298,52 @@ fun AuctionListingCard(
     onButtonClick: (AuctionListing) -> Unit,
     buttonText: String
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = listing.item.name,
                     style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                     color = getRarityColor(listing.item.rarity)
                 )
-                Text(
-                    text = "Seller: ${listing.sellerName.ifBlank { "Unknown Player" }}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "${listing.price} Gold",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Seller: ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = listing.sellerName.ifBlank { "Unknown Player" },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "${listing.price} Gold",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
-            Button(onClick = { onButtonClick(listing) }) {
+            Button(
+                onClick = { onButtonClick(listing) },
+                colors = if (buttonText == "Cancel") ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                         else ButtonDefaults.buttonColors()
+            ) {
                 Text(buttonText)
             }
         }

@@ -4,10 +4,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -159,11 +163,13 @@ fun MailItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable { if (!message.isRead) onMarkAsRead(message.id) },
         colors = CardDefaults.cardColors(
-            containerColor = if (message.isRead) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-        )
+            containerColor = if (message.isRead) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) 
+                             else MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (message.isRead) 0.dp else 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -171,39 +177,80 @@ fun MailItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = message.senderName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = if (!message.isRead) FontWeight.Bold else FontWeight.Normal
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (message.isRead) Icons.Default.MarkEmailRead else Icons.Default.Email,
+                        contentDescription = null,
+                        tint = if (message.isRead) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = message.senderName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = if (!message.isRead) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
                 Text(
                     text = SimpleDateFormat("MMM dd, HH:mm", locale).format(Date(message.timestamp)),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = message.subject, style = MaterialTheme.typography.titleSmall)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = message.body, style = MaterialTheme.typography.bodyMedium)
             
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = message.subject, 
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = message.body, 
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+            )
+            
+            if (message.rewards != null && message.rewards.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "🎁 Rewards attached!",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Button(
+                            onClick = { onClaimRewards(message.id) },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Claim", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconButton(onClick = { onReply(message) }) {
+                TextButton(
+                    onClick = { onReply(message) },
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text("Reply", style = MaterialTheme.typography.labelSmall)
                 }
                 IconButton(onClick = { onDeleteMail(message.id) }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
-                }
-            }
-            
-            message.rewards?.let { rewards ->
-                if (rewards.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = { onClaimRewards(message.id) },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("Claim Rewards")
-                    }
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }

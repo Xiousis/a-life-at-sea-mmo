@@ -115,13 +115,54 @@ fun CharacterCreationScreen(
                 expanded = expanded,
                 onDismissRequest = { expanded = false }
             ) {
-                Race.values().forEach { race ->
+                Race.entries.forEach { race ->
                     DropdownMenuItem(
                         text = { Text(race.name) },
                         onClick = {
                             selectedRace = race
                             expanded = false
                         }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Race Info Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = selectedRace.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = selectedRace.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+                
+                val boosts = selectedRace.getStatBoosts()
+                val boostList = mutableListOf<String>()
+                if (boosts.strength > 0) boostList.add("Strength +${boosts.strength.toInt()}")
+                if (boosts.endurance > 0) boostList.add("Endurance +${boosts.endurance.toInt()}")
+                if (boosts.agility > 0) boostList.add("Agility +${boosts.agility.toInt()}")
+                if (boosts.perception > 0) boostList.add("Perception +${boosts.perception.toInt()}")
+                if (boosts.willpower > 0) boostList.add("Willpower +${boosts.willpower.toInt()}")
+                if (boosts.luck > 0) boostList.add("Luck +${boosts.luck.toInt()}")
+
+                if (boostList.isNotEmpty()) {
+                    Text(
+                        text = "Stat Boosts: ${boostList.joinToString(", ")}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
             }

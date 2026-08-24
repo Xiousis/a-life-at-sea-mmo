@@ -13,11 +13,12 @@ data class Item(
     val levelRequirement: Int = 1,
     val mythicTier: String? = null,
     val weaponCategory: String? = null,
+    val factionRequirement: Faction = Faction.Neutral,
     val quantity: Int = 1
 )
 
 enum class ItemType {
-    Weapon, Armor, Accessory, Bag, Consumable, Tool, Miscellaneous, Fish, Food, Artifact, Lure
+    Weapon, Armor, Accessory, Bag, Consumable, Tool, Miscellaneous, Fish, Food, Artifact, Lure, Ship, Ingredient
 }
 
 data class AuctionListing(
@@ -53,3 +54,34 @@ data class Mission(
     val isRankUp: Boolean = false,
     val targetRank: String? = null
 )
+
+data class IslandQuest(
+    val id: String = "",
+    val title: String = "",
+    val description: String = "",
+    val islandId: String = "",
+    val minLevel: Int = 1,
+    val maxLevel: Int = 300,
+    val goldReward: Int = 0,
+    val xpReward: Int = 0,
+    val itemRewards: List<LootEntry> = emptyList(),
+    val prerequisiteQuestId: String? = null,
+    val isMainStory: Boolean = false,
+    val enemyId: String? = null, // If it's a kill quest
+    val killCountRequired: Int = 0
+)
+
+data class Recipe(
+    val id: String = "",
+    val name: String = "",
+    val levelRequirement: Int = 1,
+    val ingredients: List<RecipeIngredient> = emptyList(),
+    val result: Item = Item()
+)
+
+data class RecipeIngredient(
+    val itemId: String = "",
+    val quantity: Int = 1,
+    val type: String? = null
+)
+

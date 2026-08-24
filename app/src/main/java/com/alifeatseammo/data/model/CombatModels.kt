@@ -21,6 +21,9 @@ data class CombatState(
     val isPvP: Boolean = false,
     @get:PropertyName("isRankChallenge")
     val isRankChallenge: Boolean = false,
+    @get:PropertyName("isRaid")
+    val isRaid: Boolean = false,
+    val raidId: String? = null,
     @get:PropertyName("playerTurn")
     val playerTurn: Boolean = true,
     val logs: List<String> = emptyList(),
@@ -36,7 +39,8 @@ data class CombatState(
     val cooldowns: Map<String, Int> = emptyMap(),
     val loot: List<Item> = emptyList(),
     val goldEarned: Int = 0,
-    val xpEarned: Int = 0
+    val xpEarned: Int = 0,
+    val comboCount: Int = 0
 )
 
 data class StatusEffect(
@@ -205,6 +209,21 @@ object TechniqueRegistry {
         "Annihilation: Despair" to StatType.MysticArts,
         "Annihilation: Chaos Bolt" to StatType.MysticArts,
         "Annihilation: Ultimate Zero" to StatType.MysticArts,
+        // Navy Rokushiki
+        "Soru" to StatType.Agility,
+        "Tekkai" to StatType.Endurance,
+        "Rankyaku" to StatType.MartialArts,
+        "Geppo" to StatType.Agility,
+        "Shigan" to StatType.MartialArts,
+        "Kami-e" to StatType.Agility,
+        "Rokuogan" to StatType.Willpower,
+        // Pirate Dirty Fighting
+        "Pocket Sand" to StatType.Luck,
+        "Low Blow" to StatType.Brawling,
+        "Dirty Distraction" to StatType.Luck,
+        "Grog Splash" to StatType.Brawling,
+        "Backstab" to StatType.Agility,
+        "Scurvy Strike" to StatType.Strength,
         // Z-Tier Creation Techniques
         "Creation: Genesis Flash" to StatType.MysticArts,
         "Creation: Life Weaver" to StatType.MysticArts,
@@ -225,3 +244,54 @@ object TechniqueRegistry {
 
     fun getTypeFor(techniqueId: String): StatType? = allTechniques[techniqueId]
 }
+
+object RaidRegistry {
+    val worldBosses = listOf(
+        Enemy(name = "Abyssal Kraken", level = 50, hp = 10000, maxHp = 10000, stats = Stats(strength = 50.0, endurance = 100.0)),
+        Enemy(name = "Ancient Sea Dragon", level = 120, hp = 50000, maxHp = 50000, stats = Stats(strength = 150.0, endurance = 300.0)),
+        Enemy(name = "Ghost Captain Silvereye", level = 180, hp = 150000, maxHp = 150000, stats = Stats(strength = 300.0, endurance = 600.0)),
+        Enemy(name = "Leviathan of the Void", level = 250, hp = 500000, maxHp = 500000, stats = Stats(strength = 600.0, endurance = 1200.0)),
+        Enemy(name = "The Sunken God", level = 300, hp = 1000000, maxHp = 1000000, stats = Stats(strength = 1000.0, endurance = 2000.0))
+    )
+}
+
+data class RaidBoss(
+    val id: String = "",
+    val enemy: Enemy = Enemy(),
+    val locationId: String = "",
+    val totalDamageTaken: Long = 0,
+    val participants: Map<String, RaidParticipant> = emptyMap(), // userId -> participant
+    val status: RaidStatus = RaidStatus.Active,
+    val spawnTime: Long = 0,
+    val endTime: Long? = null
+)
+
+data class RaidParticipant(
+    val userId: String = "",
+    val userName: String = "",
+    val totalDamage: Long = 0,
+    val lastHitAt: Long = 0
+)
+
+enum class RaidStatus {
+    Active, Defeated, Expired
+}
+
+data class RaidReward(
+    val raidId: String = "",
+    val rankRewards: List<RankReward> = emptyList(),
+    val participationReward: RewardEntry = RewardEntry()
+)
+
+data class RankReward(
+    val minRank: Int,
+    val maxRank: Int,
+    val rewards: RewardEntry
+)
+
+data class RewardEntry(
+    val gold: Int = 0,
+    val xp: Int = 0,
+    val exclusiveDrops: List<LootEntry> = emptyList()
+)
+

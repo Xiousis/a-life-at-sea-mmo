@@ -24,6 +24,7 @@ fun ProfessionsScreen(
     actionState: com.alifeatseammo.ui.UIActionState,
     skillFilter: String = "all",
     onTrainClick: (StatType) -> Unit,
+    onCookBookClick: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
     var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -126,7 +127,9 @@ fun ProfessionsScreen(
                         description = desc,
                         canAfford = !isActionLoading && character.getCurrentEnergy() >= 10 && character.gold >= practiceCost && !isTraining && canLearn,
                         onPractice = { onTrainClick(type) },
-                        isLockedByMythic = !canLearn
+                        isLockedByMythic = !canLearn,
+                        onSecondaryAction = if (type == StatType.Cooking) onCookBookClick else null,
+                        secondaryActionLabel = if (type == StatType.Cooking) "COOK BOOK" else null
                     )
                 }
             }
@@ -154,7 +157,9 @@ fun ProfessionRow(
     description: String,
     canAfford: Boolean,
     onPractice: () -> Unit,
-    isLockedByMythic: Boolean = false
+    isLockedByMythic: Boolean = false,
+    onSecondaryAction: (() -> Unit)? = null,
+    secondaryActionLabel: String? = null
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth()
@@ -179,12 +184,19 @@ fun ProfessionRow(
                 Text(text = "Level: ${String.format(java.util.Locale.US, "%.1f", value)} | Cost: $cost Gold", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             }
-            Button(
-                onClick = onPractice,
-                enabled = canAfford,
-                shape = MaterialTheme.shapes.small
-            ) {
-                Text(if (isLockedByMythic) "DISABLED" else "PRACTICE")
+            Column(horizontalAlignment = Alignment.End) {
+                Button(
+                    onClick = onPractice,
+                    enabled = canAfford,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(if (isLockedByMythic) "DISABLED" else "PRACTICE")
+                }
+                if (onSecondaryAction != null && secondaryActionLabel != null) {
+                    TextButton(onClick = onSecondaryAction) {
+                        Text(secondaryActionLabel)
+                    }
+                }
             }
         }
     }

@@ -7,10 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
@@ -28,7 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
 import com.alifeatseammo.ui.AuthViewModel
 import com.alifeatseammo.ui.CharacterState
@@ -88,8 +86,9 @@ class MainActivity : ComponentActivity() {
                             onSignUp = { email, password, username -> authViewModel.signUp(email, password, username) },
                             onGuestSignIn = { authViewModel.signIn() },
                             onForgotPassword = { authViewModel.resetPassword(it) },
-                            onClearError = { authViewModel.clearAuthResult() }
-                        )
+                        ) {
+                            authViewModel.clearAuthResult()
+                        }
                     } else {
                         when (val state = characterState) {
                             is CharacterState.Loading -> {
@@ -104,9 +103,10 @@ class MainActivity : ComponentActivity() {
                                     onCharacterCreated = { name, gender, race ->
                                         authViewModel.createCharacter(name, gender, race)
                                     },
-                                    onClearError = { authViewModel.clearCreateCharacterResult() },
-                                    onLogout = { authViewModel.signOut() },
-                                )
+                                    onClearError = { authViewModel.clearCreateCharacterResult() }
+                                ) {
+                                    authViewModel.signOut()
+                                }
                             }
                             is CharacterState.Loaded -> {
                                 MainScaffold(

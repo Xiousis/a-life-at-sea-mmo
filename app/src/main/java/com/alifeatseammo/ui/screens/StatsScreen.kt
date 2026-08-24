@@ -40,6 +40,12 @@ fun StatsScreen(
             // Core Attributes Section
             item {
                 StatSectionHeader("Core Attributes", "👤")
+                Text(
+                    text = "Race: ${character.race.name}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatAttributeRow("Strength", character.stats.strength)
                     StatAttributeRow("Endurance", character.stats.endurance)

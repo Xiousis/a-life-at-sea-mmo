@@ -56,6 +56,22 @@ class SocialViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    val friends: StateFlow<List<Character>> = currentUser
+        .flatMapLatest { user ->
+            if (user != null) socialRepository.getFriends(user.uid)
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val pendingRequests: StateFlow<List<Character>> = currentUser
+        .flatMapLatest { user ->
+            if (user != null) socialRepository.getPendingRequests(user.uid)
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val crewChatMessages: StateFlow<List<ChatMessage>> = character
         .map { it?.crewId }
         .distinctUntilChanged()
@@ -194,20 +210,74 @@ class SocialViewModel @Inject constructor(
         }
     }
 
-    fun addFriend(targetId: String) {
-        viewModelScope.launch {
-            try {
-                socialRepository.sendFriendRequest(targetId)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message
+    fun toggleCrewPvP(enabled: Boolean) {
+        val char = character.value ?: return
+        performAction(if (enabled) "Enabling Crew PvP" else "Disabling Crew PvP") {
+            val crewId = char.crewId ?: throw Exception("You are not in a crew.")
+            val crew = crewRepository.getCrew(crewId).firstOrNull() ?: throw Exception("Crew not found.")
+            val myRole = crew.roles[char.id] ?: CrewRole.Member
+            if (myRole != CrewRole.Captain && myRole != CrewRole.CoCaptain) {
+                throw Exception("Only the Captain or Co-Captain can toggle Crew PvP.")
             }
+            crewRepository.toggleCrewPvP(enabled)
+        }
+    }
+
+    fun upgradeCrewPerk(perk: String) {
+        performAction("Upgrading Perk: $perk") {
+            crewRepository.upgradeCrewPerk(perk)
+        }
+    }
+
+    fun addFriend(targetId: String) {
+        performAction("Sending Friend Request") {
+            socialRepository.sendFriendRequest(targetId)
+        }
+    }
+
+    fun acceptFriendRequest(senderId: String) {
+        performAction("Accepting Friend Request") {
+            socialRepository.acceptFriendRequest(senderId)
+        }
+    }
+
+    fun declineFriendRequest(senderId: String) {
+        performAction("Declining Friend Request") {
+            socialRepository.declineFriendRequest(senderId)
+        }
+    }
+
+    fun removeFriend(friendId: String) {
+        performAction("Removing Friend") {
+            socialRepository.removeFriend(friendId)
         }
     }
 
     fun blockPlayer(targetId: String) {
+        performAction("Blocking Player") {
+            socialRepository.blockPlayer(targetId)
+        }
+    }
+
+    fun unblockPlayer(targetId: String) {
+        performAction("Unblocking Player") {
+            socialRepository.unblockPlayer(targetId)
+        }
+    }
+
+    fun getPrivateMessages(otherUserId: String): Flow<List<ChatMessage>> {
+        val myId = currentUser.value?.uid ?: return flowOf(emptyList())
+        val channelId = if (myId < otherUserId) "pm_${myId}_$otherUserId" else "pm_${otherUserId}_$myId"
+        return chatRepository.getMessages(channelId)
+    }
+
+    fun sendPrivateMessage(otherUserId: String, text: String) {
+        val myId = currentUser.value?.uid ?: return
+        val char = character.value ?: return
+        val channelId = if (myId < otherUserId) "pm_${myId}_$otherUserId" else "pm_${otherUserId}_$myId"
         viewModelScope.launch {
             try {
-                socialRepository.blockPlayer(targetId)
+                chatRepository.sendMessage(char.name, text, channelId)
             } catch (e: Exception) {
                 _errorMessage.value = e.message
             }
