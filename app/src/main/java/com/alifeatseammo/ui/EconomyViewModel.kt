@@ -140,6 +140,12 @@ class EconomyViewModel @Inject constructor(
         }
     }
 
+    fun switchActiveShip(shipId: String) {
+        performAction("Switching Active Ship") {
+            gameRepository.switchActiveShip(shipId)
+        }
+    }
+
     fun upgradeShip(upgradeType: String) {
         performAction("Upgrading Ship") {
             gameRepository.upgradeShip(upgradeType)

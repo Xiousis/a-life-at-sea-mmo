@@ -56,6 +56,7 @@ data class Character(
     val lastRankChallengeAt: Long = 0,
     val completedQuests: List<String> = emptyList(),
     val completedMissions: List<String> = emptyList(),
+    val missionStats: Map<String, MissionStat> = emptyMap(),
     val warContribution: Int = 0,
     val lastWarContributionAt: Long = 0,
     val lastRaidAttackAt: Long = 0,
@@ -277,6 +278,11 @@ data class DerivedStats(
     val dodgeChance: Double = 0.0,
     val blockEffectiveness: Double = 0.0,
     val manaRegenPerSecond: Double = 0.0
+)
+
+data class MissionStat(
+    val completions: Int = 0,
+    val lastCompletedAt: Long = 0
 )
 
 data class ProfessionStats(

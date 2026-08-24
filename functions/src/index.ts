@@ -833,6 +833,12 @@ function processCharacterUpdates(character: any): any {
         updated.mythicManaUpdatedAt = manaResult.mythicManaUpdatedAt;
     }
 
+    // 4. Ship Migration
+    if (updated.ship && (!updated.ownedShips || updated.ownedShips.length === 0)) {
+        updated.activeShipId = updated.ship.id || "row_boat";
+        updated.ownedShips = [updated.ship];
+    }
+
     return updated;
 }
 
@@ -963,7 +969,9 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
             combatState: null,
             learnedTechniques: ["bash"],
             healingState: null,
-            ship: { id: "row_boat", name: "Row Boat", price: 0, speedMultiplier: 1.0 }
+            ship: { id: "row_boat", name: "Row Boat", price: 0, speedMultiplier: 1.0 },
+            activeShipId: "row_boat",
+            ownedShips: [{ id: "row_boat", name: "Row Boat", price: 0, speedMultiplier: 1.0 }]
         };
 
         transaction.set(nameRef, { userId });
@@ -1363,6 +1371,42 @@ export const purchaseShip = functions.https.onCall(async (data, context) => {
 
         recordLog(transaction, userId, "PurchaseShip", `Purchased ${ship.name}`, -ship.price, 0);
         return { success: true };
+    });
+});
+
+export const switchActiveShip = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { shipId } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+
+    return db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(playerRef);
+        if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+
+        let character = snapshot.data() as any;
+        character = processCharacterUpdates(character);
+
+        assertCanPerformAction(character, "switch ships", { blockBusy: true, blockHealing: true });
+
+        const ownedShips = character.ownedShips || [];
+        const targetShip = ownedShips.find((s: any) => s.id === shipId);
+
+        if (!targetShip) {
+            throw new functions.https.HttpsError("failed-precondition", "You do not own this ship.");
+        }
+
+        if (character.activeShipId === shipId) {
+            throw new functions.https.HttpsError("failed-precondition", "This ship is already active.");
+        }
+
+        transaction.update(playerRef, {
+            activeShipId: shipId,
+            ship: targetShip
+        });
+
+        return { success: true, shipName: targetShip.name };
     });
 });
 
@@ -2327,8 +2371,8 @@ export const challengeHighestRank = functions.https.onCall(async (data, context)
         if (!highestRanks.includes(target.rank)) throw new functions.https.HttpsError("failed-precondition", "Target does not hold a challengeable highest rank.");
 
         const challengerCandidateRanks = ["Admiral", "Yonko"];
-        if (!challengerCandidateRanks.includes(challenger.rank) && challenger.level < 300) {
-            throw new functions.https.HttpsError("failed-precondition", "You must be Level 300 and at the rank of Admiral or Yonko to challenge.");
+        if (!challengerCandidateRanks.includes(challenger.rank) || challenger.level < 300) {
+            throw new functions.https.HttpsError("failed-precondition", "You must be Level 300 AND at the rank of Admiral or Yonko to challenge.");
         }
 
         // Cooldown check: 2 days (172,800,000 ms)
@@ -2828,14 +2872,25 @@ export const completeMission = functions.https.onCall(async (data, context) => {
         const { energy, energyUpdatedAt } = calculateCurrentEnergy(character);
         if (energy < mission.energyCost) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
 
+        const missionStats = character.missionStats || {};
+        const stats = missionStats[missionId] || { completions: 0, lastCompletedAt: 0 };
+        stats.completions += 1;
+        stats.lastCompletedAt = Date.now();
+        missionStats[missionId] = stats;
+
         let updatedChar = {
             ...character,
             energy: energy - mission.energyCost,
             energyUpdatedAt: energyUpdatedAt,
             gold: character.gold + (mission.goldReward || 0),
             xp: character.xp + (mission.xpReward || 0),
-            completedMissions: [...(character.completedMissions || []), missionId]
+            completedMissions: character.completedMissions || [],
+            missionStats: missionStats
         };
+
+        if (!mission.repeatable && !updatedChar.completedMissions.includes(missionId)) {
+            updatedChar.completedMissions.push(missionId);
+        }
 
         if (mission.isRankUp && mission.targetRank) {
             // Rank progression validation

@@ -24,6 +24,7 @@ interface GameRepository {
     suspend fun unequipItem(slot: String): Boolean
     suspend fun purchaseItem(itemId: String, shopId: String): Boolean
     suspend fun purchaseShip(shipId: String): Boolean
+    suspend fun switchActiveShip(shipId: String): Boolean
     suspend fun upgradeShip(upgradeType: String): Boolean
     suspend fun sellItem(itemId: String): Boolean
     suspend fun useItem(itemId: String): Boolean
@@ -183,6 +184,12 @@ class FirestoreGameRepository(
     override suspend fun purchaseShip(shipId: String): Boolean {
         val data = hashMapOf("shipId" to shipId)
         functions.getHttpsCallable("purchaseShip").call(data).await()
+        return true
+    }
+
+    override suspend fun switchActiveShip(shipId: String): Boolean {
+        val data = hashMapOf("shipId" to shipId)
+        functions.getHttpsCallable("switchActiveShip").call(data).await()
         return true
     }
 
