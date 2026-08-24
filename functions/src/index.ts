@@ -442,6 +442,7 @@ const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = 
     "Kraken\u0027s Rest": { x: -1600, y: -1600, region: "South Blue" },
     "Shadow Fen": { x: -1200, y: -400, region: "East Blue" },
     "Island of World Secrets": { x: 4000, y: 4000, region: "Unknown" },
+    "Champion's Colosseum": { x: 2500, y: -2500, region: "Grand Line" },
 };
 
 function calculateTravelTime(from: string, to: string, speedMultiplier: number = 1.0): number {
@@ -1342,15 +1343,22 @@ export const purchaseShip = functions.https.onCall(async (data, context) => {
         }
 
         if (character.gold < ship.price) throw new functions.https.HttpsError("failed-precondition", "Not enough gold.");
-        if (character.ship?.id === shipId) throw new functions.https.HttpsError("failed-precondition", "You already own this ship.");
 
+        const ownedShips = character.ownedShips || [];
+        if (ownedShips.some((s: any) => s.id === shipId)) {
+            throw new functions.https.HttpsError("failed-precondition", "You already own this ship.");
+        }
+
+        const newShip = { id: shipId, ...ship };
         transaction.update(playerRef, {
             hp: character.hp,
             energy: character.energy,
             energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
             gold: character.gold - ship.price,
-            ship: { id: shipId, ...ship }
+            activeShipId: shipId,
+            ship: newShip,
+            ownedShips: [...ownedShips, newShip]
         });
 
         recordLog(transaction, userId, "PurchaseShip", `Purchased ${ship.name}`, -ship.price, 0);
@@ -1910,7 +1918,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                     if (itemIndex === -1) throw new functions.https.HttpsError("not-found", "Item not found in inventory.");
 
                     const item = inventory[itemIndex];
-                    if (item.type !== "Consumable") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
+                    if (item.type !== "Consumable" && item.type !== "Food") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
 
                     // Healing logic
                     const healAmount = item.healAmount ?? 30;
@@ -2787,10 +2795,14 @@ export const completeMission = functions.https.onCall(async (data, context) => {
 
         character = processCharacterUpdates(character);
 
+        // Security: One-time enforcement
+        const mission = missionSnap.data() as any;
+        if (character.completedMissions?.includes(missionId) && !mission.repeatable) {
+            throw new functions.https.HttpsError("already-exists", "You have already completed this mission.");
+        }
+
         // Issue 11: Use central action validation
         assertCanPerformAction(character, "complete missions", { blockBusy: true, blockHealing: true });
-
-        const mission = missionSnap.data() as any;
 
         if (character.level < (mission.minLevel || 1)) {
             throw new functions.https.HttpsError("failed-precondition", "Level too low for this mission.");
@@ -2821,10 +2833,34 @@ export const completeMission = functions.https.onCall(async (data, context) => {
             energy: energy - mission.energyCost,
             energyUpdatedAt: energyUpdatedAt,
             gold: character.gold + (mission.goldReward || 0),
-            xp: character.xp + (mission.xpReward || 0)
+            xp: character.xp + (mission.xpReward || 0),
+            completedMissions: [...(character.completedMissions || []), missionId]
         };
 
         if (mission.isRankUp && mission.targetRank) {
+            // Rank progression validation
+            const rankProgression: Record<string, string[]> = {
+                "Navy": ["Navy Cadet", "Petty Officer", "Chief Petty Officer", "Master Chief Petty Officer", "Ensign", "Lieutenant", "Commander", "Captain", "Commodore", "Rear Admiral", "Vice Admiral", "Admiral", "Fleet Admiral"],
+                "Pirate": ["Rogue", "Scallywag", "Swashbuckler", "Marauder", "Corsair", "First Mate", "Captain", "Dread Pirate", "Warlord", "Yonko", "Pirate King"]
+            };
+
+            const factionRanks = rankProgression[character.faction];
+            if (factionRanks) {
+                const targetIndex = factionRanks.indexOf(mission.targetRank);
+                const currentIndex = factionRanks.indexOf(character.rank);
+
+                if (targetIndex === -1) {
+                    throw new functions.https.HttpsError("failed-precondition", `Rank ${mission.targetRank} is invalid for faction ${character.faction}.`);
+                }
+
+                if (targetIndex !== currentIndex + 1) {
+                    // Allow skipping if it's the first rank and they are Novice Sailor
+                    if (!(currentIndex === -1 && targetIndex === 0)) {
+                        throw new functions.https.HttpsError("failed-precondition", `You must be a ${factionRanks[targetIndex - 1]} to challenge for ${mission.targetRank}.`);
+                    }
+                }
+            }
+
             if (mission.targetRank === "Fleet Admiral" || mission.targetRank === "Pirate King") {
                 // Check if slots are full
                 const holdersSnap = await db.collection("players").where("rank", "==", mission.targetRank).get();
@@ -3010,13 +3046,21 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
         }
 
         // --- Faction War Presence Scoring ---
-        const warRef = db.collection("gameData").doc("world").collection("war").document("current");
+        const warRef = db.collection("gameData").doc("world").collection("war").doc("current");
         const warSnap = await transaction.get(warRef);
         if (warSnap.exists) {
             const war = warSnap.data() as any;
-            if (war.isActive && war.targetLocation === character.currentLocation) {
-                // Grant 1 contribution point per heartbeat in war zone
+            const now = Date.now();
+            const lastContrib = character.lastWarContributionAt || 0;
+
+            if (war.isActive &&
+                (!war.endTime || war.endTime > now) &&
+                war.targetLocation === character.currentLocation &&
+                (now - lastContrib >= 30000)) { // 30 second interval
+
                 updates.warContribution = admin.firestore.FieldValue.increment(1);
+                updates.lastWarContributionAt = now;
+
                 if (character.faction === "Navy") {
                     transaction.update(warRef, { navyScore: admin.firestore.FieldValue.increment(1) });
                 } else if (character.faction === "Pirate") {
@@ -3881,7 +3925,7 @@ export const useItem = functions.https.onCall(async (data, context) => {
             return { success: true, gainedArt: mythic.name };
         }
 
-        if (item.type !== "Consumable") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
+        if (item.type !== "Consumable" && item.type !== "Food") throw new functions.https.HttpsError("invalid-argument", "Item is not consumable.");
 
         let playerHp = character.hp;
         const healAmount = item.healAmount || 30;
@@ -4598,6 +4642,16 @@ export const raidCombatAction = functions.https.onCall(async (data, context) => 
         if (raid.status !== "Active") throw new functions.https.HttpsError("failed-precondition", "Raid is no longer active.");
         if (character.hp <= 0) throw new functions.https.HttpsError("failed-precondition", "You are too wounded to fight!");
 
+        // Security checks
+        if (character.currentLocation !== raid.locationId) {
+            throw new functions.https.HttpsError("failed-precondition", "You are not at the raid location.");
+        }
+
+        const now = Date.now();
+        if (character.lastRaidAttackAt && now - character.lastRaidAttackAt < 2000) {
+            throw new functions.https.HttpsError("failed-precondition", "You are attacking too fast!");
+        }
+
         // Simplified Combat Logic for Raid
         const pStats = calculateCombatStats(character, []);
         const eStats = calculateCombatStats(raid.enemy, []);
@@ -4615,6 +4669,9 @@ export const raidCombatAction = functions.https.onCall(async (data, context) => 
                 logs.push(`You missed ${raid.enemy.name}!`);
             }
         } else if (action === "Technique") {
+            if (!character.learnedTechniques?.includes(techniqueId)) {
+                throw new functions.https.HttpsError("failed-precondition", "You have not learned this technique.");
+            }
             // Very basic technique support for now
             const tech = STATIC_TECHNIQUES[techniqueId];
             if (!tech) throw new functions.https.HttpsError("not-found", "Technique not found.");
@@ -4622,27 +4679,35 @@ export const raidCombatAction = functions.https.onCall(async (data, context) => 
             const cost = tech.energyCost || 0;
             if (character.energy < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
 
-            transaction.update(playerRef, { energy: character.energy - cost });
-
             damage = Math.floor(pStats.strength * tech.power * 1.5);
             logs.push(`You use ${tech.name} and deal ${damage} damage!`);
         }
+
+        // Update player cooldown and energy
+        const playerUpdates: any = { lastRaidAttackAt: now };
+        if (action === "Technique") {
+            const tech = STATIC_TECHNIQUES[techniqueId];
+            playerUpdates.energy = character.energy - (tech.energyCost || 0);
+        }
+        transaction.update(playerRef, playerUpdates);
 
         // Apply damage to raid boss
         const newDamageTaken = raid.totalDamageTaken + damage;
         const remainingHp = raid.enemy.hp - damage;
 
-        const participants = raid.participants || {};
-        const pData = participants[userId] || { userId, userName: character.name, totalDamage: 0 };
-        pData.totalDamage += damage;
-        pData.lastHitAt = Date.now();
-        participants[userId] = pData;
-
         const raidUpdate: any = {
             totalDamageTaken: newDamageTaken,
-            participants: participants,
             "enemy.hp": Math.max(0, remainingHp)
         };
+
+        if (damage > 0) {
+            const participants = raid.participants || {};
+            const pData = participants[userId] || { userId, userName: character.name, totalDamage: 0 };
+            pData.totalDamage += damage;
+            pData.lastHitAt = now;
+            participants[userId] = pData;
+            raidUpdate.participants = participants;
+        }
 
         if (remainingHp <= 0) {
             raidUpdate.status = "Defeated";

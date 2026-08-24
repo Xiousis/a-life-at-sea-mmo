@@ -46,6 +46,7 @@ data class Character(
     val healingState: HealingState? = null,
     val trainingState: TrainingState? = null,
     val ship: Ship = Ship(),
+    val activeShipId: String = "row_boat",
     val ownedShips: List<Ship> = emptyList(),
     val mythicArt: MythicArt? = null,
     val freeMythicRolls: Int = 3,
@@ -54,7 +55,10 @@ data class Character(
     val mythicManaUpdatedAt: Long = System.currentTimeMillis(),
     val lastRankChallengeAt: Long = 0,
     val completedQuests: List<String> = emptyList(),
+    val completedMissions: List<String> = emptyList(),
     val warContribution: Int = 0,
+    val lastWarContributionAt: Long = 0,
+    val lastRaidAttackAt: Long = 0,
 ) {
     fun isHardcodedAdmin(): Boolean {
         val admins = listOf("sedna", "von")
@@ -144,8 +148,8 @@ data class Character(
 
     fun getDerivedStats(): DerivedStats {
         return DerivedStats(
-            criticalChance = (stats.perception * 0.1) + (stats.luck * 0.05),
-            dodgeChance = (stats.agility * 0.15),
+            criticalChance = 5.0 + (stats.luck * 0.5) + (stats.perception * 0.2),
+            dodgeChance = (stats.agility * 0.8) + (stats.luck * 0.2),
             blockEffectiveness = (stats.endurance * 0.2),
             manaRegenPerSecond = (stats.willpower * 0.01),
         )
