@@ -321,14 +321,19 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun getLocations(): Flow<List<LocationDef>> = flow {
-        try {
-            val snapshot = db.collection("gameData").document("world").collection("locations").get().await()
-            emit(snapshot.documents.mapNotNull { it.toObject<LocationDef>() })
-        } catch (e: Exception) {
-            android.util.Log.e("FirestoreGameRepository", "Error fetching locations", e)
-            emit(emptyList())
-        }
+    override fun getLocations(): Flow<List<LocationDef>> = callbackFlow {
+        val listener = db.collection("gameData")
+            .document("world")
+            .collection("locations")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching locations", error)
+                    return@addSnapshotListener
+                }
+                val locations = snapshot?.documents?.mapNotNull { it.toObject<LocationDef>() } ?: emptyList()
+                trySend(locations)
+            }
+        awaitClose { listener.remove() }
     }
 
     override fun getEnemyDefs(): Flow<List<EnemyDef>> = callbackFlow {
@@ -345,14 +350,19 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun getTechniques(): Flow<List<Technique>> = flow {
-        try {
-            val snapshot = db.collection("gameData").document("skills").collection("techniques").get().await()
-            emit(snapshot.documents.mapNotNull { it.toObject<Technique>() })
-        } catch (e: Exception) {
-            android.util.Log.e("FirestoreGameRepository", "Error fetching techniques", e)
-            emit(emptyList())
-        }
+    override fun getTechniques(): Flow<List<Technique>> = callbackFlow {
+        val listener = db.collection("gameData")
+            .document("skills")
+            .collection("techniques")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreGameRepository", "Error fetching techniques", error)
+                    return@addSnapshotListener
+                }
+                val techniques = snapshot?.documents?.mapNotNull { it.toObject<Technique>() } ?: emptyList()
+                trySend(techniques)
+            }
+        awaitClose { listener.remove() }
     }
 
     override fun getMissionDefs(): Flow<List<Mission>> = callbackFlow {
