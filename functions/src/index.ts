@@ -445,26 +445,6 @@ const WORLD_LOCATIONS = [
     { name: "Champion's Colosseum", region: "Grand Line", description: "A legendary island where the strongest warriors gather for ranked battles. Home to the world-renowned Arena.", isSafe: true, weather: "Clear", x: 2500, y: -2500, controlledBy: "Neutral", actions: [{ type: "Arena", label: "Grand Arena", icon: "🏟" }, { type: "Infirmary", label: "Arena Hospital", icon: "🏥" }, { type: "Market", label: "General Store", icon: "🛍" }, { type: "Market", label: "Armor Shop", icon: "🛡", parameter: "Armor" }, { type: "BlackMarket", label: "Gladiator's Black Market", icon: "🕵" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
 ];
 
-const WORLD_LOCATIONS = [
-    { name: "Fogi Tail Island", region: "East Blue", description: "A peaceful starting island with clear blue waters.", isSafe: true, weather: "Sunny", x: 0, y: 0, controlledBy: "Neutral", actions: [{ type: "Training", label: "Dojo", icon: "🥋" }, { type: "Kitchen", label: "Galley", icon: "🍳" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Medical Clinic", icon: "🏥" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }, { type: "Market", label: "General Store", icon: "🛍" }] },
-    { name: "Ironcrest Isle", region: "East Blue", description: "A rocky island known for its iron mines and blacksmiths.", isSafe: false, weather: "Foggy", x: 640, y: 160, controlledBy: "Neutral", actions: [{ type: "Forge", label: "Grand Forge", icon: "⚒" }, { type: "Market", label: "Sword Shop", icon: "⚔", parameter: "Sword" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Amber Reach", region: "East Blue", description: "A trade hub known for its amber deposits.", isSafe: false, weather: "Sunny", x: -320, y: 600, controlledBy: "Neutral", actions: [{ type: "Market", label: "Ingredient Market", icon: "🥦", parameter: "Ingredient" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Sunken Reef", region: "East Blue", description: "A shallow reef area teeming with colorful fish and hidden treasures.", isSafe: false, weather: "Clear", x: 280, y: 360, controlledBy: "Neutral", actions: [{ type: "Fishing", label: "Fishing Spot", icon: "🎣" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }, { type: "Market", label: "Fishing Gear", icon: "🎣", parameter: "Fishing Rod" }] },
-    { name: "Shadow Fen", region: "East Blue", description: "A murky swamp island filled with dangerous creatures.", isSafe: false, weather: "Overcast", x: -1200, y: -400, controlledBy: "Neutral", actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Tortuga Bay", region: "South Blue", description: "A bustling pirate haven filled with taverns and mystery.", isSafe: false, weather: "Tropical", x: 120, y: -840, controlledBy: "Pirate", actions: [{ type: "Tavern", label: "The Salty Dog", icon: "🍻" }, { type: "Market", label: "Bazaar", icon: "💰" }, { type: "Market", label: "Smuggler's Den", icon: "🕶️", parameter: "Pirate" }, { type: "Expedition", label: "Treasure Hunt", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Pirate Doctor", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Pirate's Den", region: "South Blue", description: "An outlaw stronghold hidden within jagged cliffs.", isSafe: false, weather: "Stormy", x: 1400, y: -1400, controlledBy: "Pirate", actions: [{ type: "Arena", label: "Duel Pit", icon: "⚔" }, { type: "Market", label: "Smuggler's Den", icon: "🕶️", parameter: "Pirate" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Kraken's Rest", region: "South Blue", description: "A desolate island graveyard of sunken ships and sea monsters.", isSafe: false, weather: "Stormy", x: -1600, y: -1600, controlledBy: "Neutral", actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Navy Outpost Aqua", region: "South Blue", description: "A strictly regulated military base maintaining order.", isSafe: false, weather: "Clear", x: -640, y: -440, controlledBy: "Navy", actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Infirmary", label: "Navy Hospital", icon: "🏥" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Market", label: "Navy Armory", icon: "⚔️", parameter: "Navy" }, { type: "Market", label: "Navy Commendations", icon: "🎖️", parameter: "Navy" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Navy Outpost Terra", region: "Grand Line", description: "A frontier navy post watching over the Grand Line entrance.", isSafe: false, weather: "Windy", x: -1200, y: 800, controlledBy: "Navy", actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Market", label: "Pistol Shop", icon: "🔫", parameter: "Pistol" }, { type: "Market", label: "Navy Armory", icon: "⚔️", parameter: "Navy" }, { type: "Market", label: "Navy Commendations", icon: "🎖️", parameter: "Navy" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Navy Outpost Ignis", region: "Grand Line", description: "A strategic outpost near the volcanic islands.", isSafe: false, weather: "Hot", x: 1600, y: 1200, controlledBy: "Navy", actions: [{ type: "Bounties", label: "Bounty Board", icon: "📜" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Market", label: "Navy Armory", icon: "⚔️", parameter: "Navy" }, { type: "Market", label: "Navy Commendations", icon: "🎖️", parameter: "Navy" }, { type: "Training", label: "Dojo", icon: "🥋" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Crystal Cove", region: "Grand Line", description: "An island made of glowing crystals and mysterious energy.", isSafe: false, weather: "Shimmering", x: 1120, y: 480, controlledBy: "Neutral", actions: [{ type: "BlackMarket", label: "Crystal Trader", icon: "💎" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Volcano Peak", region: "Grand Line", description: "An active volcano island with treacherous terrain.", isSafe: false, weather: "Ashy", x: 1680, y: 960, controlledBy: "Neutral", actions: [{ type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Whispering Woods", region: "Grand Line", description: "A dense forest where the trees seem to whisper secrets.", isSafe: false, weather: "Mist", x: -600, y: 720, controlledBy: "Neutral", actions: [{ type: "Cave", label: "Ancient Grotto", icon: "🕳" }, { type: "Market", label: "Sniper Shop", icon: "🎯", parameter: "Sniper" }, { type: "Observatory", label: "Star Gazing", icon: "🔭" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Serpent's Maw", region: "Grand Line", description: "A terrifying island shaped like a giant serpent's head.", isSafe: false, weather: "Foggy", x: 2000, y: 2000, controlledBy: "Neutral", actions: [{ type: "Camp", label: "Wilderness Camp", icon: "⛺" }, { type: "Grind", label: "Monster Hunt", icon: "⚔" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Island of World Secrets", region: "Unknown", description: "A mystical island shrouded in secrets. Here, you can roll for Mythic Arts.", isSafe: true, weather: "Celestial", x: 4000, y: 4000, controlledBy: "Neutral", actions: [{ type: "MythicRoll", label: "Ancient Altar", icon: "✨" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] },
-    { name: "Champion's Colosseum", region: "Grand Line", description: "A legendary island where the strongest warriors gather for ranked battles. Home to the world-renowned Arena.", isSafe: true, weather: "Clear", x: 2500, y: -2500, controlledBy: "Neutral", actions: [{ type: "Arena", label: "Grand Arena", icon: "🏟" }, { type: "Infirmary", label: "Arena Hospital", icon: "🏥" }, { type: "Market", label: "General Store", icon: "🛍" }, { type: "Market", label: "Armor Shop", icon: "🛡", parameter: "Armor" }, { type: "BlackMarket", label: "Gladiator's Black Market", icon: "🕵" }, { type: "Docks", label: "Docks", icon: "⛵" }, { type: "Shipyard", label: "Shipyard", icon: "🏗" }] }
-];
-
 const LOCATION_DATA: Record<string, { x: number, y: number, region: string }> = WORLD_LOCATIONS.reduce((acc, loc) => {
     acc[loc.name] = { x: loc.x, y: loc.y, region: loc.region };
     return acc;
@@ -1048,7 +1028,7 @@ export const migrateAllPlayers = functions.https.onCall(async (data, context) =>
 
         const batch = db.batch();
         let batchCount = 0;
-        snapshot.forEach((doc) => {
+        snapshot.forEach((doc: any) => {
             const updates = getMigrationUpdates(doc.data());
             if (updates) {
                 batch.update(doc.ref, updates);
@@ -2250,7 +2230,7 @@ export const combatAction = functions.https.onCall(async (data, context) => {
                 transaction.update(winnerRef, winnerUpdate);
 
                 // --- Faction War Scoring ---
-                const warRef = db.collection("gameData").doc("world").collection("war").document("current");
+                const warRef = db.collection("gameData").doc("world").collection("war").doc("current");
                 const warSnap = await transaction.get(warRef);
                 if (warSnap.exists) {
                     const war = warSnap.data() as any;
@@ -4507,6 +4487,62 @@ export const claimMailRewards = functions.https.onCall(async (data, context) => 
     });
 });
 
+export const sendMail = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    }
+
+    const senderId = context.auth.uid;
+    const { recipientId, subject, body } = data;
+
+    if (!recipientId || !subject || !body) {
+        throw new functions.https.HttpsError("invalid-argument", "Recipient, subject, and message are required.");
+    }
+
+    if (subject.length > 100 || body.length > 2000) {
+        throw new functions.https.HttpsError("invalid-argument", "Message is too long.");
+    }
+
+    const senderRef = db.collection("players").doc(senderId);
+    const recipientRef = db.collection("players").doc(recipientId);
+
+    const [senderSnap, recipientSnap] = await Promise.all([
+        senderRef.get(),
+        recipientRef.get()
+    ]);
+
+    if (!senderSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Sender character not found.");
+    }
+
+    if (!recipientSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "Recipient player not found.");
+    }
+
+    const sender = senderSnap.data() as any;
+    const recipient = recipientSnap.data() as any;
+
+    if (recipient.blocked?.includes(senderId)) {
+        throw new functions.https.HttpsError("permission-denied", "This player cannot receive messages from you.");
+    }
+
+    const mailRef = recipientRef.collection("mail").doc();
+
+    await mailRef.set({
+        id: mailRef.id,
+        senderId,
+        senderName: sender.name,
+        recipientId,
+        subject: subject.trim(),
+        body: body.trim(),
+        timestamp: Date.now(),
+        isRead: false,
+        claimed: false
+    });
+
+    return { success: true, mailId: mailRef.id };
+});
+
 export const promoteMember = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
@@ -4987,7 +5023,7 @@ export const startWar = functions.https.onCall(async (data, context) => {
         isActive: true
     };
 
-    await db.collection("gameData").doc("world").collection("war").document("current").set(warState);
+    await db.collection("gameData").doc("world").collection("war").doc("current").set(warState);
 
     const announcementRef = db.collection("gameData").doc("world").collection("announcements").doc();
     await announcementRef.set({
@@ -5001,7 +5037,7 @@ export const startWar = functions.https.onCall(async (data, context) => {
 export const endWar = functions.https.onCall(async (data, context) => {
     await checkAdmin(context);
 
-    const warRef = db.collection("gameData").doc("world").collection("war").document("current");
+    const warRef = db.collection("gameData").doc("world").collection("war").doc("current");
     const warSnap = await warRef.get();
     if (!warSnap.exists) return { success: false, message: "No active war found." };
 

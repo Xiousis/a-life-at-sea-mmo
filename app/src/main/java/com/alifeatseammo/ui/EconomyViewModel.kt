@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alifeatseammo.data.model.*
 import com.alifeatseammo.data.repository.*
+import com.google.firebase.functions.FirebaseFunctionsException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -34,6 +35,11 @@ class EconomyViewModel @Inject constructor(
                 if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
                     _actionState.value = UIActionState.Idle
                 }
+            } catch (e: FirebaseFunctionsException) {
+                android.util.Log.e("EconomyViewModel", "Function failed: code=${e.code}, details=${e.details}", e)
+                val errorMsg = e.message ?: "${e.code}: Action failed"
+                _actionState.value = UIActionState.Error(errorMsg)
+                _errorMessage.value = errorMsg
             } catch (e: Exception) {
                 _actionState.value = UIActionState.Error(e.message ?: "Action failed")
                 _errorMessage.value = e.message
