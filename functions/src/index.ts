@@ -667,6 +667,7 @@ export const rollMythicArt = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         const now = Date.now();
@@ -842,6 +843,29 @@ function processCharacterUpdates(character: any): any {
     return updated;
 }
 
+function getMigrationUpdates(character: any): any {
+    const updates: any = {};
+    let needed = false;
+
+    // 1. Ship Migration
+    if (character.ship && (!character.ownedShips || character.ownedShips.length === 0)) {
+        updates.activeShipId = character.ship.id || "row_boat";
+        updates.ownedShips = [character.ship];
+        needed = true;
+    }
+
+    // 2. Mythic Art Migration: element -> elements
+    if (character.mythicArt && character.mythicArt.element && (!character.mythicArt.elements || character.mythicArt.elements.length === 0)) {
+        const newMythicArt = { ...character.mythicArt };
+        newMythicArt.elements = [newMythicArt.element];
+        delete newMythicArt.element;
+        updates.mythicArt = newMythicArt;
+        needed = true;
+    }
+
+    return needed ? updates : null;
+}
+
 // --- Player Management ---
 
 export const createCharacter = functions.https.onCall(async (data, context) => {
@@ -980,6 +1004,52 @@ export const createCharacter = functions.https.onCall(async (data, context) => {
     });
 });
 
+export const migrateAllPlayers = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    // Check if user is admin
+    const callerRef = db.collection("players").doc(context.auth.uid);
+    const callerSnap = await callerRef.get();
+    if (!callerSnap.exists || !callerSnap.data()?.isAdmin) {
+        throw new functions.https.HttpsError("permission-denied", "Only admins can run migration.");
+    }
+
+    let totalMigrated = 0;
+    let lastDoc = null;
+    let hasMore = true;
+
+    while (hasMore) {
+        let query: any = db.collection("players").limit(400);
+        if (lastDoc) query = query.startAfter(lastDoc);
+
+        const snapshot = await query.get();
+        if (snapshot.empty) {
+            hasMore = false;
+            break;
+        }
+
+        const batch = db.batch();
+        let batchCount = 0;
+        snapshot.forEach((doc) => {
+            const updates = getMigrationUpdates(doc.data());
+            if (updates) {
+                batch.update(doc.ref, updates);
+                batchCount++;
+            }
+            lastDoc = doc;
+        });
+
+        if (batchCount > 0) {
+            await batch.commit();
+            totalMigrated += batchCount;
+        }
+
+        if (snapshot.size < 400) hasMore = false;
+    }
+
+    return { success: true, totalMigrated };
+});
+
 export const joinFaction = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
 
@@ -1036,6 +1106,7 @@ export const train = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "train", { blockBusy: true, blockHealing: true });
@@ -1079,14 +1150,18 @@ export const train = functions.https.onCall(async (data, context) => {
 
         const endTime = Date.now() + TRAINING_DURATION_MS;
 
-        transaction.update(playerRef, {
+        const migrationUpdates = getMigrationUpdates(character);
+        const updates: any = {
             hp: character.hp,
             healingState: character.healingState,
             energy: energy - 10,
             energyUpdatedAt,
             gold: admin.firestore.FieldValue.increment(-trainingGoldCost),
             trainingState: { endTime, statType }
-        });
+        };
+        if (migrationUpdates) Object.assign(updates, migrationUpdates);
+
+        transaction.update(playerRef, updates);
 
         recordLog(transaction, userId, "TrainStart", `Started training ${statType}`, -trainingGoldCost, 0);
 
@@ -1160,6 +1235,7 @@ export const startTravel = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "travel", { blockBusy: true, blockHealing: true });
@@ -1202,7 +1278,7 @@ export const startTravel = functions.https.onCall(async (data, context) => {
             if (eventRoll < 0.50) {
                 // 1. Ambush (Combat)
                 const enemy = generateEnemy(character.level);
-                transaction.update(playerRef, {
+                const ambushUpdates: any = {
                     hp: character.hp,
                     healingState: character.healingState,
                     combatState: {
@@ -1216,7 +1292,9 @@ export const startTravel = functions.https.onCall(async (data, context) => {
                         intendedArrivalTime: arrivalTime,
                         intendedStartTime: Date.now()
                     }
-                });
+                };
+                if (migrationUpdates) Object.assign(ambushUpdates, migrationUpdates);
+                transaction.update(playerRef, ambushUpdates);
                 return { ambush: true, enemy };
             } else if (eventRoll < 0.65) {
                 // 2. Tailwinds
@@ -1250,14 +1328,17 @@ export const startTravel = functions.https.onCall(async (data, context) => {
             }
         }
 
-        transaction.update(playerRef, {
+        const finalUpdates: any = {
             hp: character.hp,
             gold: character.gold,
             energy: character.energy,
             energyUpdatedAt: character.energyUpdatedAt,
             healingState: character.healingState,
             travelState: { destination, arrivalTime, startTime: Date.now(), eventMessage }
-        });
+        };
+        if (migrationUpdates) Object.assign(finalUpdates, migrationUpdates);
+
+        transaction.update(playerRef, finalUpdates);
         return { success: true, arrivalTime, travelDuration, eventMessage };
     });
 });
@@ -1275,16 +1356,20 @@ export const finishTravel = functions.https.onCall(async (data, context) => {
         let character = snapshot.data() as any;
         if (character.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
 
+        const migrationUpdates = getMigrationUpdates(character);
         const travel = character.travelState;
 
         if (!travel || travel.arrivalTime > Date.now()) {
             throw new functions.https.HttpsError("failed-precondition", "Travel not yet complete.");
         }
 
-        transaction.update(playerRef, {
+        const updates: any = {
             currentLocation: travel.destination,
             travelState: null
-        });
+        };
+        if (migrationUpdates) Object.assign(updates, migrationUpdates);
+
+        transaction.update(playerRef, updates);
         return { success: true, newLocation: travel.destination };
     });
 });
@@ -1337,6 +1422,7 @@ export const purchaseShip = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "purchase a ship", { blockBusy: true, blockHealing: true });
@@ -1386,6 +1472,7 @@ export const switchActiveShip = functions.https.onCall(async (data, context) => 
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "switch ships", { blockBusy: true, blockHealing: true });
@@ -2592,6 +2679,7 @@ export const startHealing = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "heal", { requireHp: false, blockBusy: true });
@@ -2620,6 +2708,7 @@ export const instantHeal = functions.https.onCall(async (data, context) => {
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "heal", { requireHp: false, blockBusy: true });
@@ -2654,6 +2743,7 @@ export const purchaseMedicalLicense = functions.https.onCall(async (data, contex
         const snapshot = await transaction.get(playerRef);
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "purchase a license", { blockBusy: true, blockHealing: true });
@@ -2773,6 +2863,7 @@ export const startMonsterHunt = functions.https.onCall(async (data, context) => 
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "hunt monsters", { blockBusy: true, blockHealing: true });
@@ -3017,6 +3108,12 @@ export const heartbeat = functions.https.onCall(async (data, context) => {
             energy: character.energy,
             energyUpdatedAt: character.energyUpdatedAt
         };
+
+        // Migration Persistence
+        const migrationUpdates = getMigrationUpdates(character);
+        if (migrationUpdates) {
+            Object.assign(updates, migrationUpdates);
+        }
 
         // Admin Repair/Sync
         if (context.auth?.token.admin && !character.isAdmin) {
@@ -3653,6 +3750,7 @@ export const equipItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "change equipment", { blockBusy: true, blockHealing: true });
@@ -3721,6 +3819,7 @@ export const unequipItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "change equipment", { blockBusy: true, blockHealing: true });
@@ -3858,6 +3957,7 @@ export const sellItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "sell items", { blockBusy: true, blockHealing: true });
@@ -3904,6 +4004,7 @@ export const useItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "use items", { blockBusy: true, blockHealing: true });
@@ -4028,6 +4129,7 @@ export const listAuctionItem = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
         assertCanPerformAction(character, "list items for auction", { blockBusy: true, blockHealing: true });
 
@@ -4404,6 +4506,7 @@ export const startFishing = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "fish", { blockBusy: true, blockHealing: true });
@@ -4503,6 +4606,7 @@ export const cook = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "cook", { blockBusy: true, blockHealing: true });
@@ -4584,6 +4688,7 @@ export const cookFish = functions.https.onCall(async (data, context) => {
         if (!snapshot.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
 
         let character = snapshot.data() as any;
+        const migrationUpdates = getMigrationUpdates(character);
         character = processCharacterUpdates(character);
 
         assertCanPerformAction(character, "cook", { blockBusy: true, blockHealing: true });
