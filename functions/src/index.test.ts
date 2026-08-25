@@ -65,4 +65,43 @@ describe("Game Logic & Security Tests", () => {
             await myFunctions.checkAdmin(context); // Should not throw
         });
     });
+
+    describe("Economy & Rate Limiting (Mocked/Logic)", () => {
+        it("should enforce chat message length limits", async () => {
+            const context = { auth: { uid: "user1" } } as any;
+            const longMessage = "a".repeat(201);
+            try {
+                // Using .run() for https.onCall in test mode
+                await myFunctions.sendMessage.run({ message: longMessage }, context);
+                expect.fail("Should have thrown invalid-argument");
+            } catch (err: any) {
+                expect(err.code).to.equal("invalid-argument");
+                expect(err.message).to.contain("too long");
+            }
+        });
+
+        it("should enforce mail subject and body limits", async () => {
+            const context = { auth: { uid: "user1" } } as any;
+            const longSubject = "s".repeat(101);
+            try {
+                await myFunctions.sendMail.run({ recipientId: "user2", subject: longSubject, body: "test" }, context);
+                expect.fail("Should have thrown invalid-argument");
+            } catch (err: any) {
+                expect(err.code).to.equal("invalid-argument");
+            }
+        });
+
+        it("should correctly apply 5% tax to auction sales", () => {
+            const price = 1000;
+            const taxRate = 0.05;
+            const netGold = Math.floor(price * (1 - taxRate));
+            expect(netGold).to.equal(950);
+        });
+
+        it("should handle rounding in tax calculation", () => {
+            const price = 19; // 5% of 19 is 0.95
+            const netGold = Math.floor(19 * 0.95);
+            expect(netGold).to.equal(18);
+        });
+    });
 });

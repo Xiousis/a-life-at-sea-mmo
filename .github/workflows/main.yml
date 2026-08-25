@@ -27,19 +27,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 18
+    - name: Use Node.js 22
       uses: actions/setup-node@v3
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
         cache-dependency-path: functions/package-lock.json
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
       working-directory: ./functions
 
     - name: Lint
       run: npm run lint
+      working-directory: ./functions
+
+    - name: Test
+      run: npm test
       working-directory: ./functions
 
     - name: Build

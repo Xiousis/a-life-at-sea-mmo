@@ -21,6 +21,7 @@ interface AuthRepository {
     suspend fun signUp(email: String, password: String, username: String): AuthResult
     suspend fun sendPasswordResetEmail(email: String): AuthResult
     suspend fun upgradeGuestAccount(email: String, password: String): AuthResult
+    suspend fun deleteAccount(): AuthResult
     fun signOut()
 }
 
@@ -85,6 +86,16 @@ class FirebaseAuthRepository(
             AuthResult.Success
         } catch (e: Exception) {
             AuthResult.Error(e.localizedMessage ?: "Failed to upgrade account")
+        }
+    }
+
+    override suspend fun deleteAccount(): AuthResult {
+        val user = auth.currentUser ?: return AuthResult.Error("No active session to delete")
+        return try {
+            user.delete().await()
+            AuthResult.Success
+        } catch (e: Exception) {
+            AuthResult.Error(e.localizedMessage ?: "Failed to delete account. You may need to re-authenticate.")
         }
     }
 

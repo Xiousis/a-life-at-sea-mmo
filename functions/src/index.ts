@@ -3266,6 +3266,19 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
     await checkAdmin(context);
 
+    const { version } = data;
+    if (!version || !Number.isInteger(version)) {
+        throw new functions.https.HttpsError("invalid-argument", "A valid integer version must be provided.");
+    }
+
+    const worldRef = db.collection("gameData").doc("world");
+    const worldSnap = await worldRef.get();
+    const currentVersion = worldSnap.data()?.worldVersion || 0;
+
+    if (version <= currentVersion) {
+        throw new functions.https.HttpsError("failed-precondition", `Version ${version} is not newer than current version ${currentVersion}.`);
+    }
+
     const chunker = new BatchChunker();
 
     // 1. Locations
@@ -3397,6 +3410,7 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
     }
 
     // 6. Missions
+    await chunker.set(worldRef, { worldVersion: version });
     const rankUpMissions = [
         // Navy
         { id: "navy_rank_1", title: "Navy Recruit Trial", description: "Complete your basic training to become a Navy Recruit.", energyCost: 10, minLevel: 1, goldReward: 500, xpReward: 100, difficulty: 1, factionRequirement: "Navy", isRankUp: true, targetRank: "Navy Recruit" },
@@ -3450,7 +3464,16 @@ export const sendMessage = functions.https.onCall(async (data, context) => {
     const { message, channelId } = data;
     const userId = context.auth.uid;
 
-    const playerSnap = await db.collection("players").doc(userId).get();
+    if (!message || typeof message !== "string") {
+        throw new functions.https.HttpsError("invalid-argument", "Message must be a string.");
+    }
+
+    if (message.length > 200) {
+        throw new functions.https.HttpsError("invalid-argument", "Message is too long (max 200 characters).");
+    }
+
+    const playerRef = db.collection("players").doc(userId);
+    const playerSnap = await playerRef.get();
     if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
     const player = playerSnap.data() as any;
 
@@ -3459,14 +3482,23 @@ export const sendMessage = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("permission-denied", `You are muted until ${new Date(player.mutedUntil).toLocaleString()}. Reason: ${player.muteReason || "None"}`);
     }
 
+    // Rate Limiting: 2 seconds
+    const now = Date.now();
+    if (player.lastChatAt && now - player.lastChatAt < 2000) {
+        throw new functions.https.HttpsError("resource-exhausted", "You are chatting too fast. Please wait 2 seconds.");
+    }
+
     const chatRef = db.collection("chat").doc();
-    await chatRef.set({
-        senderId: userId,
-        senderName: player.name,
-        message: message,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        channelId: channelId || "global"
-    });
+    await Promise.all([
+        chatRef.set({
+            senderId: userId,
+            senderName: player.name,
+            message: message.trim(),
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            channelId: channelId || "global"
+        }),
+        playerRef.update({ lastChatAt: now })
+    ]);
 
     return { success: true };
 });
@@ -4229,17 +4261,19 @@ export const buyAuctionItem = functions.https.onCall(async (data, context) => {
             inventory
         });
 
-        // Send Gold to Seller via Mail
+        // Send Gold to Seller via Mail (Apply 5% Tax)
+        const taxRate = 0.05;
+        const netGold = Math.floor(listing.price * (1 - taxRate));
         const sellerMailRef = db.collection("players").doc(listing.sellerId).collection("mail").doc();
         transaction.set(sellerMailRef, {
             id: sellerMailRef.id,
             senderName: "Auction House",
             subject: "Item Sold!",
-            body: `Your ${listing.item.name} has been sold for ${listing.price} Gold!`,
+            body: `Your ${listing.item.name} has been sold for ${listing.price} Gold! After a 5% auction fee, you received ${netGold} Gold.`,
             timestamp: Date.now(),
             isRead: false,
             claimed: false,
-            rewards: { gold: listing.price }
+            rewards: { gold: netGold }
         });
 
         transaction.delete(listingRef);
@@ -4522,23 +4556,47 @@ export const sendMail = functions.https.onCall(async (data, context) => {
     const sender = senderSnap.data() as any;
     const recipient = recipientSnap.data() as any;
 
+    // Rate Limiting: 5 seconds & Hourly Cap (50)
+    const now = Date.now();
+    const oneHourAgo = now - (60 * 60 * 1000);
+
+    // Reset hourly count if needed
+    let hourlyCount = sender.hourlyMailCount || 0;
+    if (!sender.lastMailAt || sender.lastMailAt < oneHourAgo) {
+        hourlyCount = 0;
+    }
+
+    if (sender.lastMailAt && now - sender.lastMailAt < 5000) {
+        throw new functions.https.HttpsError("resource-exhausted", "You are sending mail too fast. Please wait 5 seconds.");
+    }
+
+    if (hourlyCount >= 50) {
+        throw new functions.https.HttpsError("resource-exhausted", "Hourly mail limit reached (50). Please try again later.");
+    }
+
     if (recipient.blocked?.includes(senderId)) {
         throw new functions.https.HttpsError("permission-denied", "This player cannot receive messages from you.");
     }
 
     const mailRef = recipientRef.collection("mail").doc();
 
-    await mailRef.set({
-        id: mailRef.id,
-        senderId,
-        senderName: sender.name,
-        recipientId,
-        subject: subject.trim(),
-        body: body.trim(),
-        timestamp: Date.now(),
-        isRead: false,
-        claimed: false
-    });
+    await Promise.all([
+        mailRef.set({
+            id: mailRef.id,
+            senderId,
+            senderName: sender.name,
+            recipientId,
+            subject: subject.trim(),
+            body: body.trim(),
+            timestamp: Date.now(),
+            isRead: false,
+            claimed: false
+        }),
+        senderRef.update({
+            lastMailAt: now,
+            hourlyMailCount: hourlyCount + 1
+        })
+    ]);
 
     return { success: true, mailId: mailRef.id };
 });
@@ -5008,6 +5066,43 @@ async function distributeRaidRewards(raid: any) {
 }
 
 // --- Faction War System ---
+
+export const onUserDeleted = functions.auth.user().onDelete(async (user) => {
+    const userId = user.uid;
+    const playerRef = db.collection("players").doc(userId);
+    const playerSnap = await playerRef.get();
+
+    if (playerSnap.exists) {
+        const player = playerSnap.data() as any;
+        const nameLower = player.nameLower;
+        const crewId = player.crewId;
+
+        const batch = db.batch();
+
+        if (nameLower) {
+            batch.delete(db.collection("characterNames").doc(nameLower));
+        }
+
+        if (crewId) {
+            const crewRef = db.collection("crews").doc(crewId);
+            const crewSnap = await crewRef.get();
+            if (crewSnap.exists) {
+                const crew = crewSnap.data() as any;
+                if (crew.captainId === userId) {
+                    batch.delete(crewRef);
+                } else {
+                    batch.update(crewRef, {
+                        members: admin.firestore.FieldValue.arrayRemove(userId),
+                        totalBounty: admin.firestore.FieldValue.increment(-(player.bounty || 0))
+                    });
+                }
+            }
+        }
+
+        batch.delete(playerRef);
+        await batch.commit();
+    }
+});
 
 export const startWar = functions.https.onCall(async (data, context) => {
     await checkAdmin(context);
