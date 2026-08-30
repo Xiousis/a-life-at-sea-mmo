@@ -125,8 +125,7 @@ fun MythicArtScreen(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    val adminNames = listOf("sedna", "von")
-                    if (adminNames.contains(character.name.lowercase())) {
+                    if (character.isAdmin) {
                         Column {
                             Button(
                                 onClick = onAdminGrantTestItems,

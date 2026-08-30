@@ -11,6 +11,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import com.alifeatseammo.data.model.AuctionListing
@@ -20,6 +23,7 @@ import com.alifeatseammo.data.model.ItemType
 import com.alifeatseammo.ui.UIActionState
 import com.alifeatseammo.ui.components.ActionOverlay
 import com.alifeatseammo.ui.components.getRarityColor
+import com.alifeatseammo.ui.components.getItemEmoji
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,7 +31,7 @@ fun AuctionScreen(
     character: Character,
     listings: List<AuctionListing>,
     actionState: UIActionState,
-    onListButtonClick: (Item, Int) -> Unit,
+    onListButtonClick: (Item, Long) -> Unit,
     onBuyButtonClick: (AuctionListing) -> Unit,
     onCancelButtonClick: (AuctionListing) -> Unit,
     onBackClick: () -> Unit
@@ -85,7 +89,7 @@ fun AuctionScreen(
                     singleLine = true
                 )
 
-                val categories = ItemType.values()
+                val categories = ItemType.entries
                 LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -109,12 +113,13 @@ fun AuctionScreen(
 
             when (selectedTab) {
                 0 -> {
+                    val myListingCount = listings.count { it.sellerId == character.id }
                     val filteredListings = listings.filter { listing ->
                         val matchesSearch = listing.item.name.contains(searchText, ignoreCase = true)
                         val matchesCategory = selectedCategory == null || listing.item.type == selectedCategory
                         matchesSearch && matchesCategory
                     }
-                    BrowseListings(character, filteredListings, onBuyButtonClick)
+                    BrowseListings(character, filteredListings, myListingCount, onBuyButtonClick)
                 }
                 1 -> {
                     MyInventory(character, onListButtonClick)
@@ -133,18 +138,47 @@ fun AuctionScreen(
 fun BrowseListings(
     character: Character,
     listings: List<AuctionListing>,
+    myListingCount: Int,
     onBuyButtonClick: (AuctionListing) -> Unit
 ) {
     val otherListings = listings.filter { it.sellerId != character.id }
     
     if (otherListings.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = if (listings.isEmpty()) "No listings found matching your criteria." else "No other players have listings currently.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(32.dp)
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+                Text(
+                    text = if (listings.isEmpty()) "No listings found matching your criteria." 
+                           else "No other players have listings currently.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                
+                if (myListingCount > 0) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "Note: You have $myListingCount active listings, but you cannot buy your own items. They are shown in 'My Listings'.",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(12.dp),
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+
+                if (listings.isEmpty()) {
+                    Text(
+                        text = "Try clearing filters or check back later.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
         }
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -158,7 +192,7 @@ fun BrowseListings(
 @Composable
 fun MyInventory(
     character: Character,
-    onListButtonClick: (Item, Int) -> Unit
+    onListButtonClick: (Item, Long) -> Unit
 ) {
     var showListDialog by remember { mutableStateOf<Item?>(null) }
     var searchText by remember { mutableStateOf("") }
@@ -173,7 +207,7 @@ fun MyInventory(
             singleLine = true
         )
 
-        val categories = ItemType.values()
+        val categories = ItemType.entries
         LazyRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -250,7 +284,7 @@ fun MyInventory(
             confirmButton = {
                 Button(
                     onClick = {
-                        val price = priceText.toIntOrNull() ?: 0
+                        val price = priceText.toLongOrNull() ?: 0L
                         if (price > 0) {
                             onListButtonClick(item, price)
                             showListDialog = null
@@ -302,49 +336,110 @@ fun AuctionListingCard(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = listing.item.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = getRarityColor(listing.item.rarity)
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Seller: ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = listing.sellerName.ifBlank { "Unknown Player" },
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Item Icon
                 Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    color = getRarityColor(listing.item.rarity).copy(alpha = 0.1f),
+                    modifier = Modifier.size(48.dp)
                 ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(text = getItemEmoji(listing.item.type), fontSize = 24.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "${listing.price} Gold",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black
+                        text = listing.item.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = getRarityColor(listing.item.rarity)
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Seller: ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = listing.sellerName.ifBlank { "Unknown Player" },
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "${listing.price} G",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Button(
+                        onClick = { onButtonClick(listing) },
+                        modifier = Modifier.height(36.dp),
+                        colors = if (buttonText == "Cancel") ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                 else ButtonDefaults.buttonColors()
+                    ) {
+                        Text(buttonText, style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
-            Button(
-                onClick = { onButtonClick(listing) },
-                colors = if (buttonText == "Cancel") ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                         else ButtonDefaults.buttonColors()
-            ) {
-                Text(buttonText)
+
+            // Stats Preview Ribbon (Senior Dev Polish)
+            val stats = listing.item.statBonus
+            val statStrings = mutableListOf<String>()
+            if (stats.strength > 0) statStrings.add("STR +${stats.strength.toInt()}")
+            if (stats.swordsmanship > 0) statStrings.add("SWD +${stats.swordsmanship.toInt()}")
+            if (stats.gunslinging > 0) statStrings.add("GUN +${stats.gunslinging.toInt()}")
+            if (stats.endurance > 0) statStrings.add("END +${stats.endurance.toInt()}")
+            if (stats.agility > 0) statStrings.add("AGI +${stats.agility.toInt()}")
+
+            if (statStrings.isNotEmpty() || listing.item.description.isNotEmpty()) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                
+                if (statStrings.isNotEmpty()) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        statStrings.forEach { stat ->
+                            Surface(
+                                color = Color(0xFF81C784).copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(4.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF81C784).copy(alpha = 0.3f))
+                            ) {
+                                Text(
+                                    text = stat,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF2E7D32),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                
+                Text(
+                    text = listing.item.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
             }
         }
     }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import android.util.Log
 import com.alifeatseammo.data.model.*
 import com.alifeatseammo.data.repository.*
+import com.alifeatseammo.util.HapticManager
 import com.google.firebase.auth.FirebaseUser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,6 +29,7 @@ class GameViewModel @Inject constructor(
     private val gameRepository: GameRepository,
     private val crewRepository: CrewRepository,
     private val adminRepository: AdminRepository,
+    private val hapticManager: HapticManager,
 ) : ViewModel() {
 
     val currentUser: StateFlow<FirebaseUser?> = authRepository.currentUser
@@ -112,41 +114,35 @@ class GameViewModel @Inject constructor(
     }
 
     private fun performAction(label: String, block: suspend () -> Unit) {
-        if (_actionState.value is UIActionState.Loading) return
-
-        viewModelScope.launch {
-            _actionState.value = UIActionState.Loading(label)
-            try {
-                block()
-                _actionState.value = UIActionState.Success(label)
-                delay(2.seconds)
-                val currentState = _actionState.value
-                if ((currentState is UIActionState.Success) && (currentState.label == label)) {
-                    _actionState.value = UIActionState.Idle
-                }
-            } catch (e: Exception) {
-                _actionState.value = UIActionState.Error(e.message ?: "Action failed")
-                _errorMessage.value = e.message
-            }
-        }
+        viewModelScope.launchUIAction(label, _actionState, _errorMessage, block = block)
     }
 
     val isAdmin: StateFlow<Boolean> = character
         .map { char ->
-            char?.isAdmin == true || char?.isHardcodedAdmin() == true
+            (char?.isAdmin == true) || (char?.isHardcodedAdmin() == true)
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, initialValue = false)
+
+    val worldVersion: StateFlow<Int?> = adminRepository.getWorldVersion()
+        .stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
     private fun startHeartbeat() {
         heartbeatJob?.cancel()
         heartbeatJob = viewModelScope.launch {
             while (true) {
                 try {
+                    _isSyncing.value = true
                     gameRepository.heartbeat() 
+                    _isSyncing.value = false
                 } catch (e: Exception) {
                     Log.e("GameViewModel", "Heartbeat sync failed - this is usually transient", e)
+                    _isSyncing.value = false
+                    hapticManager.vibrateError()
                 }
-                delay(30000) 
+                delay(30.seconds) 
             }
         }
     }
@@ -232,6 +228,17 @@ class GameViewModel @Inject constructor(
     val missions: StateFlow<List<Mission>> = gameRepository.getAvailableMissions()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val filteredMissions: StateFlow<List<Mission>> = combine(
+        missions,
+        character
+    ) { allMissions, char ->
+        if (char == null) return@combine emptyList<Mission>()
+        allMissions.filter { 
+            it.factionRequirement == Faction.Neutral || it.factionRequirement == char.faction 
+        }.sortedByDescending { it.isRankUp }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     val locations: StateFlow<List<LocationDef>> = gameRepository.getLocations()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -253,7 +260,7 @@ class GameViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     val currentLocationInfo: StateFlow<LocationDef?> = combine(
         character.map { it?.currentLocation }.distinctUntilChanged(),
-        locations
+        locations,
     ) { locationName, allLocs ->
         if (locationName != null) {
             allLocs.find { it.name.equals(locationName, ignoreCase = true) }
@@ -310,6 +317,12 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun engageRaid(raidId: String) {
+        performAction("Engaging Boss") {
+            gameRepository.engageRaid(raidId)
+        }
+    }
+
     fun joinFaction(faction: Faction) {
         performAction("Joining ${faction.name}") {
             gameRepository.joinFaction(faction)
@@ -352,8 +365,10 @@ class GameViewModel @Inject constructor(
                 val destination = character.value?.travelState?.destination
                 gameRepository.finishTravel()
                 _travelResult.value = destination ?: "your destination"
+                hapticManager.vibrateSuccess()
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Failed to finish travel", e)
+                hapticManager.vibrateError()
             }
         }
     }
@@ -384,14 +399,10 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    fun seedWorld() {
-        viewModelScope.launch {
-            try {
-                val message = adminRepository.seedWorld()
-                _errorMessage.value = message
-            } catch (e: Exception) {
-                _errorMessage.value = "Error: ${e.localizedMessage ?: "Unknown error"}"
-            }
+    fun seedWorld(version: Int) {
+        performAction("Seeding World V$version") {
+            val message = adminRepository.seedWorld(version)
+            _errorMessage.value = message
         }
     }
 

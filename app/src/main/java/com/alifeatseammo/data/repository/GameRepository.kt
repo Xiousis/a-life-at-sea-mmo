@@ -47,6 +47,7 @@ interface GameRepository {
     fun getIslandQuests(locationId: String? = null): Flow<List<IslandQuest>>
     suspend fun completeQuest(questId: String): Boolean
     suspend fun raidCombatAction(raidId: String, action: CombatAction, techniqueId: String? = null, itemId: String? = null): Boolean
+    suspend fun engageRaid(raidId: String): Boolean
     fun getMailMessages(userId: String): Flow<List<MailMessage>>
     fun getGlobalAnnouncements(): Flow<List<String>>
     fun getWarState(): Flow<WarState?>
@@ -127,7 +128,7 @@ class FirestoreGameRepository(
                     return@addSnapshotListener
                 }
                 snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Mission>() })
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Mission>()?.copy(id = doc.id) })
                 }
             }
         awaitClose { subscription.remove() }
@@ -298,27 +299,29 @@ class FirestoreGameRepository(
         awaitClose { subscription.remove() }
     }
 
-    override fun getCharacters(ids: List<String>): Flow<List<Character>> = callbackFlow {
-        if (ids.isEmpty()) {
-            trySend(emptyList())
-            close()
-            return@callbackFlow
+    override fun getCharacters(ids: List<String>): Flow<List<Character>> {
+        if (ids.isEmpty()) return flowOf(emptyList())
+        
+        val chunks = ids.chunked(30)
+        val flows = chunks.map { chunk ->
+            callbackFlow {
+                val subscription = db.collection("players")
+                    .whereIn(com.google.firebase.firestore.FieldPath.documentId(), chunk)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            android.util.Log.e("FirestoreGameRepository", "Error fetching characters chunk", error)
+                            return@addSnapshotListener
+                        }
+                        snapshot?.let {
+                            trySend(it.documents.mapNotNull { doc -> doc.toObject<Character>()?.copy(id = doc.id) })
+                        }
+                    }
+                awaitClose { subscription.remove() }
+            }
         }
         
-        // Firestore whereIn limit is 10 or 30 depending on version, but crew limit is 20.
-        // We'll assume whereIn works for up to 30 as per recent Firebase updates.
-        val subscription = db.collection("players")
-            .whereIn(com.google.firebase.firestore.FieldPath.documentId(), ids)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("FirestoreGameRepository", "Error fetching characters: $ids", error)
-                    return@addSnapshotListener
-                }
-                snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Character>()?.copy(id = doc.id) })
-                }
-            }
-        awaitClose { subscription.remove() }
+        return if (flows.size == 1) flows[0]
+        else combine(flows) { it.flatMap { list -> list } }
     }
 
     override fun getLocations(): Flow<List<LocationDef>> = callbackFlow {
@@ -330,7 +333,7 @@ class FirestoreGameRepository(
                     android.util.Log.e("FirestoreGameRepository", "Error fetching locations", error)
                     return@addSnapshotListener
                 }
-                val locations = snapshot?.documents?.mapNotNull { it.toObject<LocationDef>() } ?: emptyList()
+                val locations = snapshot?.documents?.mapNotNull { it.toObject<LocationDef>()?.copy(id = it.id) } ?: emptyList()
                 trySend(locations)
             }
         awaitClose { listener.remove() }
@@ -344,7 +347,7 @@ class FirestoreGameRepository(
                     return@addSnapshotListener
                 }
                 snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<EnemyDef>() })
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<EnemyDef>()?.copy(id = doc.id) })
                 }
             }
         awaitClose { subscription.remove() }
@@ -359,7 +362,7 @@ class FirestoreGameRepository(
                     android.util.Log.e("FirestoreGameRepository", "Error fetching techniques", error)
                     return@addSnapshotListener
                 }
-                val techniques = snapshot?.documents?.mapNotNull { it.toObject<Technique>() } ?: emptyList()
+                val techniques = snapshot?.documents?.mapNotNull { it.toObject<Technique>()?.copy(id = it.id) } ?: emptyList()
                 trySend(techniques)
             }
         awaitClose { listener.remove() }
@@ -373,7 +376,7 @@ class FirestoreGameRepository(
                     return@addSnapshotListener
                 }
                 snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Mission>() })
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Mission>()?.copy(id = doc.id) })
                 }
             }
         awaitClose { subscription.remove() }
@@ -436,7 +439,7 @@ class FirestoreGameRepository(
                 return@addSnapshotListener
             }
             snapshot?.let {
-                trySend(it.documents.mapNotNull { doc -> doc.toObject<Item>() })
+                trySend(it.documents.mapNotNull { doc -> doc.toObject<Item>()?.copy(id = doc.id) })
             }
         }
         awaitClose { subscription.remove() }
@@ -526,7 +529,7 @@ class FirestoreGameRepository(
                     return@addSnapshotListener
                 }
                 snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<RaidBoss>() })
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<RaidBoss>()?.copy(id = doc.id) })
                 }
             }
         awaitClose { subscription.remove() }
@@ -561,7 +564,7 @@ class FirestoreGameRepository(
                 return@addSnapshotListener
             }
             snapshot?.let {
-                trySend(it.documents.mapNotNull { doc -> doc.toObject<IslandQuest>() })
+                trySend(it.documents.mapNotNull { doc -> doc.toObject<IslandQuest>()?.copy(id = doc.id) })
             }
         }
         awaitClose { subscription.remove() }
@@ -581,6 +584,11 @@ class FirestoreGameRepository(
             "itemId" to itemId
         )
         functions.getHttpsCallable("raidCombatAction").call(data).await()
+        return true
+    }
+
+    override suspend fun engageRaid(raidId: String): Boolean {
+        functions.getHttpsCallable("engageRaid").call(hashMapOf("raidId" to raidId)).await()
         return true
     }
 

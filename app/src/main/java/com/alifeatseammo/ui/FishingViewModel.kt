@@ -182,11 +182,11 @@ class FishingViewModel @Inject constructor(
             FishingMovementPattern.Sinker -> if (sin(time) > 0) 80f else 20f
             FishingMovementPattern.Floater -> if (sin(time) > 0) 20f else 80f
             FishingMovementPattern.Darting -> {
-                if (Random.nextFloat() < 0.05f) Random.nextFloat() * 100f else _fishPosition.value
+                if (Random.nextFloat() < 0.03f) Random.nextFloat() * 100f else _fishPosition.value
             }
         }
-        // Smoothly move towards target
-        _fishPosition.value = _fishPosition.value + (target - _fishPosition.value) * 0.1f
+        // Smoothly move towards target with lerp
+        _fishPosition.value = _fishPosition.value + (target - _fishPosition.value) * 0.08f
     }
 
     fun onBarPress(pressing: Boolean) {
@@ -208,8 +208,14 @@ class FishingViewModel @Inject constructor(
     }
 
     fun reset() {
+        gameJob?.cancel()
         _state.value = FishingState.IDLE
         _progress.value = 0f
         _caughtFish.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        gameJob?.cancel()
     }
 }

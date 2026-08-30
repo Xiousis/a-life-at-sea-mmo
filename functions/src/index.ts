@@ -2950,7 +2950,10 @@ export const completeMission = functions.https.onCall(async (data, context) => {
 
         if (mission.statRequirement) {
             for (const [stat, value] of Object.entries(mission.statRequirement)) {
-                const charStat = character.stats[STAT_MAPPING[stat] || stat];
+                // Check in base stats first, then profession stats
+                const charStat = character.stats[STAT_MAPPING[stat] || stat] ??
+                                 character.professionStats?.[STAT_MAPPING[stat] || stat];
+
                 if ((charStat || 0) < (value as number)) {
                     throw new functions.https.HttpsError("failed-precondition", `Need ${value} ${stat} for this mission.`);
                 }
@@ -2981,10 +2984,16 @@ export const completeMission = functions.https.onCall(async (data, context) => {
         }
 
         if (mission.isRankUp && mission.targetRank) {
-            // Rank progression validation
+            // Rank progression validation - MUST MATCH RankDefinitions.kt
             const rankProgression: Record<string, string[]> = {
-                "Navy": ["Navy Cadet", "Petty Officer", "Chief Petty Officer", "Master Chief Petty Officer", "Ensign", "Lieutenant", "Commander", "Captain", "Commodore", "Rear Admiral", "Vice Admiral", "Admiral", "Fleet Admiral"],
-                "Pirate": ["Rogue", "Scallywag", "Swashbuckler", "Marauder", "Corsair", "First Mate", "Captain", "Dread Pirate", "Warlord", "Yonko", "Pirate King"]
+                "Navy": [
+                    "Navy Cadet", "Navy Recruit", "Petty Officer", "Chief Petty Officer", "Ensign",
+                    "Lieutenant", "Commander", "Captain", "Commodore", "Vice Admiral", "Admiral", "Fleet Admiral"
+                ],
+                "Pirate": [
+                    "Rogue", "Rogue Sailor", "Skirmisher", "Deckhand", "Swashbuckler",
+                    "Marauder", "Buccaneer", "Corsair", "Dread Pirate", "Pirate Lord", "Yonko", "Pirate King"
+                ]
             };
 
             const factionRanks = rankProgression[character.faction];
@@ -3411,6 +3420,18 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
 
     // 6. Missions
     await chunker.set(worldRef, { worldVersion: version });
+
+    const neutralMissions = [
+        { id: "neutral_1", title: "Island Delivery", description: "Deliver supplies to the local tavern.", energyCost: 5, minLevel: 1, goldReward: 200, xpReward: 50, difficulty: 1, factionRequirement: "Neutral", repeatable: true },
+        { id: "neutral_2", title: "Docks Cleanup", description: "Help clean the barnacles off the pier.", energyCost: 5, minLevel: 1, goldReward: 150, xpReward: 40, difficulty: 1, factionRequirement: "Neutral", repeatable: true },
+        { id: "neutral_3", title: "Messenger Duty", description: "Deliver a sealed letter to the mayor.", energyCost: 10, minLevel: 5, goldReward: 500, xpReward: 150, difficulty: 2, factionRequirement: "Neutral", repeatable: true }
+    ];
+
+    const combatMissions = [
+        { id: "grind_1", title: "Monster Cull", description: "Defeat local sea pests to protect the harbor.", energyCost: 15, minLevel: 5, goldReward: 800, xpReward: 300, difficulty: 3, factionRequirement: "Neutral", repeatable: true },
+        { id: "grind_2", title: "Bounty Hunter Assist", description: "Help track down minor outlaws.", energyCost: 20, minLevel: 15, goldReward: 1500, xpReward: 600, difficulty: 4, factionRequirement: "Neutral", repeatable: true }
+    ];
+
     const rankUpMissions = [
         // Navy
         { id: "navy_rank_1", title: "Navy Recruit Trial", description: "Complete your basic training to become a Navy Recruit.", energyCost: 10, minLevel: 1, goldReward: 500, xpReward: 100, difficulty: 1, factionRequirement: "Navy", isRankUp: true, targetRank: "Navy Recruit" },
@@ -3437,8 +3458,10 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
         { id: "pirate_rank_10", title: "Emperor's Challenge", description: "Defeat a high-ranking Marine to be recognized as Yonko.", energyCost: 100, minLevel: 250, goldReward: 1000000, xpReward: 120000, difficulty: 10, factionRequirement: "Pirate", isRankUp: true, targetRank: "Yonko" },
         { id: "pirate_rank_11", title: "Pirate King's Legacy", description: "Find the ultimate treasure and claim the title of Pirate King.", energyCost: 100, minLevel: 300, goldReward: 5000000, xpReward: 500000, difficulty: 12, factionRequirement: "Pirate", isRankUp: true, targetRank: "Pirate King" }
     ];
-    await syncCollection(db.collection("gameData").doc("world").collection("missions"), rankUpMissions.map(m => m.id), chunker);
-    for (const m of rankUpMissions) {
+
+    const allMissions = [...neutralMissions, ...combatMissions, ...rankUpMissions];
+    await syncCollection(db.collection("gameData").doc("world").collection("missions"), allMissions.map(m => m.id), chunker);
+    for (const m of allMissions) {
         await chunker.set(db.collection("gameData").doc("world").collection("missions").doc(m.id), m);
     }
 
@@ -3446,7 +3469,8 @@ export const seedWorld = functions.https.onCall(async (data, context) => {
 
     return {
         success: true,
-        version: 14,
+        message: `World seeded successfully to version ${version}.`,
+        version: version,
         counts: {
             locations: WORLD_LOCATIONS.length,
             enemies: enemies.length,
@@ -3473,34 +3497,35 @@ export const sendMessage = functions.https.onCall(async (data, context) => {
     }
 
     const playerRef = db.collection("players").doc(userId);
-    const playerSnap = await playerRef.get();
-    if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
-    const player = playerSnap.data() as any;
 
-    if (player.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
-    if (player.mutedUntil && player.mutedUntil > Date.now()) {
-        throw new functions.https.HttpsError("permission-denied", `You are muted until ${new Date(player.mutedUntil).toLocaleString()}. Reason: ${player.muteReason || "None"}`);
-    }
+    return db.runTransaction(async (transaction) => {
+        const playerSnap = await transaction.get(playerRef);
+        if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+        const player = playerSnap.data() as any;
 
-    // Rate Limiting: 2 seconds
-    const now = Date.now();
-    if (player.lastChatAt && now - player.lastChatAt < 2000) {
-        throw new functions.https.HttpsError("resource-exhausted", "You are chatting too fast. Please wait 2 seconds.");
-    }
+        if (player.isBanned) throw new functions.https.HttpsError("permission-denied", "User is banned.");
+        if (player.mutedUntil && player.mutedUntil > Date.now()) {
+            throw new functions.https.HttpsError("permission-denied", `You are muted until ${new Date(player.mutedUntil).toLocaleString()}. Reason: ${player.muteReason || "None"}`);
+        }
 
-    const chatRef = db.collection("chat").doc();
-    await Promise.all([
-        chatRef.set({
+        // Rate Limiting: 2 seconds
+        const now = Date.now();
+        if (player.lastChatAt && now - player.lastChatAt < 2000) {
+            throw new functions.https.HttpsError("resource-exhausted", "You are chatting too fast. Please wait 2 seconds.");
+        }
+
+        const chatRef = db.collection("chat").doc();
+        transaction.set(chatRef, {
             senderId: userId,
             senderName: player.name,
             message: message.trim(),
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
             channelId: channelId || "global"
-        }),
-        playerRef.update({ lastChatAt: now })
-    ]);
+        });
+        transaction.update(playerRef, { lastChatAt: now });
 
-    return { success: true };
+        return { success: true };
+    });
 });
 
 export async function checkAdmin(context: functions.https.CallableContext) {
@@ -4540,65 +4565,73 @@ export const sendMail = functions.https.onCall(async (data, context) => {
     const senderRef = db.collection("players").doc(senderId);
     const recipientRef = db.collection("players").doc(recipientId);
 
-    const [senderSnap, recipientSnap] = await Promise.all([
-        senderRef.get(),
-        recipientRef.get()
-    ]);
+    return db.runTransaction(async (transaction) => {
+        const [senderSnap, recipientSnap] = await Promise.all([
+            transaction.get(senderRef),
+            transaction.get(recipientRef)
+        ]);
 
-    if (!senderSnap.exists) {
-        throw new functions.https.HttpsError("not-found", "Sender character not found.");
-    }
+        if (!senderSnap.exists) {
+            throw new functions.https.HttpsError("not-found", "Sender character not found.");
+        }
 
-    if (!recipientSnap.exists) {
-        throw new functions.https.HttpsError("not-found", "Recipient player not found.");
-    }
+        if (!recipientSnap.exists) {
+            throw new functions.https.HttpsError("not-found", "Recipient player not found.");
+        }
 
-    const sender = senderSnap.data() as any;
-    const recipient = recipientSnap.data() as any;
+        const sender = senderSnap.data() as any;
+        const recipient = recipientSnap.data() as any;
 
-    // Rate Limiting: 5 seconds & Hourly Cap (50)
-    const now = Date.now();
-    const oneHourAgo = now - (60 * 60 * 1000);
+        const now = Date.now();
+        const oneHourMs = 60 * 60 * 1000;
 
-    // Reset hourly count if needed
-    let hourlyCount = sender.hourlyMailCount || 0;
-    if (!sender.lastMailAt || sender.lastMailAt < oneHourAgo) {
-        hourlyCount = 0;
-    }
+        // Throttling: 5 seconds between messages
+        if (sender.lastMailAt && now - sender.lastMailAt < 5000) {
+            throw new functions.https.HttpsError("resource-exhausted", "You are sending mail too fast. Please wait 5 seconds.");
+        }
 
-    if (sender.lastMailAt && now - sender.lastMailAt < 5000) {
-        throw new functions.https.HttpsError("resource-exhausted", "You are sending mail too fast. Please wait 5 seconds.");
-    }
+        // Hourly Window Logic
+        let windowStart = sender.mailWindowStartedAt || now;
+        let count = sender.mailCountInWindow || 0;
 
-    if (hourlyCount >= 50) {
-        throw new functions.https.HttpsError("resource-exhausted", "Hourly mail limit reached (50). Please try again later.");
-    }
+        if (now - windowStart >= oneHourMs) {
+            // New window
+            windowStart = now;
+            count = 1;
+        } else {
+            // Existing window
+            if (count >= 50) {
+                const waitTimeMin = Math.ceil((oneHourMs - (now - windowStart)) / 60000);
+                throw new functions.https.HttpsError("resource-exhausted", `Hourly mail limit reached (50). Please try again in ${waitTimeMin} minutes.`);
+            }
+            count++;
+        }
 
-    if (recipient.blocked?.includes(senderId)) {
-        throw new functions.https.HttpsError("permission-denied", "This player cannot receive messages from you.");
-    }
+        if (recipient.blocked?.includes(senderId)) {
+            throw new functions.https.HttpsError("permission-denied", "This player cannot receive messages from you.");
+        }
 
-    const mailRef = recipientRef.collection("mail").doc();
-
-    await Promise.all([
-        mailRef.set({
+        const mailRef = recipientRef.collection("mail").doc();
+        transaction.set(mailRef, {
             id: mailRef.id,
             senderId,
             senderName: sender.name,
             recipientId,
             subject: subject.trim(),
             body: body.trim(),
-            timestamp: Date.now(),
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
             isRead: false,
             claimed: false
-        }),
-        senderRef.update({
-            lastMailAt: now,
-            hourlyMailCount: hourlyCount + 1
-        })
-    ]);
+        });
 
-    return { success: true, mailId: mailRef.id };
+        transaction.update(senderRef, {
+            lastMailAt: now,
+            mailWindowStartedAt: windowStart,
+            mailCountInWindow: count
+        });
+
+        return { success: true, mailId: mailRef.id };
+    });
 });
 
 export const promoteMember = functions.https.onCall(async (data, context) => {
@@ -4873,13 +4906,18 @@ export const forceSpawnRaid = functions.https.onCall(async (data, context) => {
 
 async function spawnRaidLogic() {
     const boss = WORLD_BOSSES[Math.floor(Math.random() * WORLD_BOSSES.length)];
-    const location = RAID_LOCATIONS[Math.floor(Math.random() * RAID_LOCATIONS.length)];
+
+    // Spawn at a random spot in the sea (excluding the very edge)
+    const x = Math.floor(Math.random() * 4000) - 2000;
+    const y = Math.floor(Math.random() * 4000) - 2000;
+
     const raidId = `raid_${Date.now()}`;
 
     const raidData = {
         id: raidId,
         enemy: { ...boss, hp: boss.hp },
-        locationId: location,
+        x: x,
+        y: y,
         totalDamageTaken: 0,
         participants: {},
         status: "Active",
@@ -4901,13 +4939,65 @@ async function spawnRaidLogic() {
 
     const announcementRef = db.collection("gameData").doc("world").collection("announcements").doc();
     batch.set(announcementRef, {
-        text: `⚠️ WORLD RAID ALERT: ${boss.name} has appeared at ${location}!`,
+        text: `⚠️ WORLD RAID ALERT: ${boss.name} has appeared at coordinates (${x}, ${y})!`,
         timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
 
     await batch.commit();
-    return { success: true, boss: boss.name, location };
+    return { success: true, boss: boss.name, x, y };
 }
+
+export const engageRaid = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+
+    const { raidId } = data;
+    const userId = context.auth.uid;
+    const playerRef = db.collection("players").doc(userId);
+    const raidRef = db.collection("gameData").doc("world").collection("raids").doc(raidId);
+
+    return db.runTransaction(async (transaction) => {
+        const [playerSnap, raidSnap] = await Promise.all([
+            transaction.get(playerRef),
+            transaction.get(raidRef)
+        ]);
+
+        if (!playerSnap.exists) throw new functions.https.HttpsError("not-found", "Character not found.");
+        if (!raidSnap.exists) throw new functions.https.HttpsError("not-found", "Raid not found.");
+
+        const character = playerSnap.data() as any;
+        const raid = raidSnap.data() as any;
+
+        if (raid.status !== "Active") throw new functions.https.HttpsError("failed-precondition", "Raid is no longer active.");
+
+        // Check distance (Player must be at an island close to the raid)
+        const currentLoc = character.currentLocation;
+        const locInfo = WORLD_LOCATIONS.find(l => l.name === currentLoc);
+        if (!locInfo) throw new functions.https.HttpsError("not-found", "Current location data not found.");
+
+        const dist = Math.sqrt(Math.pow(raid.x - locInfo.x, 2) + Math.pow(raid.y - locInfo.y, 2));
+        if (dist > 1000) {
+            throw new functions.https.HttpsError("failed-precondition", "You are too far away from the raid boss. Sail to a closer island.");
+        }
+
+        // Set player combat state
+        const combatState = {
+            enemy: { ...raid.enemy, id: raidId },
+            isRaid: true,
+            raidId: raidId,
+            playerTurn: true,
+            logs: [`You have engaged the WORLD BOSS: ${raid.enemy.name}!`],
+            isFinished: false,
+            playerWon: false,
+            turnCount: 0,
+            playerEffects: [],
+            enemyEffects: [],
+            cooldowns: {}
+        };
+
+        transaction.update(playerRef, { combatState });
+        return { success: true };
+    });
+});
 
 export const raidCombatAction = functions.https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
@@ -4932,9 +5022,14 @@ export const raidCombatAction = functions.https.onCall(async (data, context) => 
         if (raid.status !== "Active") throw new functions.https.HttpsError("failed-precondition", "Raid is no longer active.");
         if (character.hp <= 0) throw new functions.https.HttpsError("failed-precondition", "You are too wounded to fight!");
 
-        // Security checks
-        if (character.currentLocation !== raid.locationId) {
-            throw new functions.https.HttpsError("failed-precondition", "You are not at the raid location.");
+        // Distance check
+        const currentLoc = character.currentLocation;
+        const locInfo = WORLD_LOCATIONS.find(l => l.name === currentLoc);
+        if (!locInfo) throw new functions.https.HttpsError("not-found", "Current location data not found.");
+
+        const dist = Math.sqrt(Math.pow(raid.x - locInfo.x, 2) + Math.pow(raid.y - locInfo.y, 2));
+        if (dist > 1000) {
+             throw new functions.https.HttpsError("failed-precondition", "You are too far away from the raid boss. Sail to a closer island.");
         }
 
         const now = Date.now();
@@ -5083,12 +5178,23 @@ export const onUserDeleted = functions.auth.user().onDelete(async (user) => {
             batch.delete(db.collection("characterNames").doc(nameLower));
         }
 
+        // 1. Crew Cleanup
         if (crewId) {
             const crewRef = db.collection("crews").doc(crewId);
             const crewSnap = await crewRef.get();
             if (crewSnap.exists) {
                 const crew = crewSnap.data() as any;
                 if (crew.captainId === userId) {
+                    // Disband crew: clear crewId and crewRank from all members
+                    const members = crew.members || [];
+                    for (const memberId of members) {
+                        if (memberId !== userId) {
+                            batch.update(db.collection("players").doc(memberId), {
+                                crewId: null,
+                                crewRank: null
+                            });
+                        }
+                    }
                     batch.delete(crewRef);
                 } else {
                     batch.update(crewRef, {
@@ -5098,6 +5204,25 @@ export const onUserDeleted = functions.auth.user().onDelete(async (user) => {
                 }
             }
         }
+
+        // 2. Auction Cleanup
+        const auctionsSnap = await db.collection("auctions").where("sellerId", "==", userId).get();
+        auctionsSnap.forEach(doc => batch.delete(doc.ref));
+
+        // 3. Friend Requests / Crew Invites Cleanup
+        const frSentSnap = await db.collection("friendRequests").where("senderId", "==", userId).get();
+        frSentSnap.forEach(doc => batch.delete(doc.ref));
+        const frRecvSnap = await db.collection("friendRequests").where("receiverId", "==", userId).get();
+        frRecvSnap.forEach(doc => batch.delete(doc.ref));
+
+        const invitesSentSnap = await db.collection("crewInvites").where("senderId", "==", userId).get();
+        invitesSentSnap.forEach(doc => batch.delete(doc.ref));
+        const invitesRecvSnap = await db.collection("crewInvites").where("targetId", "==", userId).get();
+        invitesRecvSnap.forEach(doc => batch.delete(doc.ref));
+
+        // 4. Mail subcollection cleanup (batch limit of 500 applies here)
+        const mailSnap = await playerRef.collection("mail").limit(300).get();
+        mailSnap.forEach(doc => batch.delete(doc.ref));
 
         batch.delete(playerRef);
         await batch.commit();

@@ -38,8 +38,8 @@ class FirestoreSocialRepository(
                     trySend(emptyList())
                 } else {
                     // Fetch characters for these IDs
-                    db.collection("players").whereIn("id", friendIds).get().addOnSuccessListener { querySnapshot ->
-                        trySend(querySnapshot.documents.mapNotNull { it.toObject<Character>() })
+                    db.collection("players").whereIn(com.google.firebase.firestore.FieldPath.documentId(), friendIds).get().addOnSuccessListener { querySnapshot ->
+                        trySend(querySnapshot.documents.mapNotNull { it.toObject<Character>()?.copy(id = it.id) })
                     }.addOnFailureListener { e ->
                         android.util.Log.e("SocialRepository", "Error fetching friend details", e)
                     }
@@ -62,8 +62,8 @@ class FirestoreSocialRepository(
                     if (senderIds.isEmpty()) {
                         trySend(emptyList())
                     } else {
-                        db.collection("players").whereIn("id", senderIds).get().addOnSuccessListener { querySnapshot ->
-                            trySend(querySnapshot.documents.mapNotNull { it.toObject<Character>() })
+                        db.collection("players").whereIn(com.google.firebase.firestore.FieldPath.documentId(), senderIds).get().addOnSuccessListener { querySnapshot ->
+                            trySend(querySnapshot.documents.mapNotNull { it.toObject<Character>()?.copy(id = it.id) })
                         }.addOnFailureListener { e ->
                             android.util.Log.e("SocialRepository", "Error fetching sender details", e)
                         }

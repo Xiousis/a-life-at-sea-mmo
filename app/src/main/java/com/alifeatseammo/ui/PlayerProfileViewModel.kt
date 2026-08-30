@@ -18,22 +18,26 @@ class PlayerProfileViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _playerId = MutableStateFlow<String?>(null)
+    private val _crewId = MutableStateFlow<String?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val playerProfile: StateFlow<Character?> = _playerId
-        .filterNotNull()
-        .flatMapLatest { id -> gameRepository.getPlayerProfile(id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val playerCrew: StateFlow<Crew?> = playerProfile
-        .map { it?.crewId }
-        .distinctUntilChanged()
-        .flatMapLatest { crewId ->
-            if (crewId != null) crewRepository.getCrew(crewId)
+        .flatMapLatest { id ->
+            if (id != null) gameRepository.getPlayerProfile(id)
             else flowOf(null)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val playerCrew: StateFlow<Crew?> = combine(
+        playerProfile.map { it?.crewId }.distinctUntilChanged(),
+        _crewId
+    ) { fromProfile, direct ->
+        direct ?: fromProfile
+    }.flatMapLatest { crewId ->
+        if (crewId != null) crewRepository.getCrew(crewId)
+        else flowOf(null)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val crewMembers: StateFlow<List<Character>> = playerCrew
@@ -46,5 +50,11 @@ class PlayerProfileViewModel @Inject constructor(
 
     fun loadPlayer(playerId: String) {
         _playerId.value = playerId
+        _crewId.value = null
+    }
+
+    fun loadCrew(crewId: String) {
+        _crewId.value = crewId
+        _playerId.value = null
     }
 }

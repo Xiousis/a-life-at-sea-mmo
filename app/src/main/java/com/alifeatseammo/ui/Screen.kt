@@ -25,7 +25,7 @@ sealed interface Screen {
     @Serializable object Skills : Screen
     @Serializable object Settings : Screen
     @Serializable object Help : Screen
-    @Serializable object CrewProfile : Screen
+    @Serializable data class CrewProfile(val crewId: String? = null) : Screen
     @Serializable object Tavern : Screen
     @Serializable data class Market(val category: String? = null) : Screen
     @Serializable object Mail : Screen

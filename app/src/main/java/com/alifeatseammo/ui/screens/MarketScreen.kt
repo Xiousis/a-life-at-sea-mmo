@@ -2,11 +2,13 @@ package com.alifeatseammo.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.*
 import com.alifeatseammo.ui.components.getRarityColor
+import com.alifeatseammo.ui.components.getItemEmoji
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +35,9 @@ fun MarketScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val isLoading = actionState is com.alifeatseammo.ui.UIActionState.Loading
+    
+    var searchText by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf<ItemType?>(null) }
     
     Scaffold(
         topBar = {
@@ -104,10 +110,48 @@ fun MarketScreen(
                 )
             }
             
+            // Search and Filter Bar
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search items...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = selectedCategory == null,
+                            onClick = { selectedCategory = null },
+                            label = { Text("All") }
+                        )
+                    }
+                    items(ItemType.entries) { type ->
+                        FilterChip(
+                            selected = selectedCategory == type,
+                            onClick = { selectedCategory = type },
+                            label = { Text(type.name) }
+                        )
+                    }
+                }
+            }
+
             if (selectedTab == 0) {
-                BuyTab(marketItems, character, isLoading, onBuyItem)
+                val filteredMarket = marketItems.filter { 
+                    it.name.contains(searchText, ignoreCase = true) && 
+                    (selectedCategory == null || it.type == selectedCategory)
+                }
+                BuyTab(filteredMarket, character, isLoading, onBuyItem)
             } else {
-                SellTab(character.inventory, isLoading, onSellItem)
+                val filteredInventory = character.inventory.filter { 
+                    it.name.contains(searchText, ignoreCase = true) && 
+                    (selectedCategory == null || it.type == selectedCategory)
+                }
+                SellTab(filteredInventory, isLoading, onSellItem)
             }
         }
     }
@@ -197,11 +241,9 @@ fun MarketItemRow(
                 modifier = Modifier.size(48.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = getItemIcon(item.type),
-                        contentDescription = null,
-                        tint = getRarityColor(item.rarity),
-                        modifier = Modifier.size(24.dp)
+                    Text(
+                        text = getItemEmoji(item.type),
+                        fontSize = 24.sp
                     )
                 }
             }
@@ -298,12 +340,3 @@ fun FactionBadge(faction: Faction) {
     }
 }
 
-private fun getItemIcon(type: ItemType): ImageVector {
-    // This could be expanded with more specific icons
-    return when (type) {
-        ItemType.Weapon -> Icons.Default.Info // Should be sword
-        ItemType.Armor -> Icons.Default.Info // Should be shield
-        ItemType.Consumable -> Icons.Default.Info // Should be food/drink
-        else -> Icons.Default.Info
-    }
-}

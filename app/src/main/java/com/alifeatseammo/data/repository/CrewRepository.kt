@@ -19,7 +19,7 @@ interface CrewRepository {
     suspend fun respondToInvite(crewId: String, accept: Boolean): Boolean
     suspend fun promoteMember(targetId: String, rank: String): Boolean
     suspend fun kickMember(targetId: String): Boolean
-    suspend fun donateToCrew(amount: Int): Boolean
+    suspend fun donateToCrew(amount: Long): Boolean
     suspend fun updateCrewSettings(description: String, isPublic: Boolean): Boolean
     suspend fun upgradeCrewPerk(perk: String): Boolean
     suspend fun toggleCrewPvP(enabled: Boolean): Boolean
@@ -40,7 +40,7 @@ class FirestoreCrewRepository(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    trySend(snapshot.toObject(Crew::class.java))
+                    trySend(snapshot.toObject(Crew::class.java)?.copy(id = snapshot.id))
                 }
             }
         awaitClose { subscription.remove() }
@@ -90,7 +90,7 @@ class FirestoreCrewRepository(
         return true
     }
 
-    override suspend fun donateToCrew(amount: Int): Boolean {
+    override suspend fun donateToCrew(amount: Long): Boolean {
         val data = hashMapOf("amount" to amount)
         functions.getHttpsCallable("donateToCrew").call(data).await()
         return true
@@ -115,12 +115,10 @@ class FirestoreCrewRepository(
     }
 
     override fun getTopCrews(limit: Int, sortBy: String): Flow<List<Crew>> = callbackFlow {
-        var query: com.google.firebase.firestore.Query = db.collection("crews")
-        
-        query = when (sortBy) {
-            "pvpWins" -> query.orderBy("pvpWins", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            "totalBounty" -> query.orderBy("totalBounty", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            else -> query.orderBy("level", com.google.firebase.firestore.Query.Direction.DESCENDING)
+        val query = when (sortBy) {
+            "pvpWins" -> db.collection("crews").orderBy("pvpWins", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            "totalBounty" -> db.collection("crews").orderBy("totalBounty", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            else -> db.collection("crews").orderBy("level", com.google.firebase.firestore.Query.Direction.DESCENDING)
                          .orderBy("experience", com.google.firebase.firestore.Query.Direction.DESCENDING)
         }
 
@@ -131,7 +129,7 @@ class FirestoreCrewRepository(
                     return@addSnapshotListener
                 }
                 snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Crew>() })
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<Crew>()?.copy(id = doc.id) })
                 }
             }
         awaitClose { subscription.remove() }
@@ -147,7 +145,7 @@ class FirestoreCrewRepository(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<CrewInvite>() })
+                    trySend(snapshot.documents.mapNotNull { it.toObject<CrewInvite>()?.copy(id = it.id) })
                 }
             }
         awaitClose { subscription.remove() }

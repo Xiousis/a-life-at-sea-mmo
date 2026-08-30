@@ -69,13 +69,6 @@ fun SettingsScreen(
             if (isAdmin) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { viewModel.seedWorld() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                ) {
-                    Text("Seed World Data (Admin)")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
                     onClick = { onAdminPanelClick() },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
                 ) {

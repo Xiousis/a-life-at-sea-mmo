@@ -1,15 +1,18 @@
 package com.alifeatseammo
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
+import javax.inject.Inject
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,12 +42,34 @@ import com.alifeatseammo.ui.screens.CombatScreen
 import com.alifeatseammo.ui.screens.LoginScreen
 import com.alifeatseammo.ui.screens.TravelingScreen
 import com.alifeatseammo.ui.theme.ALifeAtSeaMMOTheme
+import com.google.firebase.Firebase
+import com.google.firebase.appcheck.appCheck
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+import com.google.firebase.initialize
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var musicManager: com.alifeatseammo.util.MusicManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // Handle music lifecycle globally
+        ProcessLifecycleOwner.get().lifecycle.addObserver(musicManager)
+        
+        Firebase.initialize(context = this)
+        Firebase.appCheck.installAppCheckProviderFactory(
+            if (BuildConfig.DEBUG) {
+                Log.d("AppCheck", "Using Debug Provider. Check Logcat for 'DebugAppCheckProvider' to find your token for the Firebase Console.")
+                DebugAppCheckProviderFactory.getInstance()
+            } else {
+                PlayIntegrityAppCheckProviderFactory.getInstance()
+            }
+        )
+
         enableEdgeToEdge()
         setContent {
             ALifeAtSeaMMOTheme {
@@ -103,7 +128,7 @@ class MainActivity : ComponentActivity() {
                                     onCharacterCreated = { name, gender, race ->
                                         authViewModel.createCharacter(name, gender, race)
                                     },
-                                    onClearError = { authViewModel.clearCreateCharacterResult() }
+                                    onClearError = { authViewModel.clearCreateCharacterResult() },
                                 ) {
                                     authViewModel.signOut()
                                 }
@@ -112,7 +137,7 @@ class MainActivity : ComponentActivity() {
                                 MainScaffold(
                                     navController = navController,
                                     currentChar = state.character,
-                                    snackbarHostState = snackbarHostState
+                                    snackbarHostState = snackbarHostState,
                                 )
                             }
                             is CharacterState.Error -> {

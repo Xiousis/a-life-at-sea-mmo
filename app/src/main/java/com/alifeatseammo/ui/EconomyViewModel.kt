@@ -24,27 +24,20 @@ class EconomyViewModel @Inject constructor(
     val actionState: StateFlow<UIActionState> = _actionState.asStateFlow()
 
     private fun performAction(label: String, block: suspend () -> Unit) {
-        if (_actionState.value is UIActionState.Loading) return
-
-        viewModelScope.launch {
-            _actionState.value = UIActionState.Loading(label)
-            try {
-                block()
-                _actionState.value = UIActionState.Success(label)
-                kotlinx.coroutines.delay(2000)
-                if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
-                    _actionState.value = UIActionState.Idle
+        viewModelScope.launchUIAction(
+            label = label,
+            actionState = _actionState,
+            errorState = _errorMessage,
+            onError = { e ->
+                if (e is FirebaseFunctionsException) {
+                    android.util.Log.e("EconomyViewModel", "Function failed: code=${e.code}, details=${e.details}", e)
+                    e.message ?: "${e.code}: Action failed"
+                } else {
+                    e.message ?: "Action failed"
                 }
-            } catch (e: FirebaseFunctionsException) {
-                android.util.Log.e("EconomyViewModel", "Function failed: code=${e.code}, details=${e.details}", e)
-                val errorMsg = e.message ?: "${e.code}: Action failed"
-                _actionState.value = UIActionState.Error(errorMsg)
-                _errorMessage.value = errorMsg
-            } catch (e: Exception) {
-                _actionState.value = UIActionState.Error(e.message ?: "Action failed")
-                _errorMessage.value = e.message
-            }
-        }
+            },
+            block = block
+        )
     }
 
     private val currentUser = authRepository.currentUser
@@ -66,6 +59,15 @@ class EconomyViewModel @Inject constructor(
         _marketCategory.value = category
     }
 
+    val availableShips: StateFlow<List<Ship>> = flowOf(
+        listOf(
+            Ship("row_boat", "Row Boat", 0, 1.0f),
+            Ship("sloop", "Sloop", 500, 1.5f),
+            Ship("caravel", "Caravel", 2500, 2.0f),
+            Ship("galleon", "Galleon", 10000, 3.0f),
+        )
+    ).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val mailMessages: StateFlow<List<MailMessage>> = currentUser
         .flatMapLatest { user ->
@@ -82,7 +84,7 @@ class EconomyViewModel @Inject constructor(
             return
         }
         performAction("Equipping ${item.name}") {
-            gameRepository.equipItem(item.id, item.type.name)
+            gameRepository.equipItem(item.id, item.slot ?: item.type.name)
         }
     }
 

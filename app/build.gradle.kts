@@ -1,4 +1,5 @@
 import com.google.firebase.appdistribution.gradle.firebaseAppDistribution
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -11,10 +12,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-ksp {
-    arg("appfunctions:aggregateAppFunctions", "true")
-}
-
 kotlin {
     jvmToolchain(17)
 }
@@ -23,12 +20,29 @@ android {
     namespace = "com.alifeatseammo"
     compileSdk = 37
 
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { stream -> 
+            localProperties.load(stream) 
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = localProperties.getProperty("signing.store.file")?.let { path -> file(path) }
+            storePassword = localProperties.getProperty("signing.store.password")
+            keyAlias = localProperties.getProperty("signing.key.alias")
+            keyPassword = localProperties.getProperty("signing.key.password")
+        }
+    }
+
     defaultConfig {
         applicationId = "com.alifeatseammo"
         minSdk = 28
         targetSdk = 37
-        versionCode = 6
-        versionName = "1.5"
+        versionCode = 19
+        versionName = "1.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -41,11 +55,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             firebaseAppDistribution {
                 artifactType = "APK"
-                releaseNotes = "v1.5: New Scheduled World Raid system (daily at 5:30PM EST), AppFunctions integration, Admin Panel, and major data model refactor."
+                releaseNotes = "v1.9.0: Senior Polish & Launch Prep. Adaptive Inventory (List-Detail), Haptic Feedback, smooth Fishing physics, Auction House stats preview, and 'Set Sail' mission shortcuts."
                 testers = "oscali11@gmail.com"
             }
         }
@@ -56,6 +71,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -64,6 +80,7 @@ dependencies {
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.appcheck.playintegrity)
+    implementation(libs.firebase.appcheck.debug)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -72,6 +89,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -83,12 +101,8 @@ dependencies {
     implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
-    implementation(libs.androidx.appfunctions)
-    implementation(libs.androidx.appfunctions.service)
-    ksp(libs.androidx.appfunctions.compiler)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    implementation(libs.firebase.ai)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.functions)

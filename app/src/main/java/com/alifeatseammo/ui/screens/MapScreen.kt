@@ -27,10 +27,12 @@ fun MapScreen(
     activeRaids: List<RaidBoss> = emptyList(),
     seaEvents: List<SeaEvent> = emptyList(),
     onLocationClick: (LocationDef) -> Unit,
+    onRaidClick: (RaidBoss) -> Unit,
     onBackClick: () -> Unit
 ) {
     var selectedLocation by remember { mutableStateOf<LocationDef?>(null) }
     var selectedEvent by remember { mutableStateOf<SeaEvent?>(null) }
+    var selectedRaid by remember { mutableStateOf<RaidBoss?>(null) }
 
     // Dynamic scaling based on location bounds
     val minX = locations.minOfOrNull { it.x }?.toFloat() ?: -500f
@@ -89,7 +91,20 @@ fun MapScreen(
                                 val canvasWidth = size.width
                                 val canvasHeight = size.height
                                 
-                                // Check events first (smaller/more specific)
+                                // Check raids first
+                                activeRaids.forEach { raid ->
+                                    val x = (raid.x.toFloat() - mapMinX) * (canvasWidth / mapWidth)
+                                    val y = (raid.y.toFloat() - mapMinY) * (canvasHeight / mapHeight)
+                                    val raidOffset = Offset(x, y)
+                                    if ((offset - raidOffset).getDistance() < 50f) {
+                                        selectedRaid = raid
+                                        selectedLocation = null
+                                        selectedEvent = null
+                                        return@detectTapGestures
+                                    }
+                                }
+
+                                // Check events next
                                 seaEvents.forEach { event ->
                                     val x = (event.x - mapMinX) * (canvasWidth / mapWidth)
                                     val y = (event.y - mapMinY) * (canvasHeight / mapHeight)
@@ -109,6 +124,7 @@ fun MapScreen(
                                     if ((offset - locOffset).getDistance() < 40f) {
                                         selectedLocation = loc
                                         selectedEvent = null
+                                        selectedRaid = null
                                     }
                                 }
                             }
@@ -145,29 +161,40 @@ fun MapScreen(
                         val y = (loc.y - mapMinY) * (size.height / mapHeight)
                         
                         val isCurrent = loc.name == character.currentLocation
-                        val raidAtLocation = activeRaids.find { it.locationId == loc.id }
+                        
+                        drawCircle(
+                            color = if (isCurrent) Color.Red else if (loc.isSafe) Color(0xFF4CAF50) else Color(0xFF795548),
+                            radius = if (isCurrent) 12f else 8f,
+                            center = Offset(x, y)
+                        )
+                    }
 
-                        if (raidAtLocation != null) {
-                            // Draw Skull for Raid
-                            drawCircle(
-                                color = Color.Black,
-                                radius = 10f,
-                                center = Offset(x, y)
-                            )
-                            // We can't easily draw "💀" in Canvas without nativeCanvas or textMeasurer
-                            // Let's use a distinct color and border for now, or nativeCanvas
-                            drawCircle(
-                                color = Color.White,
-                                radius = 6f,
-                                center = Offset(x, y)
-                            )
-                        } else {
-                            drawCircle(
-                                color = if (isCurrent) Color.Red else if (loc.isSafe) Color(0xFF4CAF50) else Color(0xFF795548),
-                                radius = if (isCurrent) 12f else 8f,
-                                center = Offset(x, y)
-                            )
-                        }
+                    // Draw Raid Bosses
+                    activeRaids.forEach { raid ->
+                        val x = (raid.x.toFloat() - mapMinX) * (size.width / mapWidth)
+                        val y = (raid.y.toFloat() - mapMinY) * (size.height / mapHeight)
+                        
+                        // Draw Skull/Boss Icon (Larger)
+                        drawCircle(
+                            color = Color.Black,
+                            radius = 16f,
+                            center = Offset(x, y)
+                        )
+                        drawCircle(
+                            color = Color.Red,
+                            radius = 12f,
+                            center = Offset(x, y)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 4f,
+                            center = Offset(x - 4f, y - 4f)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 4f,
+                            center = Offset(x + 4f, y - 4f)
+                        )
                     }
 
                     // Draw Sea Event Icons
@@ -189,12 +216,48 @@ fun MapScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .height(160.dp),
+                    .height(180.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    if (selectedEvent != null) {
+                    if (selectedRaid != null) {
+                        val raid = selectedRaid!!
+                        Text(
+                            text = "💀 WORLD BOSS: ${raid.enemy.name}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.Red,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Lv. ${raid.enemy.level} | HP: ${raid.enemy.hp}/${raid.enemy.maxHp} | Pos: (${raid.x.toInt()}, ${raid.y.toInt()})",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        val currentLocInfo = locations.find { it.name == character.currentLocation }
+                        val distance = currentLocInfo?.let { loc ->
+                            kotlin.math.sqrt(Math.pow(raid.x - loc.x, 2.0) + Math.pow(raid.y - loc.y, 2.0))
+                        } ?: 1000.0
+
+                        if (distance <= 1000.0) {
+                            Button(
+                                onClick = { onRaidClick(raid) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                            ) {
+                                Text("BATTLE RAID BOSS")
+                            }
+                        } else {
+                            Text(
+                                text = "You are too far away (${distance.toInt()} units) to engage. Sail to a closer island.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    } else if (selectedEvent != null) {
                         val event = selectedEvent!!
                         Text(
                             text = "${event.type.icon} ${event.name}",
@@ -231,20 +294,6 @@ fun MapScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.secondary
                                 )
-                                val raidAtLocation = activeRaids.find { it.locationId == loc.id }
-                                if (raidAtLocation != null) {
-                                    Text(
-                                        text = "⚠️ RAID BOSS: ${raidAtLocation.enemy.name}",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = Color.Red,
-                                        fontWeight = FontWeight.Black
-                                    )
-                                    Text(
-                                        text = "Rewards: Standard XP/Gold\nTop 3 Dmg: +0.1% Exclusive Drop",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
                             }
                             if (loc.isSafe) {
                                 Surface(

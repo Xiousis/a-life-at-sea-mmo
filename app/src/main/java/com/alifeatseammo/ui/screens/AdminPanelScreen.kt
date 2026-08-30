@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.ui.GameViewModel
 import com.alifeatseammo.ui.UIActionState
+import com.alifeatseammo.ui.components.ActionOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +25,7 @@ fun AdminPanelScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val searchResults by viewModel.searchPlayers(searchQuery).collectAsState(initial = emptyList())
+    val worldVersion by viewModel.worldVersion.collectAsState()
     val actionState by viewModel.actionState.collectAsState()
 
     var showTeleportDialog by remember { mutableStateOf<Character?>(null) }
@@ -66,11 +68,27 @@ fun AdminPanelScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            Text("Current World Version: ${worldVersion ?: "0 (Not Initialized)"}", style = MaterialTheme.typography.bodyLarge)
+            var nextVersionText by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = nextVersionText,
+                onValueChange = { nextVersionText = it },
+                label = { Text("Next World Version") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
             
             Button(
-                onClick = { viewModel.seedWorld() },
+                onClick = { 
+                    nextVersionText.toIntOrNull()?.let { 
+                        viewModel.seedWorld(it) 
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                enabled = nextVersionText.toIntOrNull() != null
             ) {
                 Text("RE-SEED WORLD DATA")
             }
@@ -90,6 +108,10 @@ fun AdminPanelScreen(
                     )
                 }
             }
+        }
+
+        if (actionState is UIActionState.Loading) {
+            ActionOverlay(actionState)
         }
     }
 

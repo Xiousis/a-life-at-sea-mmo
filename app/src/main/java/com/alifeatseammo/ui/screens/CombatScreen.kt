@@ -1,6 +1,6 @@
 package com.alifeatseammo.ui.screens
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -12,10 +12,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
@@ -24,7 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alifeatseammo.data.model.*
 import com.alifeatseammo.ui.components.StatusBar
+import com.alifeatseammo.ui.components.ThemedCard
 import com.alifeatseammo.ui.components.getElementColor
+import com.alifeatseammo.ui.components.LowHpWarning
 
 @Composable
 fun CombatScreen(
@@ -49,187 +56,225 @@ fun CombatScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (combatState.isRankChallenge) {
-            Surface(
-                color = MaterialTheme.colorScheme.errorContainer,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Text(
-                    text = "RANK CHALLENGE",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-            }
-        }
-
-        if (combatState.isRaid) {
-            Surface(
-                color = Color.Black,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Text(
-                    text = "WORLD RAID BOSS",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-            }
-            CombatButton(
-                label = "Leaderboard",
-                modifier = Modifier.padding(bottom = 8.dp),
-                color = Color.Yellow
-            ) { showLeaderboard = true }
-        }
-
-        Text(
-            text = "────────────────────────",
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-        )
-        Text(
-            text = "BATTLE",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 4.sp
-        )
-        if (combatState.comboCount > 0) {
-            Text(
-                text = "COMBO x${combatState.comboCount}",
-                style = MaterialTheme.typography.titleLarge,
-                color = Color(0xFFFF9800),
-                fontWeight = FontWeight.Black
-            )
-        }
-        Text(
-            text = "────────────────────────",
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Player Section
-        var currentMp by remember { mutableStateOf(character.getCurrentMythicMana()) }
-        LaunchedEffect(character.mythicArt) {
-            while (character.mythicArt != null) {
-                currentMp = character.getCurrentMythicMana()
-                kotlinx.coroutines.delay(1000) // Update every second
-            }
-        }
-
-        CombatantStatus(
-            name = "YOU",
-            hp = character.hp,
-            maxHp = character.maxHp,
-            barColor = Color(0xFF4CAF50),
-            effects = combatState.playerEffects,
-            elements = character.mythicArt?.elements ?: emptyList()
-        )
-        
-        if (character.mythicArt != null) {
-            StatusBar(
-                label = "MP",
-                current = currentMp,
-                max = character.maxMythicMana,
-                color = Color(0xFF2196F3)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "vs", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Enemy Section
-        CombatantStatus(
-            name = if (combatState.isRaid) "WORLD BOSS: ${enemy.name.uppercase()}" else enemy.name.uppercase(),
-            hp = enemy.hp,
-            maxHp = enemy.maxHp,
-            barColor = Color(0xFFF44336),
-            effects = combatState.enemyEffects,
-            elements = enemy.elements,
-            playerArt = character.mythicArt
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Narrative Log
-        Box(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                .padding(8.dp)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(combatState.logs) { log ->
-                    val textColor = when {
-                        log.contains("CRITICAL", ignoreCase = true) -> Color(0xFFFFC107) // Amber
-                        log.contains("DODGED", ignoreCase = true) || log.contains("EVADED", ignoreCase = true) -> Color(0xFF03A9F4) // Light Blue
-                        log.contains("WEAKNESS", ignoreCase = true) -> Color(0xFFE91E63) // Pink/Red
-                        else -> MaterialTheme.colorScheme.onSurface
-                    }
+            if (combatState.isRankChallenge) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
                     Text(
-                        text = log,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = textColor,
+                        text = "RANK CHALLENGE",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                        lineHeight = 24.sp,
-                        fontWeight = if (textColor != MaterialTheme.colorScheme.onSurface) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Action Grid
-        Text(
-            text = "────────────────────────",
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-        )
-        
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val isPlayerTurn = combatState.playerTurn
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CombatButton("Attack", Modifier.weight(1f), enabled = isPlayerTurn) { onActionClick(CombatAction.Attack, null, null) }
+            if (combatState.isRaid) {
+                Surface(
+                    color = Color.Black,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "WORLD RAID BOSS",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
                 CombatButton(
-                    label = "Technique", 
-                    modifier = Modifier.weight(1f), 
-                    enabled = isPlayerTurn,
-                    color = primaryElementColor
-                ) { showTechniques = true }
+                    label = "Leaderboard",
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    color = Color.Yellow
+                ) { showLeaderboard = true }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CombatButton("Defend", Modifier.weight(1f), enabled = isPlayerTurn) { onActionClick(CombatAction.Defend, null, null) }
-                CombatButton("Item", Modifier.weight(1f), enabled = isPlayerTurn) { showItems = true }
+
+            Text(
+                text = "BATTLE",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 6.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            AnimatedVisibility(
+                visible = combatState.comboCount > 1,
+                enter = scaleIn() + fadeIn(),
+                exit = scaleOut() + fadeOut()
+            ) {
+                Text(
+                    text = "COMBO x${combatState.comboCount}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color(0xFFFF9800),
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
-            CombatButton("Flee", Modifier.fillMaxWidth(), enabled = isPlayerTurn) { onActionClick(CombatAction.Flee, null, null) }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val latestCharacter by rememberUpdatedState(character)
+
+            // Player Section
+            var currentMp by remember { mutableIntStateOf(character.getCurrentMythicMana()) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    if (latestCharacter.mythicArt != null) {
+                        currentMp = latestCharacter.getCurrentMythicMana()
+                    }
+                    kotlinx.coroutines.delay(1000)
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                val playerScale by animateFloatAsState(if (combatState.playerTurn) 1.05f else 1f)
+                Box(modifier = Modifier.weight(1f).scale(playerScale)) {
+                    CombatantStatus(
+                        name = "YOU",
+                        hp = character.hp,
+                        maxHp = character.maxHp,
+                        barColor = Color(0xFF4CAF50),
+                        effects = combatState.playerEffects,
+                        elements = character.mythicArt?.elements ?: emptyList(),
+                        isTurn = combatState.playerTurn
+                    )
+                }
+                if (combatState.playerTurn) {
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+            
+            if (character.mythicArt != null) {
+                StatusBar(
+                    label = "MP",
+                    current = currentMp,
+                    max = character.maxMythicMana,
+                    color = Color(0xFF9575CD)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "VS", 
+                style = MaterialTheme.typography.titleLarge, 
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Enemy Section
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                if (!combatState.playerTurn) {
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = Color(0xFFF44336),
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                val enemyScale by animateFloatAsState(if (!combatState.playerTurn) 1.05f else 1f)
+                Box(modifier = Modifier.weight(1f).scale(enemyScale)) {
+                    CombatantStatus(
+                        name = if (combatState.isRaid) "WORLD BOSS" else enemy.name.uppercase(),
+                        hp = enemy.hp,
+                        maxHp = enemy.maxHp,
+                        barColor = Color(0xFFF44336),
+                        effects = combatState.enemyEffects,
+                        elements = enemy.elements,
+                        playerArt = character.mythicArt,
+                        isTurn = !combatState.playerTurn
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Narrative Log
+            ThemedCard(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                modifier = Modifier.weight(1f)
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(combatState.logs) { log ->
+                        val textColor = when {
+                            log.contains("CRITICAL", ignoreCase = true) -> Color(0xFFFFC107)
+                            log.contains("DODGED", ignoreCase = true) || log.contains("EVADED", ignoreCase = true) -> Color(0xFF03A9F4)
+                            log.contains("WEAKNESS", ignoreCase = true) -> Color(0xFFE91E63)
+                            log.startsWith("YOU", ignoreCase = true) -> Color(0xFF81C784)
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
+                        Text(
+                            text = log.uppercase(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = textColor,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                            lineHeight = 20.sp,
+                            fontWeight = if (textColor != MaterialTheme.colorScheme.onSurface) FontWeight.Black else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Action Grid
+            Text(
+                text = "────────────────────────",
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
+            
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val isPlayerTurn = combatState.playerTurn
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CombatButton("Attack", Modifier.weight(1f), enabled = isPlayerTurn) { onActionClick(CombatAction.Attack, null, null) }
+                    CombatButton(
+                        label = "Technique", 
+                        modifier = Modifier.weight(1f), 
+                        enabled = isPlayerTurn,
+                        color = primaryElementColor
+                    ) { showTechniques = true }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CombatButton("Defend", Modifier.weight(1f), enabled = isPlayerTurn) { onActionClick(CombatAction.Defend, null, null) }
+                    CombatButton("Item", Modifier.weight(1f), enabled = isPlayerTurn) { showItems = true }
+                }
+                CombatButton("Flee", Modifier.fillMaxWidth(), enabled = isPlayerTurn) { onActionClick(CombatAction.Flee, null, null) }
+            }
+
+            Text(
+                text = "────────────────────────",
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
         }
 
-        Text(
-            text = "────────────────────────",
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-        )
+        LowHpWarning(hpRatio = character.hp.toFloat() / character.maxHp.toFloat())
     }
 
     if (showTechniques) {
@@ -372,7 +417,8 @@ fun CombatantStatus(
     barColor: Color,
     effects: List<StatusEffect> = emptyList(),
     elements: List<ElementType> = emptyList(),
-    playerArt: MythicArt? = null
+    playerArt: MythicArt? = null,
+    isTurn: Boolean = false
 ) {
     var previousHp by remember { mutableIntStateOf(hp) }
     var flashActive by remember { mutableStateOf(false) }
@@ -407,7 +453,12 @@ fun CombatantStatus(
             .padding(4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text(
+                text = name, 
+                style = MaterialTheme.typography.labelLarge, 
+                fontWeight = if (isTurn) FontWeight.Black else FontWeight.Bold,
+                color = if (isTurn) barColor else Color.Unspecified
+            )
             Spacer(modifier = Modifier.width(8.dp))
             
             // Elements

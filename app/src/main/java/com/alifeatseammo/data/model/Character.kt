@@ -1,7 +1,9 @@
 package com.alifeatseammo.data.model
 
 import com.google.firebase.firestore.PropertyName
+import androidx.annotation.Keep
 
+@Keep
 data class Character(
     val id: String = "",
     val name: String = "",
@@ -12,7 +14,7 @@ data class Character(
     val maxHp: Int = 100,
     val energy: Int = 100,
     val maxEnergy: Int = 100,
-    val gold: Int = 0,
+    val gold: Long = 0,
     val justicePoints: Int = 0,
     val pirateReputation: Int = 0,
     val xp: Int = 0,
@@ -36,7 +38,9 @@ data class Character(
     val lastOnline: Long = System.currentTimeMillis(),
     @get:PropertyName("isOnline")
     val isOnline: Boolean = false,
+    @get:PropertyName("isAdmin")
     val isAdmin: Boolean = false,
+    @get:PropertyName("isBanned")
     val isBanned: Boolean = false,
     val friends: List<String> = emptyList(),
     val blocked: List<String> = emptyList(),
@@ -62,8 +66,9 @@ data class Character(
     val lastRaidAttackAt: Long = 0,
 ) {
     fun isHardcodedAdmin(): Boolean {
-        val admins = listOf("sedna", "von")
-        return admins.contains(name.lowercase())
+        // SECURITY: Remove hardcoded admin names in production. 
+        // Use Firestore 'isAdmin' flag or custom claims instead.
+        return false
     }
 
     fun canEquip(item: Item): Boolean {
@@ -125,9 +130,8 @@ data class Character(
     }
 
     fun getCurrentEnergy(): Int {
-        val baseRegenRateMs = 3 * 60 * 1000L // 3 minutes
         val regenMultiplier = (mythicArt?.energyRegainMultiplier ?: 1.0f).coerceAtLeast(0.01f)
-        val regenRateMs = (baseRegenRateMs / regenMultiplier).toLong().coerceAtLeast(1000L)
+        val regenRateMs = (BASE_REGEN_RATE_ENERGY / regenMultiplier).toLong().coerceAtLeast(MIN_REGEN_RATE_MS)
         
         val now = System.currentTimeMillis()
         val elapsed = (now - energyUpdatedAt).coerceAtLeast(0L)
@@ -137,9 +141,8 @@ data class Character(
 
     fun getCurrentMythicMana(): Int {
         if (mythicArt == null) return 0
-        val baseRegenRateMs = 2 * 1000L // 2 seconds for mythic mana
         val regenMultiplier = (mythicArt.energyRegainMultiplier).coerceAtLeast(0.01f)
-        val regenRateMs = (baseRegenRateMs / regenMultiplier).toLong().coerceAtLeast(1000L)
+        val regenRateMs = (BASE_REGEN_RATE_MYTHIC_MANA / regenMultiplier).toLong().coerceAtLeast(MIN_REGEN_RATE_MS)
 
         val now = System.currentTimeMillis()
         val elapsed = (now - mythicManaUpdatedAt).coerceAtLeast(0L)
@@ -156,8 +159,18 @@ data class Character(
         )
     }
 
+    companion object {
+        const val BASE_REGEN_RATE_ENERGY = 3 * 60 * 1000L // 3 minutes
+        const val BASE_REGEN_RATE_MYTHIC_MANA = 2 * 1000L // 2 seconds
+        const val MIN_REGEN_RATE_MS = 1000L
+        const val MAX_LEVEL = 300
+        const val HP_PER_LEVEL = 20
+        const val ENERGY_PER_5_LEVELS = 5
+        const val XP_BASE = 100
+    }
 }
 
+@Keep
 data class MythicArt(
     val name: String = "",
     val tier: String = "F",
@@ -178,15 +191,18 @@ data class MythicArt(
     val elementalWeaknesses: List<ElementType> = emptyList()
 )
 
+@Keep
 data class HealingState(
     val endTime: Long = 0
 )
 
+@Keep
 data class TrainingState(
     val endTime: Long = 0,
     val statType: StatType = StatType.Strength
 )
 
+@Keep
 data class Ship(
     val id: String = "row_boat",
     val name: String = "Row Boat",
@@ -200,6 +216,7 @@ data class Ship(
     val upgrades: ShipUpgrades = ShipUpgrades()
 )
 
+@Keep
 data class ShipUpgrades(
     val hullLevel: Int = 0,
     val sailLevel: Int = 0,
@@ -240,11 +257,13 @@ enum class Race(val description: String) {
     }
 }
 
+@Keep
 data class TravelEvent(
     val message: String = "",
     val timestamp: Long = System.currentTimeMillis()
 )
 
+@Keep
 data class TravelState(
     val destination: String = "",
     val arrivalTime: Long = 0,
@@ -253,6 +272,7 @@ data class TravelState(
     val events: List<TravelEvent> = emptyList()
 )
 
+@Keep
 data class Stats(
     val strength: Double = 0.0,
     val endurance: Double = 0.0,
@@ -273,6 +293,7 @@ data class Stats(
     val elementalMastery: Map<ElementType, Double> = emptyMap()
 )
 
+@Keep
 data class DerivedStats(
     val criticalChance: Double = 0.0,
     val dodgeChance: Double = 0.0,
@@ -280,11 +301,13 @@ data class DerivedStats(
     val manaRegenPerSecond: Double = 0.0
 )
 
+@Keep
 data class MissionStat(
     val completions: Int = 0,
     val lastCompletedAt: Long = 0
 )
 
+@Keep
 data class ProfessionStats(
     val cooking: Double = 0.0,
     val navigating: Double = 0.0,
@@ -300,6 +323,7 @@ enum class StatType {
     Cooking, Navigating, TreasureHunting, Blacksmith, Fishing, Medical
 }
 
+@Keep
 data class Crew(
     val id: String = "",
     val name: String = "",
@@ -337,7 +361,9 @@ enum class CrewRole {
     Captain, CoCaptain, FirstMate, Quartermaster, Officer, Member
 }
 
+@Keep
 data class CrewInvite(
+    val id: String = "",
     val crewId: String = "",
     val crewName: String = "",
     val senderId: String = "",
@@ -346,6 +372,7 @@ data class CrewInvite(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+@Keep
 data class MailMessage(
     val id: String = "",
     val senderId: String = "",
@@ -360,16 +387,15 @@ data class MailMessage(
 
 enum class ActionType {
     Docks, Tavern, Training, Market, Bounties, Crew, Arena, Smuggler, BlackMarket, Shipyard, Camp, Fishing, Infirmary, Work,
-    Kitchen, Forge, Observatory, Expedition, Grind, MythicRoll
+    Kitchen, Forge, Observatory, Expedition, Grind, MythicRoll, Cave
 }
 
 fun Character.getXpNeeded(): Int {
-    return (level * level * 100).coerceAtLeast(100)
+    return (level * level * Character.XP_BASE).coerceAtLeast(Character.XP_BASE)
 }
 
 fun Character.checkLevelUp(): Character {
-    val maxLevel = 300
-    if (level >= maxLevel) return this.copy(xp = 0)
+    if (level >= Character.MAX_LEVEL) return this.copy(xp = 0)
 
     var currentLevel = level
     var currentXp = xp
@@ -377,13 +403,13 @@ fun Character.checkLevelUp(): Character {
     var currentMaxEnergy = maxEnergy
     var currentStats = stats
 
-    var xpNeeded = currentLevel * currentLevel * 100
-    while ((currentXp >= xpNeeded) && (currentLevel < maxLevel)) {
+    var xpNeeded = currentLevel * currentLevel * Character.XP_BASE
+    while ((currentXp >= xpNeeded) && (currentLevel < Character.MAX_LEVEL)) {
         currentXp -= xpNeeded
         currentLevel++
-        currentMaxHp += 20
+        currentMaxHp += Character.HP_PER_LEVEL
         if ((currentLevel % 5) == 0) {
-            currentMaxEnergy += 5
+            currentMaxEnergy += Character.ENERGY_PER_5_LEVELS
         }
         
         // Match server-side stat growth (+1 to all base stats)
@@ -396,8 +422,8 @@ fun Character.checkLevelUp(): Character {
             luck = currentStats.luck + 1.0
         )
         
-        if (currentLevel < maxLevel) {
-            xpNeeded = currentLevel * currentLevel * 100
+        if (currentLevel < Character.MAX_LEVEL) {
+            xpNeeded = currentLevel * currentLevel * Character.XP_BASE
         } else {
             currentXp = 0
         }

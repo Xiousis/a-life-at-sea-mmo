@@ -2,4 +2,10 @@
 <resources>
 
     <style name="Theme.ALifeAtSeaMMO" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.ALifeAtSeaMMO.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/white</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/a_life_at_sea_mmo_app_icon</item>
+        <item name="postSplashScreenTheme">@style/Theme.ALifeAtSeaMMO</item>
+    </style>
 </resources>

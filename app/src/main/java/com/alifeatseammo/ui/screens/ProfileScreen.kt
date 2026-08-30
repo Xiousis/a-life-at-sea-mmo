@@ -35,7 +35,7 @@ fun ProfileScreen(
     onAttackClick: () -> Unit = {},
     onChallengeClick: () -> Unit = {},
     onMessageClick: () -> Unit = {},
-    onViewCrewClick: () -> Unit = {},
+    onViewCrewClick: (String) -> Unit = {},
     onAddFriendClick: () -> Unit = {}
 ) {
     val locale = Locale.US
@@ -299,7 +299,7 @@ fun ProfileScreen(
                         Text("MESSAGE", fontWeight = FontWeight.Bold)
                     }
                     Button(
-                        onClick = onViewCrewClick,
+                        onClick = { character.crewId?.let { onViewCrewClick(it) } },
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.extraSmall,
                         enabled = character.crewId != null

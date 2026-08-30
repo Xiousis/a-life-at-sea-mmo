@@ -252,6 +252,7 @@ object ItemDefinitions {
         rarity = Rarity.Uncommon,
         price = 800,
         statBonus = Stats(endurance = 8.0, agility = 3.0),
+        slot = "Boots",
         levelRequirement = 8
     )
 
@@ -285,6 +286,7 @@ object ItemDefinitions {
         rarity = Rarity.Uncommon,
         price = 200,
         statBonus = Stats(endurance = 10.0, willpower = 2.0),
+        slot = "Helmet",
         levelRequirement = 8
     )
 
@@ -340,7 +342,7 @@ object ItemDefinitions {
         id = "salt",
         name = "Salt",
         description = "Essential for preserving and seasoning food.",
-        type = ItemType.Miscellaneous, // Or Ingredient if we add it to ItemType
+        type = ItemType.Ingredient,
         rarity = Rarity.Common,
         price = 5
     )
@@ -349,7 +351,7 @@ object ItemDefinitions {
         id = "spices",
         name = "Spices",
         description = "Exotic spices from distant lands.",
-        type = ItemType.Miscellaneous,
+        type = ItemType.Ingredient,
         rarity = Rarity.Uncommon,
         price = 50
     )
@@ -358,7 +360,7 @@ object ItemDefinitions {
         id = "seaweed",
         name = "Seaweed",
         description = "Nutritious but slimy. Good for soups.",
-        type = ItemType.Miscellaneous,
+        type = ItemType.Ingredient,
         rarity = Rarity.Common,
         price = 2
     )

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.alifeatseammo.data.model.Character
 import com.alifeatseammo.data.model.CombatAction
 import com.alifeatseammo.data.repository.GameRepository
+import com.alifeatseammo.util.HapticManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +15,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CombatViewModel @Inject constructor(
-    private val gameRepository: GameRepository
+    private val gameRepository: GameRepository,
+    private val hapticManager: HapticManager,
 ) : ViewModel() {
 
     private val _errorMessage = MutableStateFlow<String?>(null)
@@ -23,9 +25,11 @@ class CombatViewModel @Inject constructor(
     fun combatAction(action: CombatAction, techniqueId: String? = null, itemId: String? = null) {
         viewModelScope.launch {
             try {
+                hapticManager.vibrateImpact()
                 gameRepository.combatAction(action, techniqueId, itemId)
             } catch (e: Exception) {
                 _errorMessage.value = e.message
+                hapticManager.vibrateError()
             }
         }
     }
@@ -61,10 +65,12 @@ class CombatViewModel @Inject constructor(
     }
 
     fun claimVictoryRewards() {
+        // The backend uses 'Flee' as a generic exit action when combat is finished
         combatAction(CombatAction.Flee)
     }
 
     fun retreatFromDefeat() {
+        // The backend uses 'Flee' as a generic exit action when combat is finished
         combatAction(CombatAction.Flee)
     }
 

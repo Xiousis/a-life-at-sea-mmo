@@ -16,6 +16,7 @@ import java.util.Locale
 fun CrewProfileScreen(
     crew: Crew?,
     members: List<Character>,
+    isOwnCrew: Boolean = false,
     onBackClick: () -> Unit,
     onJoinClick: (String) -> Unit
 ) {
@@ -68,11 +69,15 @@ fun CrewProfileScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    Button(
-                        onClick = { onJoinClick(crew.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraSmall
-                    ) {
+                    if (!isOwnCrew) {
+                        Button(
+                            onClick = { onJoinClick(crew.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.extraSmall,
+                            enabled = crew.members.size < 20
+                        ) {
+                            Text("JOIN CREW", fontWeight = FontWeight.Bold)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

@@ -16,7 +16,7 @@ class SocialViewModel @Inject constructor(
     private val gameRepository: GameRepository,
     private val chatRepository: ChatRepository,
     private val crewRepository: CrewRepository,
-    private val socialRepository: SocialRepository
+    private val socialRepository: SocialRepository,
 ) : ViewModel() {
 
     private val _errorMessage = MutableStateFlow<String?>(null)
@@ -26,22 +26,7 @@ class SocialViewModel @Inject constructor(
     val actionState: StateFlow<UIActionState> = _actionState.asStateFlow()
 
     private fun performAction(label: String, block: suspend () -> Unit) {
-        if (_actionState.value is UIActionState.Loading) return
-
-        viewModelScope.launch {
-            _actionState.value = UIActionState.Loading(label)
-            try {
-                block()
-                _actionState.value = UIActionState.Success(label)
-                kotlinx.coroutines.delay(2000)
-                if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
-                    _actionState.value = UIActionState.Idle
-                }
-            } catch (e: Exception) {
-                _actionState.value = UIActionState.Error(e.message ?: "Action failed")
-                _errorMessage.value = e.message
-            }
-        }
+        viewModelScope.launchUIAction(label, _actionState, _errorMessage, block = block)
     }
 
     private val currentUser = authRepository.currentUser
@@ -92,7 +77,7 @@ class SocialViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             character.collectLatest { char ->
-                if (char != null && char.faction == Faction.Navy && char.infamy >= 100 && char.crewId != null) {
+                if (char != null && (char.faction == Faction.Navy) && (char.infamy >= 100) && (char.crewId != null)) {
                     leaveCrew()
                     _errorMessage.value = "You have been kicked from the Navy and your crew due to high infamy!"
                 }
@@ -148,7 +133,7 @@ class SocialViewModel @Inject constructor(
     fun respondToInvite(crewId: String, accept: Boolean) {
         if (!accept) {
             performAction("Declining Invite") {
-                crewRepository.respondToInvite(crewId, false)
+                crewRepository.respondToInvite(crewId, accept = false)
             }
             return
         }
@@ -157,10 +142,10 @@ class SocialViewModel @Inject constructor(
         performAction("Accepting Invite") {
             val crew = crewRepository.getCrew(crewId).firstOrNull()
             if (crew != null && crew.faction != char.faction) {
-                crewRepository.respondToInvite(crewId, false)
+                crewRepository.respondToInvite(crewId, accept = false)
                 throw Exception("You cannot join a crew of a different faction.")
             }
-            crewRepository.respondToInvite(crewId, accept)
+            crewRepository.respondToInvite(crewId, accept = accept)
         }
     }
 
@@ -183,7 +168,7 @@ class SocialViewModel @Inject constructor(
         }
     }
 
-    fun donateGold(amount: Int) {
+    fun donateGold(amount: Long) {
         if (amount <= 0) {
             _errorMessage.value = "Amount must be greater than 0"
             return

@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.alifeatseammo.data.model.Gender
 import com.alifeatseammo.data.model.Race
@@ -29,6 +30,14 @@ fun CharacterCreationScreen(
     val isLoading = creationResult is AuthResult.Loading
     val serverError = (creationResult as? AuthResult.Error)?.message
 
+    val raceIcons = mapOf(
+        Race.Human to "🚶",
+        Race.Abyssal to "🌊",
+        Race.Beastkin to "🐾",
+        Race.Celestian to "✨",
+        Race.Automaton to "🤖"
+    )
+
     fun validateName(input: String): String? {
         val trimmed = input.trim()
         if (trimmed.length < 3) return "Name too short (min 3)"
@@ -45,7 +54,7 @@ fun CharacterCreationScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(text = "Begin Your Adventure", style = MaterialTheme.typography.headlineMedium)
+        Text(text = "⚓ Begin Your Adventure ⚓", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(32.dp))
 
         if (serverError != null) {
@@ -82,7 +91,7 @@ fun CharacterCreationScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Gender.values().forEach { gender ->
+            Gender.entries.forEach { gender ->
                 FilterChip(
                     selected = selectedGender == gender,
                     onClick = { selectedGender = gender },
@@ -117,7 +126,7 @@ fun CharacterCreationScreen(
             ) {
                 Race.entries.forEach { race ->
                     DropdownMenuItem(
-                        text = { Text(race.name) },
+                        text = { Text("${raceIcons[race] ?: ""} ${race.name}") },
                         onClick = {
                             selectedRace = race
                             expanded = false
@@ -165,6 +174,12 @@ fun CharacterCreationScreen(
                         color = MaterialTheme.colorScheme.secondary
                     )
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Bonus: ${selectedRace.description}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.alpha(0.8f)
+                )
             }
         }
 

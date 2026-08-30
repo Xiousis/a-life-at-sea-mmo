@@ -7,16 +7,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.SportsKabaddi
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -33,13 +37,14 @@ import com.alifeatseammo.ui.components.SocialOverlay
 fun MainScaffold(
     navController: NavHostController,
     currentChar: com.alifeatseammo.data.model.Character,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
     val gameViewModel: GameViewModel = hiltViewModel()
     val announcements by gameViewModel.announcements.collectAsState()
+    val isSyncing by gameViewModel.isSyncing.collectAsState()
 
     var showSocialOverlay by remember { mutableStateOf(false) }
     val socialViewModel: SocialViewModel = hiltViewModel()
@@ -63,8 +68,12 @@ fun MainScaffold(
                             restoreState = true
                         }
                     },
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text("HUB") }
+                    icon = { 
+                        BadgedBox(badge = { if (announcements.isNotEmpty()) Badge() }) {
+                            Icon(Icons.Default.Home, contentDescription = null) 
+                        }
+                    },
+                    label = { Text("HUB", fontWeight = FontWeight.Bold) }
                 )
                 item(
                     selected = currentDestination?.hasRoute<Screen.Map>() == true,
@@ -78,7 +87,7 @@ fun MainScaffold(
                         }
                     },
                     icon = { Icon(Icons.Default.Map, contentDescription = null) },
-                    label = { Text("SEA") }
+                    label = { Text("SEA", fontWeight = FontWeight.Bold) }
                 )
                 item(
                     selected = currentDestination?.hasRoute<Screen.PvP>() == true,
@@ -92,7 +101,7 @@ fun MainScaffold(
                         }
                     },
                     icon = { Icon(Icons.Default.SportsKabaddi, contentDescription = null) },
-                    label = { Text("BATTLE") }
+                    label = { Text("BATTLE", fontWeight = FontWeight.Bold) }
                 )
                 item(
                     selected = currentDestination?.hasRoute<Screen.Crew>() == true,
@@ -106,7 +115,7 @@ fun MainScaffold(
                         }
                     },
                     icon = { Icon(Icons.Default.Groups, contentDescription = null) },
-                    label = { Text("CREW") }
+                    label = { Text("CREW", fontWeight = FontWeight.Bold) }
                 )
             }
             item(
@@ -126,14 +135,14 @@ fun MainScaffold(
             item(
                 selected = showSocialOverlay,
                 onClick = { showSocialOverlay = !showSocialOverlay },
-                icon = { Icon(Icons.Default.Groups, contentDescription = null) },
+                icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null) },
                 label = { Text("SOCIAL") }
             )
         }
     )
     {
         Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) }
+            snackbarHost = { SnackbarHost(snackbarHostState) },
         ) { padding ->
             Column(modifier = Modifier.fillMaxSize().padding(padding)) {
                 if (announcements.isNotEmpty()) {
@@ -156,8 +165,22 @@ fun MainScaffold(
                         navController = navController,
                         currentChar = currentChar,
                         snackbarHostState = snackbarHostState,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
+
+                    if (isSyncing) {
+                        Surface(
+                            modifier = Modifier.padding(16.dp).align(Alignment.TopEnd),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                            shape = CircleShape
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp).padding(4.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
 
                     SocialOverlay(
                         viewModel = socialViewModel,

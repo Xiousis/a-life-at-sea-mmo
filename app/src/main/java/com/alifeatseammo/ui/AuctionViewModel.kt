@@ -26,28 +26,26 @@ class AuctionViewModel @Inject constructor(
     val actionState: StateFlow<UIActionState> = _actionState.asStateFlow()
 
     private fun performAction(label: String, block: suspend () -> Unit) {
-        if (_actionState.value is UIActionState.Loading) return
-
-        viewModelScope.launch {
-            _actionState.value = UIActionState.Loading(label)
-            try {
-                block()
-                _actionState.value = UIActionState.Success(label)
-                delay(2000)
-                if (_actionState.value is UIActionState.Success && (_actionState.value as UIActionState.Success).label == label) {
-                    _actionState.value = UIActionState.Idle
+        viewModelScope.launchUIAction(
+            label = label,
+            actionState = _actionState,
+            errorState = _errorMessage,
+            onError = { e ->
+                if (e is FirebaseFunctionsException) {
+                    android.util.Log.e("AuctionViewModel", "Function failed: code=${e.code}, details=${e.details}", e)
+                    when (e.code) {
+                        FirebaseFunctionsException.Code.PERMISSION_DENIED ->
+                            "Permissions Denied. Please ensure your App Check debug token is registered. Search Logcat for 'DebugAppCheckProvider' to find it."
+                        FirebaseFunctionsException.Code.UNAUTHENTICATED -> "You must be logged in to use the Auction House."
+                        else -> e.message ?: "${e.code}: Auction action failed"
+                    }
+                } else {
+                    android.util.Log.e("AuctionViewModel", "Action $label failed", e)
+                    e.message ?: "Action failed"
                 }
-            } catch (e: FirebaseFunctionsException) {
-                android.util.Log.e("AuctionViewModel", "Function failed: code=${e.code}, details=${e.details}", e)
-                val errorMsg = e.message ?: "${e.code}: Auction action failed"
-                _actionState.value = UIActionState.Error(errorMsg)
-                _errorMessage.value = errorMsg
-            } catch (e: Exception) {
-                android.util.Log.e("AuctionViewModel", "Action $label failed", e)
-                _actionState.value = UIActionState.Error(e.message ?: "Action failed")
-                _errorMessage.value = e.message
-            }
-        }
+            },
+            block = block
+        )
     }
 
     private val currentUser = authRepository.currentUser
@@ -67,18 +65,23 @@ class AuctionViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun listAuctionItem(item: Item, price: Int) {
+    fun listAuctionItem(item: Item, price: Long) {
         if (price <= 0) {
             _errorMessage.value = "Price must be greater than 0"
             return
         }
+        android.util.Log.d("AuctionViewModel", "Listing item: ${item.name} (ID: ${item.id}) for $price")
         performAction("Listing ${item.name}") {
             auctionRepository.listAuctionItem(item.id, price)
         }
     }
 
     fun buyAuctionItem(listing: AuctionListing) {
-        val char = character.value ?: return
+        val char = character.value
+        if (char == null) {
+            _errorMessage.value = "Character data not loaded. Please wait."
+            return
+        }
         if (char.gold < listing.price) {
             _errorMessage.value = "Insufficient gold"
             return
@@ -87,6 +90,11 @@ class AuctionViewModel @Inject constructor(
             _errorMessage.value = "You cannot buy your own listing"
             return
         }
+        if (char.inventory.size >= char.calculateMaxCapacity()) {
+            _errorMessage.value = "Backpack Full! Sell or unequip items to make room."
+            return
+        }
+        android.util.Log.d("AuctionViewModel", "Buying listing: ${listing.id} for ${listing.price}")
         performAction("Buying ${listing.item.name}") {
             auctionRepository.buyAuctionItem(listing.id)
         }

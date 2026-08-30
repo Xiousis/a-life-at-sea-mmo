@@ -2,6 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Auctions collection
+    match /auctions/{listingId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     // Players collection
     match /players/{userId} {
       // Anyone logged in can read public player profiles
@@ -28,12 +34,6 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if false;
       }
-    }
-
-    // Auctions collection
-    match /auctions/{listingId} {
-      allow read: if request.auth != null;
-      allow write: if false;
     }
 
     // Announcements collection

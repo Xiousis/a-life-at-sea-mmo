@@ -36,7 +36,7 @@ fun CrewScreen(
     onRespondToInvite: (String, Boolean) -> Unit,
     onPromoteMember: (String, String) -> Unit,
     onKickMember: (String) -> Unit,
-    onDonateGold: (Int) -> Unit,
+    onDonateGold: (Long) -> Unit,
     onUpdateSettings: (String, Boolean) -> Unit,
     onToggleCrewPvP: (Boolean) -> Unit,
     onUpgradePerk: (String) -> Unit,
@@ -382,7 +382,7 @@ fun CrewScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    val amount = amountText.toIntOrNull() ?: 0
+                    val amount = amountText.toLongOrNull() ?: 0L
                     if (amount > 0) {
                         onDonateGold(amount)
                         showDonateDialog = false

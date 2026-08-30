@@ -1,7 +1,9 @@
 package com.alifeatseammo.data.model
 
 import com.google.firebase.firestore.PropertyName
+import androidx.annotation.Keep
 
+@Keep
 data class LocationDef(
     val id: String = "",
     val name: String = "",
@@ -17,6 +19,7 @@ data class LocationDef(
     val y: Int = 0,
 )
 
+@Keep
 data class ActionDef(
     val type: ActionType = ActionType.Market,
     val label: String = "",
@@ -24,18 +27,20 @@ data class ActionDef(
     val parameter: String? = null
 )
 
+@Keep
 data class EnemyDef(
     val id: String = "",
     val name: String = "",
     val level: Int = 1,
     val hp: Int = 100,
     val stats: Stats = Stats(),
-    val goldRewardMin: Int = 0,
-    val goldRewardMax: Int = 0,
+    val goldRewardMin: Long = 0,
+    val goldRewardMax: Long = 0,
     val xpReward: Int = 0,
     val dropTableId: String? = null
 )
 
+@Keep
 data class Technique(
     val id: String = "",
     val name: String = "",
@@ -49,11 +54,13 @@ data class Technique(
     val effects: List<StatusEffect> = emptyList()
 )
 
+@Keep
 data class LootTable(
     val id: String = "",
     val entries: List<LootEntry> = emptyList()
 )
 
+@Keep
 data class LootEntry(
     val itemId: String = "",
     val chance: Float = 0.1f, // 0.0 to 1.0
@@ -61,6 +68,7 @@ data class LootEntry(
     val maxAmount: Int = 1
 )
 
+@Keep
 data class FishDef(
     val id: String = "",
     val name: String = "",
@@ -75,6 +83,7 @@ enum class FishingMovementPattern {
     Steady, Sinker, Floater, Darting
 }
 
+@Keep
 data class SeaEvent(
     val id: String = "",
     val name: String = "",
@@ -98,6 +107,7 @@ enum class SeaEventType(val icon: String, val color: String) {
     MysticMist("🌫️", "#BDC3C7")
 }
 
+@Keep
 data class WarState(
     val id: String = "current",
     val targetLocation: String = "",

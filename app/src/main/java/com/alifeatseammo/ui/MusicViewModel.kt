@@ -33,13 +33,14 @@ class MusicViewModel @Inject constructor(
                     } else {
                         val location = locations.find { it.name.equals(character.currentLocation, ignoreCase = true) }
                         when {
+                            character.combatState != null -> R.raw.life_at_sea_traveling_music // Placeholder for Battle
                             character.travelState != null -> R.raw.life_at_sea_traveling_music
                             location?.name?.startsWith("Navy Outpost", ignoreCase = true) == true -> R.raw.navy_outpost_music
                             location?.name?.equals("Pirate's Den", ignoreCase = true) == true -> R.raw.pirate_den_music
                             else -> R.raw.life_at_sea_menu_sound
                         }
                     }
-                }
+                }.distinctUntilChanged()
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, R.raw.life_at_sea_menu_sound)

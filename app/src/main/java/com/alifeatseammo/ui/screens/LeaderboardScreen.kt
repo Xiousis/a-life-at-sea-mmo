@@ -27,7 +27,7 @@ fun LeaderboardScreen(
     onCrewSortSelected: (String) -> Unit,
     onBackClick: () -> Unit,
     onPlayerClick: (Character) -> Unit,
-    onCrewClick: (com.alifeatseammo.data.model.Crew) -> Unit = {}
+    onCrewClick: (String) -> Unit = {}
 ) {
     var showPlayers by remember { mutableStateOf(true) }
 
@@ -154,7 +154,7 @@ fun LeaderboardScreen(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             },
-                            modifier = Modifier.clickable { onCrewClick(crew) }
+                            modifier = Modifier.clickable { onCrewClick(crew.id) }
                         )
                         HorizontalDivider()
                     }

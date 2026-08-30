@@ -12,6 +12,7 @@ import kotlinx.coroutines.tasks.await
 import java.util.Date
 
 data class ChatMessage(
+    val id: String = "",
     val senderId: String = "",
     val senderName: String = "",
     val message: String = "",
@@ -40,7 +41,7 @@ class FirestoreChatRepository(
                     return@addSnapshotListener
                 }
                 snapshot?.let {
-                    trySend(it.documents.mapNotNull { doc -> doc.toObject<ChatMessage>() })
+                    trySend(it.documents.mapNotNull { doc -> doc.toObject<ChatMessage>()?.copy(id = doc.id) })
                 }
             }
         awaitClose { subscription.remove() }

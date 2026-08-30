@@ -7,7 +7,6 @@ An Android-based Massive Multiplayer Online (MMO) game set in a maritime world. 
 *   **Modern UI**: Built entirely with **Jetpack Compose** for a reactive and fluid user experience.
 *   **Real-time Backend**: Powered by **Firebase Firestore** for game state and player data synchronization.
 *   **Authentication**: Secure player login via **Firebase Auth**.
-*   **AI Integration**: Utilizing **Firebase AI** (Vertex AI for Firebase) for intelligent game features.
 *   **Analytics**: Integrated **Firebase Analytics** to track player engagement and game performance.
 *   **Navigation**: Uses **Navigation 3** for robust multi-pane and adaptive layouts.
 
@@ -17,7 +16,7 @@ An Android-based Massive Multiplayer Online (MMO) game set in a maritime world. 
 *   **UI Framework**: Jetpack Compose
 *   **Architecture**: MVVM / Clean Architecture
 *   **Dependency Injection**: (e.g., Hilt/Koin if applicable, but currently visible in gradle)
-*   **Backend**: Firebase (Auth, Firestore, Analytics, AI)
+*   **Backend**: Firebase (Auth, Firestore, Analytics)
 *   **Build System**: Kotlin DSL (Gradle) with Version Catalogs
 
 ## 📥 Getting Started
@@ -36,7 +35,6 @@ An Android-based Massive Multiplayer Online (MMO) game set in a maritime world. 
 4.  Enable the following services in the console:
     *   Authentication (Email/Password or other providers)
     *   Cloud Firestore
-    *   Vertex AI for Firebase (if using AI features)
 
 ## 🏗️ Building
 

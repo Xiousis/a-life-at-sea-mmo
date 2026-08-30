@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.TimeUnit
 
 interface AdminRepository {
     fun searchPlayers(query: String): Flow<List<Character>>
@@ -17,7 +18,8 @@ interface AdminRepository {
     suspend fun teleportPlayer(userId: String, location: String): Boolean
     suspend fun adjustGold(userId: String, amount: Int, reason: String): Boolean
     suspend fun sendGlobalAnnouncement(message: String): Boolean
-    suspend fun seedWorld(): String
+    fun getWorldVersion(): Flow<Int?>
+    suspend fun seedWorld(version: Int): String
 }
 
 class FirestoreAdminRepository(
@@ -37,7 +39,7 @@ class FirestoreAdminRepository(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<Character>() })
+                    trySend(snapshot.documents.mapNotNull { it.toObject<Character>()?.copy(id = it.id) })
                 }
             }
         awaitClose { subscription.remove() }
@@ -54,7 +56,7 @@ class FirestoreAdminRepository(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    trySend(snapshot.documents.mapNotNull { it.toObject<TransactionLog>() })
+                    trySend(snapshot.documents.mapNotNull { it.toObject<TransactionLog>()?.copy(id = it.id) })
                 }
             }
         awaitClose { subscription.remove() }
@@ -90,9 +92,31 @@ class FirestoreAdminRepository(
         return true
     }
 
-    override suspend fun seedWorld(): String {
-        val result = functions.getHttpsCallable("seedWorld").call().await()
-        val data = result.data as? Map<*, *>
-        return data?.get("message")?.toString() ?: "No message received"
+    override fun getWorldVersion(): Flow<Int?> = callbackFlow {
+        val subscription = db.collection("gameData").document("world")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("AdminRepository", "Error fetching world version", error)
+                    return@addSnapshotListener
+                }
+                trySend(snapshot?.getLong("worldVersion")?.toInt())
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    override suspend fun seedWorld(version: Int): String {
+        return try {
+            val data = hashMapOf("version" to version)
+            // Use 120 second timeout for long-running world seeding
+            val result = functions.getHttpsCallable("seedWorld")
+                .withTimeout(120, TimeUnit.SECONDS)
+                .call(data)
+                .await()
+            val response = result.data as? Map<*, *>
+            response?.get("message")?.toString() ?: "World seeded successfully (no message returned)"
+        } catch (e: Exception) {
+            android.util.Log.e("AdminRepository", "Failed to seed world", e)
+            throw e
+        }
     }
 }

@@ -1,19 +1,22 @@
 package com.alifeatseammo.data.model
 
 import com.google.firebase.firestore.PropertyName
+import androidx.annotation.Keep
 
+@Keep
 data class Enemy(
     val name: String = "",
     val level: Int = 1,
     val hp: Int = 50,
     val maxHp: Int = 50,
     val stats: Stats = Stats(),
-    val goldReward: Int = 0,
+    val goldReward: Long = 0,
     val xpReward: Int = 0,
     val dropTableId: String? = null,
     val elements: List<ElementType> = emptyList()
 )
 
+@Keep
 data class CombatState(
     val enemy: Enemy = Enemy(),
     val opponentId: String? = null,
@@ -38,11 +41,12 @@ data class CombatState(
     val enemyEffects: List<StatusEffect> = emptyList(),
     val cooldowns: Map<String, Int> = emptyMap(),
     val loot: List<Item> = emptyList(),
-    val goldEarned: Int = 0,
+    val goldEarned: Long = 0,
     val xpEarned: Int = 0,
     val comboCount: Int = 0
 )
 
+@Keep
 data class StatusEffect(
     val type: EffectType = EffectType.Bleed,
     val duration: Int = 0, // In turns
@@ -65,6 +69,7 @@ enum class CombatAction {
     Attack, Technique, Defend, Item, Flee
 }
 
+@Keep
 data class TechniqueDefinition(
     val id: String,
     val type: StatType
@@ -255,10 +260,13 @@ object RaidRegistry {
     )
 }
 
+@Keep
 data class RaidBoss(
     val id: String = "",
     val enemy: Enemy = Enemy(),
-    val locationId: String = "",
+    val locationId: String? = null, // Optional island name
+    val x: Double = 0.0,
+    val y: Double = 0.0,
     val totalDamageTaken: Long = 0,
     val participants: Map<String, RaidParticipant> = emptyMap(), // userId -> participant
     val status: RaidStatus = RaidStatus.Active,
@@ -266,6 +274,7 @@ data class RaidBoss(
     val endTime: Long? = null
 )
 
+@Keep
 data class RaidParticipant(
     val userId: String = "",
     val userName: String = "",
@@ -277,20 +286,23 @@ enum class RaidStatus {
     Active, Defeated, Expired
 }
 
+@Keep
 data class RaidReward(
     val raidId: String = "",
     val rankRewards: List<RankReward> = emptyList(),
     val participationReward: RewardEntry = RewardEntry()
 )
 
+@Keep
 data class RankReward(
     val minRank: Int,
     val maxRank: Int,
     val rewards: RewardEntry
 )
 
+@Keep
 data class RewardEntry(
-    val gold: Int = 0,
+    val gold: Long = 0,
     val xp: Int = 0,
     val exclusiveDrops: List<LootEntry> = emptyList()
 )
